@@ -5,13 +5,13 @@ import { db } from '../firebase/config';
 import { Smartphone, RefreshCw, ChevronDown, ChevronRight, Filter, X } from 'lucide-react';
 
 const InventorySummaryForm = () => {
-  // Original state
+  // Main state
   const [inventoryData, setInventoryData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [expandedSections, setExpandedSections] = useState({});
+  const [expandedColorSections, setExpandedColorSections] = useState({});
   
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
@@ -40,51 +40,47 @@ const InventorySummaryForm = () => {
     colors: []
   });
 
-  // Toggle row expansion
+  // Toggle row expansion (for base configurations)
   const toggleRowExpansion = (index) => {
     const newExpandedRows = new Set(expandedRows);
     if (newExpandedRows.has(index)) {
       newExpandedRows.delete(index);
-      // When a row is collapsed, also reset its expanded sections
-      setExpandedSections(prev => {
+      setExpandedColorSections(prev => {
         const newState = { ...prev };
         delete newState[index];
         return newState;
       });
     } else {
       newExpandedRows.add(index);
-      // Initialize section state when row is expanded
-      setExpandedSections(prev => ({
+      setExpandedColorSections(prev => ({
         ...prev,
-        [index]: { sold: false, display: false, stock: false }
+        [index]: {}
       }));
     }
     setExpandedRows(newExpandedRows);
   };
 
-  // Toggle section expansion
-  const toggleSectionExpansion = (rowIndex, section) => {
-    setExpandedSections(prev => ({
+  // Toggle section expansion for color breakdown
+  const toggleColorSectionExpansion = (rowIndex, colorIndex, section) => {
+    setExpandedColorSections(prev => ({
       ...prev,
       [rowIndex]: {
         ...prev[rowIndex],
-        [section]: !prev[rowIndex]?.[section]
+        [`${colorIndex}_${section}`]: !prev[rowIndex]?.[`${colorIndex}_${section}`]
       }
     }));
   };
 
-  // Handle filter change - UPDATED VERSION
+  // Handle filter change
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    
-    // Simply update the filter value - no cascading clearing
     setFilters(prev => ({
       ...prev,
       [name]: value
     }));
   };
 
-  // Clear all filters - UPDATED VERSION
+  // Clear all filters
   const clearFilters = () => {
     setFilters({
       manufacturer: '',
@@ -93,8 +89,6 @@ const InventorySummaryForm = () => {
       storage: '',
       color: ''
     });
-    
-    // Reset filtered options to show all options
     setFilteredOptions({
       models: filterOptions.models,
       rams: filterOptions.rams,
@@ -104,93 +98,68 @@ const InventorySummaryForm = () => {
   };
 
   // Utility functions
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    
-    // Try to parse the date
     try {
       const date = new Date(dateString);
-      // Check if the date is valid
       if (isNaN(date.getTime())) {
-        return dateString; // If invalid, just return the original string
+        return dateString;
       }
-      
-      // Format as MM/DD/YYYY
       return date.toLocaleDateString('en-US', {
         month: '2-digit',
         day: '2-digit',
         year: 'numeric'
       });
     } catch {
-      // If any error occurs, return the original string
       return dateString;
     }
   };
 
-  // Format price
   const formatPrice = (price) => {
     if (!price && price !== 0) return 'N/A';
     return `₱${price.toLocaleString()}`;
   };
 
-  // Calculate margin percentage
   const calculateMargin = (dealersPrice, retailPrice) => {
     if (!dealersPrice || !retailPrice) return 'N/A';
-    
-    // Convert to numbers if they're strings
     const costPrice = typeof dealersPrice === 'string' ? parseFloat(dealersPrice.replace(/[^\d.-]/g, '')) : dealersPrice;
     const sellPrice = typeof retailPrice === 'string' ? parseFloat(retailPrice.replace(/[^\d.-]/g, '')) : retailPrice;
-    
     if (costPrice <= 0) return 'N/A';
-    
     const marginAmount = sellPrice - costPrice;
     const marginPercentage = (marginAmount / costPrice) * 100;
-    
     return `${marginPercentage.toFixed(2)}%`;
   };
 
-  // Format RAM and Storage with GB
   const formatWithGB = (value) => {
     if (!value) return 'N/A';
-    
-    // If the value already contains GB or TB, return as is
     if (value.includes('GB') || value.includes('TB') || value.includes('gb') || value.includes('tb')) {
       return value;
     }
-    
-    // Otherwise add GB
     return `${value}GB`;
   };
-
   // Apply filters to data
   const applyFilters = () => {
     if (!inventoryData.length) return;
-    
     const filtered = inventoryData.filter(item => {
-      // Skip filters that are not set
       if (filters.manufacturer && item.manufacturer !== filters.manufacturer) return false;
       if (filters.model && item.model !== filters.model) return false;
       if (filters.ram && item.ram !== filters.ram) return false;
       if (filters.storage && item.storage !== filters.storage) return false;
-      if (filters.color && item.color !== filters.color) return false;
+      if (filters.color && !item.colors.some(colorData => colorData.color === filters.color)) return false;
       return true;
     });
-    
     setFilteredData(filtered);
   };
   
-  // Update filtered options based on current selections - UPDATED VERSION
+  // Update filtered options based on current selections
   const updateFilteredOptions = () => {
     if (!inventoryData.length) return;
     
-    // Start with all available options
     let filteredModels = filterOptions.models;
     let filteredRams = filterOptions.rams;
     let filteredStorages = filterOptions.storages;
     let filteredColors = filterOptions.colors;
     
-    // Filter models based on selected manufacturer (if any)
     if (filters.manufacturer) {
       filteredModels = [...new Set(
         inventoryData
@@ -199,70 +168,50 @@ const InventorySummaryForm = () => {
       )].sort();
     }
     
-    // Filter RAM options based on selected manufacturer and/or model (if any)
     if (filters.manufacturer || filters.model) {
       let filtered = inventoryData;
-      
       if (filters.manufacturer) {
         filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
       }
-      
       if (filters.model) {
         filtered = filtered.filter(item => item.model === filters.model);
       }
-      
-      filteredRams = [...new Set(
-        filtered.map(item => item.ram)
-      )].sort();
+      filteredRams = [...new Set(filtered.map(item => item.ram))].sort();
     }
     
-    // Filter storage options based on selected manufacturer, model, and/or RAM (if any)
     if (filters.manufacturer || filters.model || filters.ram) {
       let filtered = inventoryData;
-      
       if (filters.manufacturer) {
         filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
       }
-      
       if (filters.model) {
         filtered = filtered.filter(item => item.model === filters.model);
       }
-      
       if (filters.ram) {
         filtered = filtered.filter(item => item.ram === filters.ram);
       }
-      
-      filteredStorages = [...new Set(
-        filtered.map(item => item.storage)
-      )].sort();
+      filteredStorages = [...new Set(filtered.map(item => item.storage))].sort();
     }
     
-    // Filter color options based on all previous selections (if any)
     if (filters.manufacturer || filters.model || filters.ram || filters.storage) {
       let filtered = inventoryData;
-      
       if (filters.manufacturer) {
         filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
       }
-      
       if (filters.model) {
         filtered = filtered.filter(item => item.model === filters.model);
       }
-      
       if (filters.ram) {
         filtered = filtered.filter(item => item.ram === filters.ram);
       }
-      
       if (filters.storage) {
         filtered = filtered.filter(item => item.storage === filters.storage);
       }
-      
       filteredColors = [...new Set(
-        filtered.map(item => item.color)
+        filtered.flatMap(item => item.colors.map(colorData => colorData.color))
       )].sort();
     }
     
-    // Update filtered options
     setFilteredOptions({
       models: filteredModels,
       rams: filteredRams,
@@ -270,6 +219,7 @@ const InventorySummaryForm = () => {
       colors: filteredColors
     });
   };
+
   // Fetch and process inventory data
   const fetchInventoryData = async () => {
     setLoading(true);
@@ -279,10 +229,8 @@ const InventorySummaryForm = () => {
       const inventoryRef = collection(db, 'inventory');
       const snapshot = await getDocs(inventoryRef);
       
-      // Group inventory by model, ram, storage, and color
+      // Group inventory by manufacturer, model, ram, storage (excluding color)
       const groupedData = {};
-      
-      // For filter options
       const manufacturers = new Set();
       const models = new Set();
       const rams = new Set();
@@ -291,9 +239,7 @@ const InventorySummaryForm = () => {
       
       snapshot.forEach(doc => {
         const item = { id: doc.id, ...doc.data() };
-        
-        // Create a unique key for each configuration
-        const key = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}_${item.color}`;
+        const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
         
         // Add to filter options
         if (item.manufacturer) manufacturers.add(item.manufacturer);
@@ -302,12 +248,25 @@ const InventorySummaryForm = () => {
         if (item.storage) storages.add(item.storage);
         if (item.color) colors.add(item.color);
         
-        if (!groupedData[key]) {
-          groupedData[key] = {
+        if (!groupedData[baseKey]) {
+          groupedData[baseKey] = {
             manufacturer: item.manufacturer,
             model: item.model,
             ram: item.ram,
             storage: item.storage,
+            totalSold: 0,
+            totalOnDisplay: 0,
+            totalOnHand: 0,
+            totalAvailable: 0,
+            dealersPrice: item.dealersPrice || 0,
+            retailPrice: item.retailPrice || 0,
+            colors: {}
+          };
+        }
+        
+        // Group by color within each base configuration
+        if (!groupedData[baseKey].colors[item.color]) {
+          groupedData[baseKey].colors[item.color] = {
             color: item.color,
             sold: 0,
             onDisplay: 0,
@@ -321,44 +280,50 @@ const InventorySummaryForm = () => {
           };
         }
         
+        const colorData = groupedData[baseKey].colors[item.color];
+        
         // Count and store items based on status
         switch (item.status) {
           case 'Sold':
-            groupedData[key].sold++;
-            groupedData[key].soldItems.push(item);
+            colorData.sold++;
+            groupedData[baseKey].totalSold++;
+            colorData.soldItems.push(item);
             break;
           case 'On-Display':
-            groupedData[key].onDisplay++;
-            groupedData[key].onDisplayItems.push(item);
+            colorData.onDisplay++;
+            groupedData[baseKey].totalOnDisplay++;
+            colorData.onDisplayItems.push(item);
             break;
           case 'On-Hand':
-            groupedData[key].onHand++;
-            groupedData[key].onHandItems.push(item);
+            colorData.onHand++;
+            groupedData[baseKey].totalOnHand++;
+            colorData.onHandItems.push(item);
             break;
         }
         
-        // Calculate available (On-Display + On-Hand)
-        groupedData[key].available = groupedData[key].onDisplay + groupedData[key].onHand;
+        colorData.available = colorData.onDisplay + colorData.onHand;
       });
       
-      // Sort items in each group by lastUpdated
+      // Process grouped data
       Object.values(groupedData).forEach(group => {
-        // Sort function for date strings (earliest first)
-        const sortByLastUpdated = (a, b) => {
-          const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
-          const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
-          return dateA - dateB; // Ascending order (oldest first)
-        };
+        group.totalAvailable = group.totalOnDisplay + group.totalOnHand;
         
-        // Sort all item arrays
-        group.soldItems.sort(sortByLastUpdated);
-        group.onDisplayItems.sort(sortByLastUpdated);
-        group.onHandItems.sort(sortByLastUpdated);
+        group.colors = Object.values(group.colors).map(colorData => {
+          const sortByLastUpdated = (a, b) => {
+            const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
+            const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
+            return dateA - dateB;
+          };
+          
+          colorData.soldItems.sort(sortByLastUpdated);
+          colorData.onDisplayItems.sort(sortByLastUpdated);
+          colorData.onHandItems.sort(sortByLastUpdated);
+          
+          return colorData;
+        }).sort((a, b) => a.color.localeCompare(b.color));
       });
       
-      // Convert to array and sort
       const inventoryArray = Object.values(groupedData).sort((a, b) => {
-        // Sort by manufacturer, then model, then RAM, then storage, then color
         if (a.manufacturer !== b.manufacturer) {
           return a.manufacturer.localeCompare(b.manufacturer);
         }
@@ -368,13 +333,9 @@ const InventorySummaryForm = () => {
         if (a.ram !== b.ram) {
           return a.ram.localeCompare(b.ram);
         }
-        if (a.storage !== b.storage) {
-          return a.storage.localeCompare(b.storage);
-        }
-        return a.color.localeCompare(b.color);
+        return a.storage.localeCompare(b.storage);
       });
       
-      // Update filter options
       const filterOpts = {
         manufacturers: [...manufacturers].sort(),
         models: [...models].sort(),
@@ -383,8 +344,6 @@ const InventorySummaryForm = () => {
         colors: [...colors].sort()
       };
       setFilterOptions(filterOpts);
-      
-      // Initialize filtered options with all options
       setFilteredOptions({
         models: filterOpts.models,
         rams: filterOpts.rams,
@@ -402,18 +361,16 @@ const InventorySummaryForm = () => {
     }
   };
 
-  // Initial data fetch
+  // Effects
   useEffect(() => {
     fetchInventoryData();
   }, []);
   
-  // Update filtered options when inventory data changes
   useEffect(() => {
     updateFilteredOptions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inventoryData, filters]);
   
-  // Apply filters when they change
   useEffect(() => {
     applyFilters();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -459,6 +416,7 @@ const InventorySummaryForm = () => {
       </div>
     );
   }
+
   return (
     <div className="min-h-screen bg-white p-4">
       <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
@@ -500,124 +458,54 @@ const InventorySummaryForm = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              {/* Manufacturer filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Manufacturer
-                </label>
-                <select
-                  name="manufacturer"
-                  value={filters.manufacturer}
-                  onChange={handleFilterChange}
-                  className="w-full p-2 border rounded"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
+                <select name="manufacturer" value={filters.manufacturer} onChange={handleFilterChange} className="w-full p-2 border rounded">
                   <option value="">All Manufacturers</option>
                   {filterOptions.manufacturers.map(manufacturer => (
-                    <option key={manufacturer} value={manufacturer}>
-                      {manufacturer}
-                    </option>
+                    <option key={manufacturer} value={manufacturer}>{manufacturer}</option>
                   ))}
                 </select>
               </div>
               
-              {/* Model filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Model
-                </label>
-                <select
-                  name="model"
-                  value={filters.model}
-                  onChange={handleFilterChange}
-                  className="w-full p-2 border rounded"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                <select name="model" value={filters.model} onChange={handleFilterChange} className="w-full p-2 border rounded">
                   <option value="">All Models</option>
                   {filteredOptions.models.map(model => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
+                    <option key={model} value={model}>{model}</option>
                   ))}
                 </select>
-                {filters.manufacturer && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Showing models for {filters.manufacturer}
-                  </p>
-                )}
               </div>
               
-              {/* RAM filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  RAM
-                </label>
-                <select
-                  name="ram"
-                  value={filters.ram}
-                  onChange={handleFilterChange}
-                  className="w-full p-2 border rounded"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
+                <select name="ram" value={filters.ram} onChange={handleFilterChange} className="w-full p-2 border rounded">
                   <option value="">All RAM</option>
                   {filteredOptions.rams.map(ram => (
-                    <option key={ram} value={ram}>
-                      {ram}
-                    </option>
+                    <option key={ram} value={ram}>{ram}</option>
                   ))}
                 </select>
-                {(filters.manufacturer || filters.model) && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Filtered by current selections
-                  </p>
-                )}
               </div>
               
-              {/* Storage filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Storage
-                </label>
-                <select
-                  name="storage"
-                  value={filters.storage}
-                  onChange={handleFilterChange}
-                  className="w-full p-2 border rounded"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">Storage</label>
+                <select name="storage" value={filters.storage} onChange={handleFilterChange} className="w-full p-2 border rounded">
                   <option value="">All Storage</option>
                   {filteredOptions.storages.map(storage => (
-                    <option key={storage} value={storage}>
-                      {storage}
-                    </option>
+                    <option key={storage} value={storage}>{storage}</option>
                   ))}
                 </select>
-                {(filters.manufacturer || filters.model || filters.ram) && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Filtered by current selections
-                  </p>
-                )}
               </div>
               
-              {/* Color filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Color
-                </label>
-                <select
-                  name="color"
-                  value={filters.color}
-                  onChange={handleFilterChange}
-                  className="w-full p-2 border rounded"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                <select name="color" value={filters.color} onChange={handleFilterChange} className="w-full p-2 border rounded">
                   <option value="">All Colors</option>
                   {filteredOptions.colors.map(color => (
-                    <option key={color} value={color}>
-                      {color}
-                    </option>
+                    <option key={color} value={color}>{color}</option>
                   ))}
                 </select>
-                {(filters.manufacturer || filters.model || filters.ram || filters.storage) && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Filtered by current selections
-                  </p>
-                )}
               </div>
             </div>
             
@@ -651,10 +539,7 @@ const InventorySummaryForm = () => {
               {Object.values(filters).some(f => f) ? (
                 <>
                   <p className="text-gray-500 mb-4">No items match your current filters.</p>
-                  <button
-                    onClick={clearFilters}
-                    className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-md"
-                  >
+                  <button onClick={clearFilters} className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-md">
                     Clear Filters
                   </button>
                 </>
@@ -662,8 +547,7 @@ const InventorySummaryForm = () => {
                 <p className="text-gray-500">There are no inventory items in the database.</p>
               )}
             </div>
-          ) : (
-            <div className="space-y-4">
+          ) : (<div className="space-y-4">
               {/* Inventory list */}
               <div className="bg-white border rounded-lg overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -673,8 +557,8 @@ const InventorySummaryForm = () => {
                       <th className="px-3 py-3 text-left">Model</th>
                       <th className="px-3 py-3 text-left">RAM</th>
                       <th className="px-3 py-3 text-left">Storage</th>
-                      <th className="px-3 py-3 text-left">Color</th>
-                      <th className="pl-0 pr-1 py-3 text-right">Dealer&apos;s Price</th>
+                      <th className="px-3 py-3 text-left">Colors</th>
+                      <th className="pl-0 pr-1 py-3 text-right">{"Dealer's Price"}</th>
                       <th className="px-1 py-3 text-right">Retail Price</th>
                       <th className="px-1 py-3 text-right">Margin</th>
                       <th className="pl-12 pr-1 py-3 text-center">Sold</th>
@@ -695,195 +579,246 @@ const InventorySummaryForm = () => {
                           <td className="px-3 py-3 text-sm font-medium">{item.model}</td>
                           <td className="px-3 py-3 text-sm">{formatWithGB(item.ram)}</td>
                           <td className="px-3 py-3 text-sm">{formatWithGB(item.storage)}</td>
-                          <td className="px-3 py-3 text-sm">{item.color}</td>
+                          <td className="px-3 py-3 text-sm">
+                            <div className="flex flex-wrap gap-1">
+                              {item.colors.slice(0, 3).map((colorData, colorIndex) => (
+                                <span 
+                                  key={colorIndex} 
+                                  className="inline-block px-2 py-1 text-xs bg-gray-100 rounded"
+                                >
+                                  {colorData.color}
+                                </span>
+                              ))}
+                              {item.colors.length > 3 && (
+                                <span className="inline-block px-2 py-1 text-xs bg-gray-200 rounded">
+                                  +{item.colors.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
                           <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
                           <td className="px-1 py-3 text-sm text-right font-medium">
                             {calculateMargin(item.dealersPrice, item.retailPrice)}
                           </td>
-                          
                           <td className="pl-12 pr-1 py-2 text-sm text-center">
                             <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-                              {item.sold}
+                              {item.totalSold}
                             </span>
                           </td>
-                          
                           <td className="px-1 py-2 text-sm text-center">
                             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                              {item.onDisplay}
+                              {item.totalOnDisplay}
                             </span>
                           </td>
-                          
                           <td className="px-1 py-2 text-sm text-center">
                             <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                              {item.onHand}
+                              {item.totalOnHand}
                             </span>
                           </td>
-                          
                           <td className="px-1 py-2 text-sm text-center">
                             <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                              {item.available}
+                              {item.totalAvailable}
                             </span>
                           </td>
                         </tr>
-                        {/* Expanded details */}
+                        
+                        {/* Expanded color breakdown */}
                         {expandedRows.has(index) && (
                           <tr>
                             <td colSpan="12" className="px-0 py-0 border-b border-gray-200">
                               <div className="px-4 pb-4 pt-2 bg-gray-100">
                                 <div className="space-y-4">
+                                  <h4 className="font-semibold text-gray-700 mb-3">
+                                    Color Breakdown ({item.colors.length} colors)
+                                  </h4>
                                   
-                                  {/* Sold Items */}
-                                  {item.soldItems.length > 0 && (
-                                    <div>
-                                      <div 
-                                        className="flex items-center justify-between cursor-pointer bg-purple-50 p-2 rounded-t border border-purple-200"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleSectionExpansion(index, 'sold');
-                                        }}
-                                      >
-                                        <h4 className="font-semibold text-purple-700">
-                                          Sold Units ({item.sold})
-                                        </h4>
-                                        {expandedSections[index]?.sold ? (
-                                          <ChevronDown className="h-5 w-5 text-purple-500" />
-                                        ) : (
-                                          <ChevronRight className="h-5 w-5 text-purple-500" />
-                                        )}
+                                  {item.colors.map((colorData, colorIndex) => (
+                                    <div key={colorIndex} className="border border-gray-200 rounded-lg bg-white">
+                                      {/* Color header */}
+                                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                                        <div className="flex justify-between items-center">
+                                          <div className="flex items-center gap-4">
+                                            <h5 className="font-medium text-gray-800">{colorData.color}</h5>
+                                            <div className="flex gap-4 text-sm">
+                                              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                                                Sold: {colorData.sold}
+                                              </span>
+                                              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+                                                Display: {colorData.onDisplay}
+                                              </span>
+                                              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                                                Stock: {colorData.onHand}
+                                              </span>
+                                              <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                                                Available: {colorData.available}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="text-sm text-gray-600">
+                                            {formatPrice(colorData.retailPrice)} • {calculateMargin(colorData.dealersPrice, colorData.retailPrice)} margin
+                                          </div>
+                                        </div>
                                       </div>
                                       
-                                      {expandedSections[index]?.sold && (
-                                        <div className="overflow-x-auto border border-t-0 border-purple-200 rounded-b">
-                                          <table className="min-w-full">
-                                            <thead className="bg-purple-50">
-                                              <tr className="text-xs text-purple-800">
-                                                <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody className="bg-white">
-                                              {item.soldItems.map((soldItem, soldIndex) => (
-                                                <tr key={soldIndex} className={soldIndex % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
-                                                  <td className="py-2 px-3 text-xs">{soldItem.imei1 || 'N/A'}</td>
-                                                  <td className="py-2 px-3 text-xs">{soldItem.imei2 || '-'}</td>
-                                                  <td className="py-2 px-3 text-xs">{soldItem.barcode || 'N/A'}</td>
-                                                  <td className="py-2 px-3 text-xs text-right">{formatPrice(soldItem.retailPrice)}</td>
-                                                  <td className="py-2 px-3 text-xs">{formatDate(soldItem.lastUpdated)}</td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  {/* On Display Items */}
-                                  {item.onDisplayItems.length > 0 && (
-                                    <div>
-                                      <div 
-                                        className="flex items-center justify-between cursor-pointer bg-yellow-50 p-2 rounded-t border border-yellow-200"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleSectionExpansion(index, 'display');
-                                        }}
-                                      >
-                                        <h4 className="font-semibold text-yellow-700">
-                                          Display Units ({item.onDisplay})
-                                        </h4>
-                                        {expandedSections[index]?.display ? (
-                                          <ChevronDown className="h-5 w-5 text-yellow-500" />
-                                        ) : (
-                                          <ChevronRight className="h-5 w-5 text-yellow-500" />
+                                      {/* Color details sections */}
+                                      <div className="p-4 space-y-3">
+                                        {/* Sold Items */}
+                                        {colorData.soldItems.length > 0 && (
+                                          <div>
+                                            <div 
+                                              className="flex items-center justify-between cursor-pointer bg-purple-50 p-2 rounded-t border border-purple-200"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleColorSectionExpansion(index, colorIndex, 'sold');
+                                              }}
+                                            >
+                                              <h6 className="font-semibold text-purple-700">
+                                                Sold Units ({colorData.sold})
+                                              </h6>
+                                              {expandedColorSections[index]?.[`${colorIndex}_sold`] ? (
+                                                <ChevronDown className="h-4 w-4 text-purple-500" />
+                                              ) : (
+                                                <ChevronRight className="h-4 w-4 text-purple-500" />
+                                              )}
+                                            </div>
+                                            
+                                            {expandedColorSections[index]?.[`${colorIndex}_sold`] && (
+                                              <div className="overflow-x-auto border border-t-0 border-purple-200 rounded-b">
+                                                <table className="min-w-full">
+                                                  <thead className="bg-purple-50">
+                                                    <tr className="text-xs text-purple-800">
+                                                      <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                      <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                      <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                      <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                      <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody className="bg-white">
+                                                    {colorData.soldItems.map((soldItem, soldIndex) => (
+                                                      <tr key={soldIndex} className={soldIndex % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
+                                                        <td className="py-2 px-3 text-xs">{soldItem.imei1 || 'N/A'}</td>
+                                                        <td className="py-2 px-3 text-xs">{soldItem.imei2 || '-'}</td>
+                                                        <td className="py-2 px-3 text-xs">{soldItem.barcode || 'N/A'}</td>
+                                                        <td className="py-2 px-3 text-xs text-right">{formatPrice(soldItem.retailPrice)}</td>
+                                                        <td className="py-2 px-3 text-xs">{formatDate(soldItem.lastUpdated)}</td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
+                                            )}
+                                          </div>
                                         )}
-                                      </div>
-                                      
-                                      {expandedSections[index]?.display && (
-                                        <div className="overflow-x-auto border border-t-0 border-yellow-200 rounded-b">
-                                          <table className="min-w-full">
-                                            <thead className="bg-yellow-50">
-                                              <tr className="text-xs text-yellow-800">
-                                                <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody className="bg-white">
-                                              {item.onDisplayItems.map((displayItem, displayIndex) => (
-                                                <tr key={displayIndex} className={displayIndex % 2 === 0 ? 'bg-white' : 'bg-yellow-50'}>
-                                                  <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
-                                                  <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
-                                                  <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
-                                                  <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>
-                                                  <td className="py-2 px-3 text-xs">{formatDate(displayItem.lastUpdated)}</td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  {/* On Hand Items */}
-                                  {item.onHandItems.length > 0 && (
-                                    <div>
-                                      <div 
-                                        className="flex items-center justify-between cursor-pointer bg-blue-50 p-2 rounded-t border border-blue-200"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleSectionExpansion(index, 'stock');
-                                        }}
-                                      >
-                                        <h4 className="font-semibold text-blue-700">
-                                          Stock Units ({item.onHand})
-                                        </h4>
-                                        {expandedSections[index]?.stock ? (
-                                          <ChevronDown className="h-5 w-5 text-blue-500" />
-                                        ) : (
-                                          <ChevronRight className="h-5 w-5 text-blue-500" />
+                                        
+                                        {/* On Display Items */}
+                                        {colorData.onDisplayItems.length > 0 && (
+                                          <div>
+                                            <div 
+                                              className="flex items-center justify-between cursor-pointer bg-yellow-50 p-2 rounded-t border border-yellow-200"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleColorSectionExpansion(index, colorIndex, 'display');
+                                              }}
+                                            >
+                                              <h6 className="font-semibold text-yellow-700">
+                                                Display Units ({colorData.onDisplay})
+                                              </h6>
+                                              {expandedColorSections[index]?.[`${colorIndex}_display`] ? (
+                                                <ChevronDown className="h-4 w-4 text-yellow-500" />
+                                              ) : (
+                                                <ChevronRight className="h-4 w-4 text-yellow-500" />
+                                              )}
+                                            </div>
+                                            
+                                            {expandedColorSections[index]?.[`${colorIndex}_display`] && (
+                                              <div className="overflow-x-auto border border-t-0 border-yellow-200 rounded-b">
+                                                <table className="min-w-full">
+                                                  <thead className="bg-yellow-50">
+                                                    <tr className="text-xs text-yellow-800">
+                                                      <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                      <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                      <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                      <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                      <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody className="bg-white">
+                                                    {colorData.onDisplayItems.map((displayItem, displayIndex) => (
+                                                      <tr key={displayIndex} className={displayIndex % 2 === 0 ? 'bg-white' : 'bg-yellow-50'}>
+                                                        <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
+                                                        <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
+                                                        <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
+                                                        <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>
+                                                        <td className="py-2 px-3 text-xs">{formatDate(displayItem.lastUpdated)}</td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
+                                            )}
+                                          </div>
                                         )}
-                                      </div>
-                                      
-                                      {expandedSections[index]?.stock && (
-                                        <div className="overflow-x-auto border border-t-0 border-blue-200 rounded-b">
-                                          <table className="min-w-full">
-                                            <thead className="bg-blue-50">
-                                              <tr className="text-xs text-blue-800">
-                                                <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody className="bg-white">
-                                              {item.onHandItems.map((handItem, handIndex) => (
-                                                <tr key={handIndex} className={handIndex % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                                                  <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
-                                                  <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
-                                                  <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
-                                                  <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>
-                                                  <td className="py-2 px-3 text-xs">{formatDate(handItem.lastUpdated)}</td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                        
+                                        {/* On Hand Items */}
+                                        {colorData.onHandItems.length > 0 && (
+                                          <div>
+                                            <div 
+                                              className="flex items-center justify-between cursor-pointer bg-blue-50 p-2 rounded-t border border-blue-200"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleColorSectionExpansion(index, colorIndex, 'stock');
+                                              }}
+                                            >
+                                              <h6 className="font-semibold text-blue-700">
+                                                Stock Units ({colorData.onHand})
+                                              </h6>
+                                              {expandedColorSections[index]?.[`${colorIndex}_stock`] ? (
+                                                <ChevronDown className="h-4 w-4 text-blue-500" />
+                                              ) : (
+                                                <ChevronRight className="h-4 w-4 text-blue-500" />
+                                              )}
+                                            </div>
+                                            
+                                            {expandedColorSections[index]?.[`${colorIndex}_stock`] && (
+                                              <div className="overflow-x-auto border border-t-0 border-blue-200 rounded-b">
+                                                <table className="min-w-full">
+                                                  <thead className="bg-blue-50">
+                                                    <tr className="text-xs text-blue-800">
+                                                      <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                      <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                      <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                      <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                      <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody className="bg-white">
+                                                    {colorData.onHandItems.map((handItem, handIndex) => (
+                                                      <tr key={handIndex} className={handIndex % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                                        <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
+                                                        <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
+                                                        <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
+                                                        <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>
+                                                        <td className="py-2 px-3 text-xs">{formatDate(handItem.lastUpdated)}</td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
 
-                                  {/* Empty states */}
-                                  {item.soldItems.length === 0 && item.onDisplayItems.length === 0 && item.onHandItems.length === 0 && (
-                                    <div className="text-center py-4 text-gray-500">
-                                      No detailed information available for this configuration
+                                        {/* Empty states */}
+                                        {colorData.soldItems.length === 0 && colorData.onDisplayItems.length === 0 && colorData.onHandItems.length === 0 && (
+                                          <div className="text-center py-4 text-gray-500">
+                                            No detailed information available for this color
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  )}
+                                  ))}
                                 </div>
                               </div>
                             </td>
@@ -891,8 +826,93 @@ const InventorySummaryForm = () => {
                         )}
                       </React.Fragment>
                     ))}
-                    </tbody>
+                  </tbody>
                 </table>
+              </div>
+              {/* Inventory Value Summary */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">{"Total Dealer's Value"}</p>
+                        <p className="text-xs text-gray-500">{"(Available units × Dealer's price)"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-blue-600">
+                          {(() => {
+                            const totalDealerValue = filteredData.reduce((total, item) => {
+                              return total + (item.totalAvailable * item.dealersPrice);
+                            }, 0);
+                            return formatPrice(totalDealerValue);
+                          })()}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Total Retail Value</p>
+                        <p className="text-xs text-gray-500">{"(Available units × Retail price)"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-green-600">
+                          {(() => {
+                            const totalRetailValue = filteredData.reduce((total, item) => {
+                              return total + (item.totalAvailable * item.retailPrice);
+                            }, 0);
+                            return formatPrice(totalRetailValue);
+                          })()}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Potential Profit</p>
+                        <p className="text-xs text-gray-500">{"(Retail value - Dealer's value)"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-purple-600">
+                          {(() => {
+                            const totalDealerValue = filteredData.reduce((total, item) => {
+                              return total + (item.totalAvailable * item.dealersPrice);
+                            }, 0);
+                            const totalRetailValue = filteredData.reduce((total, item) => {
+                              return total + (item.totalAvailable * item.retailPrice);
+                            }, 0);
+                            const potentialProfit = totalRetailValue - totalDealerValue;
+                            return formatPrice(potentialProfit);
+                          })()}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {(() => {
+                            const totalDealerValue = filteredData.reduce((total, item) => {
+                              return total + (item.totalAvailable * item.dealersPrice);
+                            }, 0);
+                            const totalRetailValue = filteredData.reduce((total, item) => {
+                              return total + (item.totalAvailable * item.retailPrice);
+                            }, 0);
+                            const marginPercentage = totalDealerValue > 0 ? 
+                              ((totalRetailValue - totalDealerValue) / totalDealerValue * 100) : 0;
+                            return `${marginPercentage.toFixed(3)}% margin`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Summary footer */}
