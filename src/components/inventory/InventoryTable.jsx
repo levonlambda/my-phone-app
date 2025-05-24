@@ -5,6 +5,8 @@ import { db } from '../../firebase/config';
 import InventoryRow from './InventoryRow';
 import InventoryEditForm from './InventoryEditForm';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
+// ADD THIS IMPORT - Import getCurrentDate utility function
+import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
 
 const InventoryTable = ({ 
   inventoryItems, 
@@ -177,7 +179,7 @@ const InventoryTable = ({
     }
   };
 
-  // Handle save edits
+  // Handle save edits - UPDATED TO INCLUDE lastUpdated
   const handleSaveEdit = async (id) => {
     setSavingItemId(id);
     
@@ -195,7 +197,8 @@ const InventoryTable = ({
         retailPrice: retailPrice,
         imei1: editFormData.imei1,
         barcode: editFormData.barcode,
-        status: editFormData.status
+        status: editFormData.status,
+        lastUpdated: getCurrentDate() // ADDED: Update lastUpdated when item is edited
       };
       
       // Get a reference to the document
@@ -244,7 +247,7 @@ const InventoryTable = ({
         });
       }
       
-      // Update local state
+      // Update local state - UPDATED to include lastUpdated
       setAllItems(prevItems => 
         prevItems.map(item => 
           item.id === id 
@@ -262,7 +265,7 @@ const InventoryTable = ({
       setEditingItemId(null);
       setSavingItemId(null);
       
-      // Re-apply filters to update the displayed inventory items
+      // Re-apply filters to update the displayed inventory items - UPDATED to include lastUpdated
       const updatedItems = allItems.map(item => 
         item.id === id 
           ? { 
