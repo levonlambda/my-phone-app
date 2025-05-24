@@ -80,7 +80,7 @@ const PhoneSelectionForm = () => {
   const [lastUpdated, setLastUpdated] = useState(getCurrentDate());
   const [userEnteredBarcode, setUserEnteredBarcode] = useState(false);
 
-  // ====== EVENT HANDLERS ======
+ // ====== EVENT HANDLERS ======
   // Event handlers for form inputs
   const handleManufacturerChange = (e) => {
     const newManufacturer = e.target.value;
@@ -173,7 +173,7 @@ const PhoneSelectionForm = () => {
     }
   };
   
-  // Handle barcode search
+  // Handle barcode search - FIXED VERSION
   const handleBarcodeSearch = async () => {
     if (!barcodeSearch.trim()) {
       setBarcodeSearchError('Please enter a barcode to search');
@@ -220,12 +220,16 @@ const PhoneSelectionForm = () => {
       setDealersPrice(formatNumberWithCommas(matchingPhone.dealersPrice.toString()));
       setRetailPrice(formatNumberWithCommas(matchingPhone.retailPrice.toString()));
       
-      // Set barcode
-      setBarcode(matchingPhone.barcode);
-      setUserEnteredBarcode(true); // Treat this as a user-confirmed barcode
-      
-      // Everything is selected at this point
+      // IMPORTANT FIX: Set isSpecsSelected to true BEFORE setting barcode
+      // This ensures the barcode field exists when we try to set its value
       setIsSpecsSelected(true);
+      
+      // Use setTimeout to ensure the DOM has updated and the barcode field exists
+      setTimeout(() => {
+        // Set barcode
+        setBarcode(matchingPhone.barcode);
+        setUserEnteredBarcode(true); // Treat this as a user-confirmed barcode
+      }, 0);
       
       // Clear the barcode search
       setBarcodeSearch('');
@@ -245,7 +249,6 @@ const PhoneSelectionForm = () => {
       setIsBarcodeSearching(false);
     }
   };
-
   // Pricing input handlers with commas that work correctly
   const handleDealersPriceChange = (e) => {
     const rawValue = e.target.value;
@@ -280,7 +283,6 @@ const PhoneSelectionForm = () => {
     setStatus(newStatus);
     setLastUpdated(getCurrentDate());
   };
-
   // Form submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -414,7 +416,6 @@ const PhoneSelectionForm = () => {
       alert('Error saving phone details. Please try again.');
     }
   };
-
   // ====== EFFECT HOOKS ======
   // Fetch manufacturers on component mount
   useEffect(() => {
@@ -506,7 +507,6 @@ const PhoneSelectionForm = () => {
     // CRITICAL FIX: Removed dealersPrice and retailPrice from the dependency array
     // This prevents the effect from running when price changes
   }, [selectedManufacturer, selectedModel, selectedRam, selectedStorage, selectedColor, priceCache, userEnteredBarcode]);
-
   // Show loading state for initial load
   if ((loading || optionsLoading) && manufacturers.length === 0) {
     return (
@@ -545,7 +545,6 @@ const PhoneSelectionForm = () => {
       </div>
     );
   }
-  
   // Main component render
   return (
     <div className="min-h-screen bg-white p-4">
