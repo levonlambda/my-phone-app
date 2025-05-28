@@ -38,14 +38,14 @@ const InventoryListForm = () => {
     barcode: ''
   });
   
-  // Filter options lists
+  // Filter options lists - Updated to use 'Stock' instead of 'On-Hand'
   const [filterOptions, setFilterOptions] = useState({
     manufacturers: [],
     models: [],
     rams: [],
     storages: [],
     colors: [],
-    statuses: ['On-Hand', 'On-Display', 'Sold', 'Reserved', 'Defective']
+    statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
   });
   
   // Show/hide filters
@@ -53,7 +53,6 @@ const InventoryListForm = () => {
   
   // Debounce timer ref
   const debounceTimerRef = useRef(null);
-
   // Format number with commas
   const formatNumberWithCommas = (value) => {
     if (!value && value !== 0) return '';
@@ -174,7 +173,6 @@ const InventoryListForm = () => {
       debounceTimerRef.current = null;
     }
   };
-
   // Apply filters to the data
   const applyFilters = useCallback((items) => {
     return items.filter(item => {
@@ -198,9 +196,12 @@ const InventoryListForm = () => {
         return false;
       }
       
-      // Apply status filter
-      if (filters.status && item.status !== filters.status) {
-        return false;
+      // Apply status filter - handle both 'Stock' and 'On-Hand'
+      if (filters.status) {
+        const filterStatus = filters.status === 'Stock' ? 'On-Hand' : filters.status;
+        if (item.status !== filterStatus) {
+          return false;
+        }
       }
       
       // Apply color filter
@@ -263,7 +264,7 @@ const InventoryListForm = () => {
       rams,
       storages,
       colors,
-      statuses: ['On-Hand', 'On-Display', 'Sold', 'Reserved', 'Defective']
+      statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
     });
   }, [filters.manufacturer, filters.model]);
 
@@ -348,7 +349,6 @@ const InventoryListForm = () => {
       setSortDirection('asc');
     }
   };
-
   // Apply filters when they change AFTER initial data load
   useEffect(() => {
     if (!initialLoad && allItems.length > 0) {
@@ -417,7 +417,6 @@ const InventoryListForm = () => {
       </div>
     );
   }
-
   // Main component render
   return (
     <div className="min-h-screen bg-white p-4">

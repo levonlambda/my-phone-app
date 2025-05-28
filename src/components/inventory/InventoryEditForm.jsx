@@ -83,6 +83,9 @@ const InventoryEditForm = ({
           className="w-full p-1 border rounded font-mono"
         />
       </td>
+      <td className="border px-2 py-3 whitespace-nowrap text-xs text-gray-500">
+        {new Date().toLocaleDateString('en-US')}
+      </td>
       <td className="border px-2 py-3 text-center whitespace-nowrap">
         <select
           name="status"
@@ -90,7 +93,7 @@ const InventoryEditForm = ({
           onChange={handleEditInputChange}
           className="w-full p-1 border rounded text-center"
         >
-          <option value="On-Hand">On-Hand</option>
+          <option value="On-Hand">Stock</option>
           <option value="On-Display">On-Display</option>
           <option value="Sold">Sold</option>
           <option value="Reserved">Reserved</option>

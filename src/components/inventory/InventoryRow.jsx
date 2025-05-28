@@ -8,6 +8,30 @@ const InventoryRow = ({
   handleEditClick, 
   handleDeleteClick 
 }) => {
+  // Function to format the date
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    // If it's already in MM/DD/YYYY format, return as is
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+      return dateString;
+    }
+    // Otherwise try to parse and format
+    try {
+      const date = new Date(dateString);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    } catch {
+      return dateString;
+    }
+  };
+  
+  // Function to get status display text
+  const getStatusDisplay = (status) => {
+    return status === 'On-Hand' ? 'Stock' : status;
+  };
+  
   return (
     <tr className="hover:bg-gray-50">
       <td className="border px-2 py-3 whitespace-nowrap">{item.manufacturer}</td>
@@ -20,15 +44,16 @@ const InventoryRow = ({
       </td>
       <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.imei1}</td>
       <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.barcode || '-'}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-xs">{formatDate(item.lastUpdated)}</td>
       <td className="border px-2 py-3 text-center whitespace-nowrap">
         <span className={`inline-block px-3 py-1 rounded-full text-sm ${
-          item.status === 'On-Hand' ? 'bg-green-100 text-green-800' :
-          item.status === 'On-Display' ? 'bg-blue-100 text-blue-800' :
-          item.status === 'Sold' ? 'bg-red-100 text-red-800' :
-          item.status === 'Reserved' ? 'bg-yellow-100 text-yellow-800' :
+          item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800' :
+          item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800' :
+          item.status === 'Sold' ? 'bg-purple-100 text-purple-800' :
+          item.status === 'Reserved' ? 'bg-orange-100 text-orange-800' :
           'bg-gray-100 text-gray-800'
         }`}>
-          {item.status}
+          {getStatusDisplay(item.status)}
         </span>
       </td>
       <td className="border px-2 py-3 text-center whitespace-nowrap">
@@ -64,7 +89,8 @@ InventoryRow.propTypes = {
     retailPrice: PropTypes.number.isRequired,
     imei1: PropTypes.string.isRequired,
     barcode: PropTypes.string,
-    status: PropTypes.string.isRequired
+    status: PropTypes.string.isRequired,
+    lastUpdated: PropTypes.string
   }).isRequired,
   formatNumberWithCommas: PropTypes.func.isRequired,
   handleEditClick: PropTypes.func.isRequired,

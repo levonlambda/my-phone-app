@@ -73,7 +73,7 @@ const PhoneAdditionalInfo = ({
             onChange={handleStatusChange}
             required
           >
-            <option value="On-Hand">On-Hand</option>
+            <option value="On-Hand">Stock</option>
             <option value="On-Display">On-Display</option>
             <option value="Sold">Sold</option>
             <option value="Reserved">Reserved</option>

@@ -17,6 +17,7 @@ export const usePhoneCache = () => {
      
       configsSnapshot.forEach(doc => {
         const data = doc.data();
+        console.log("Loading price config:", doc.id, data); // Add this line
         if (data.manufacturer && data.model && data.ram && data.storage) {
           let cacheKey;
          

@@ -5,7 +5,7 @@ import { db } from '../../firebase/config';
 import InventoryRow from './InventoryRow';
 import InventoryEditForm from './InventoryEditForm';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
-// ADD THIS IMPORT - Import getCurrentDate utility function
+// Import getCurrentDate utility function
 import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
 
 const InventoryTable = ({ 
@@ -179,7 +179,7 @@ const InventoryTable = ({
     }
   };
 
-  // Handle save edits - UPDATED TO INCLUDE lastUpdated
+  // Handle save edits - includes lastUpdated
   const handleSaveEdit = async (id) => {
     setSavingItemId(id);
     
@@ -198,7 +198,7 @@ const InventoryTable = ({
         imei1: editFormData.imei1,
         barcode: editFormData.barcode,
         status: editFormData.status,
-        lastUpdated: getCurrentDate() // ADDED: Update lastUpdated when item is edited
+        lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
       };
       
       // Get a reference to the document
@@ -247,7 +247,7 @@ const InventoryTable = ({
         });
       }
       
-      // Update local state - UPDATED to include lastUpdated
+      // Update local state - includes lastUpdated
       setAllItems(prevItems => 
         prevItems.map(item => 
           item.id === id 
@@ -265,7 +265,7 @@ const InventoryTable = ({
       setEditingItemId(null);
       setSavingItemId(null);
       
-      // Re-apply filters to update the displayed inventory items - UPDATED to include lastUpdated
+      // Re-apply filters to update the displayed inventory items - includes lastUpdated
       const updatedItems = allItems.map(item => 
         item.id === id 
           ? { 
@@ -345,6 +345,7 @@ const InventoryTable = ({
             </th>
             <th className="border px-2 py-3 text-left font-semibold" style={{ width: '15%' }}>IMEI1</th>
             <th className="border px-2 py-3 text-left font-semibold" style={{ width: '15%' }}>Barcode</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>Last Updated</th>
             <th 
               className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('status')}

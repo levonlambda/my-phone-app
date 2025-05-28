@@ -347,7 +347,34 @@ const PhoneSelectionForm = () => {
         throw new Error(result.error || 'Failed to add phone to inventory');
       }
       
+      console.log("About to update price configurations:");
+      console.log("Dealers Price:", dealersPrice);
+      console.log("Retail Price:", retailPrice);
+
       // IMPORTANT: Update the price configuration
+      const baseUpdateResult = await updatePriceConfiguration(
+        selectedManufacturer,
+        selectedModel,
+        selectedRam,
+        selectedStorage,
+        dealersPrice,
+        retailPrice
+      );
+      
+      console.log("Base price update result:", baseUpdateResult);
+      
+      const colorUpdateResult = await updatePriceConfiguration(
+        selectedManufacturer,
+        selectedModel,
+        selectedRam,
+        selectedStorage,
+        dealersPrice,
+        retailPrice,
+        selectedColor
+      );
+      
+      console.log("Color price update result:", colorUpdateResult);
+
       // 1. First update base price (without color)
       await updatePriceConfiguration(
         selectedManufacturer,
@@ -357,6 +384,7 @@ const PhoneSelectionForm = () => {
         dealersPrice,
         retailPrice
       );
+      
       
       // 2. Then update color-specific price if different from base price
       await updatePriceConfiguration(
