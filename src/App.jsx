@@ -28,22 +28,22 @@ function App() {
             Inventory Summary
           </button>
           <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('inventory')}
+          >
+            Inventory List
+          </button>
+          <button 
             className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
             onClick={() => setActiveComponent('selection')}
           >
-            Select Phone
+            Add Phone Inventory
           </button>
           <button 
             className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
             onClick={() => setActiveComponent('form')}
           >
-            Add New Phone
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('inventory')}
-          >
-            Inventory List
+            Add Phone Model
           </button>
           <button 
             className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
