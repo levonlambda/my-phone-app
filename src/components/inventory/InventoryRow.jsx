@@ -4,7 +4,6 @@ import { Trash2 } from 'lucide-react';
 
 const InventoryRow = ({ 
   item, 
-  formatNumberWithCommas, 
   handleEditClick, 
   handleDeleteClick 
 }) => {
@@ -39,9 +38,6 @@ const InventoryRow = ({
       <td className="border px-2 py-3 whitespace-nowrap">{item.ram}</td>
       <td className="border px-2 py-3 whitespace-nowrap">{item.storage}</td>
       <td className="border px-2 py-3 whitespace-nowrap">{item.color}</td>
-      <td className="border px-2 py-3 text-right whitespace-nowrap">
-        {formatNumberWithCommas(item.retailPrice)}
-      </td>
       <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.imei1}</td>
       <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.barcode || '-'}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-xs">{formatDate(item.lastUpdated)}</td>
@@ -86,13 +82,11 @@ InventoryRow.propTypes = {
     ram: PropTypes.string.isRequired,
     storage: PropTypes.string.isRequired,
     color: PropTypes.string.isRequired,
-    retailPrice: PropTypes.number.isRequired,
     imei1: PropTypes.string.isRequired,
     barcode: PropTypes.string,
     status: PropTypes.string.isRequired,
     lastUpdated: PropTypes.string
   }).isRequired,
-  formatNumberWithCommas: PropTypes.func.isRequired,
   handleEditClick: PropTypes.func.isRequired,
   handleDeleteClick: PropTypes.func.isRequired
 };

@@ -13,7 +13,6 @@ const InventoryTable = ({
   handleSort, 
   sortField, 
   sortDirection, 
-  formatNumberWithCommas,
   allItems,
   setAllItems,
   setInventoryItems,
@@ -26,7 +25,6 @@ const InventoryTable = ({
     ram: '',
     storage: '',
     color: '',
-    retailPrice: '',
     imei1: '',
     barcode: '',
     status: ''
@@ -35,12 +33,6 @@ const InventoryTable = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Parse price value for filters
-  const parsePrice = (value) => {
-    if (!value) return '';
-    return value.replace(/,/g, '');
-  };
 
   // Handle edit button click
   const handleEditClick = (item) => {
@@ -59,7 +51,6 @@ const InventoryTable = ({
       ram: item.ram,
       storage: item.storage,
       color: item.color,
-      retailPrice: formatNumberWithCommas(item.retailPrice),
       imei1: item.imei1,
       barcode: item.barcode || '',
       status: item.status
@@ -151,7 +142,6 @@ const InventoryTable = ({
       ram: '',
       storage: '',
       color: '',
-      retailPrice: '',
       imei1: '',
       barcode: '',
       status: ''
@@ -162,21 +152,10 @@ const InventoryTable = ({
   const handleEditInputChange = (e) => {
     const { name, value } = e.target;
     
-    if (name === 'retailPrice') {
-      // Format price with commas
-      const sanitizedValue = value.replace(/[^\d,]/g, '');
-      const formattedValue = formatNumberWithCommas(sanitizedValue);
-      
-      setEditFormData(prev => ({
-        ...prev,
-        [name]: formattedValue
-      }));
-    } else {
-      setEditFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   // Handle save edits - includes lastUpdated
@@ -184,9 +163,6 @@ const InventoryTable = ({
     setSavingItemId(id);
     
     try {
-      // Remove commas from price and convert to number
-      const retailPrice = parseFloat(parsePrice(editFormData.retailPrice)) || 0;
-      
       // Create an update object with the edited fields
       const updateData = {
         manufacturer: editFormData.manufacturer,
@@ -194,7 +170,6 @@ const InventoryTable = ({
         ram: editFormData.ram,
         storage: editFormData.storage,
         color: editFormData.color,
-        retailPrice: retailPrice,
         imei1: editFormData.imei1,
         barcode: editFormData.barcode,
         status: editFormData.status,
@@ -254,8 +229,9 @@ const InventoryTable = ({
             ? { 
                 ...item, 
                 ...updateData,
-                // Keep original dealersPrice since we're not editing it
-                dealersPrice: item.dealersPrice
+                // Keep original prices since we're not editing them
+                dealersPrice: item.dealersPrice,
+                retailPrice: item.retailPrice
               } 
             : item
         )
@@ -271,8 +247,9 @@ const InventoryTable = ({
           ? { 
               ...item, 
               ...updateData,
-              // Keep original dealersPrice since we're not editing it
-              dealersPrice: item.dealersPrice
+              // Keep original prices since we're not editing them
+              dealersPrice: item.dealersPrice,
+              retailPrice: item.retailPrice
             } 
           : item
       );
@@ -313,7 +290,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('manufacturer')}
-              style={{ width: '12%' }}
+              style={{ width: '14%' }}
             >
               Manufacturer
               {sortField === 'manufacturer' && (
@@ -323,40 +300,30 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('model')}
-              style={{ width: '12%' }}
+              style={{ width: '14%' }}
             >
               Model
               {sortField === 'model' && (
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '6%' }}>RAM</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '7%' }}>Storage</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '12%' }}>Color</th>
-            <th 
-              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('retailPrice')}
-              style={{ width: '7%' }}
-            >
-              Price
-              {sortField === 'retailPrice' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '15%' }}>IMEI1</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '15%' }}>Barcode</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>Last Updated</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>RAM</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>Storage</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '14%' }}>Color</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>IMEI1</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>Barcode</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '10%' }}>Date</th>
             <th 
               className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('status')}
-              style={{ width: '8%' }}
+              style={{ width: '10%' }}
             >
               Status
               {sortField === 'status' && (
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </th>
-            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '6%' }}>Action</th>
+            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '8%' }}>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -375,7 +342,6 @@ const InventoryTable = ({
               <InventoryRow 
                 key={item.id}
                 item={item}
-                formatNumberWithCommas={formatNumberWithCommas}
                 handleEditClick={handleEditClick}
                 handleDeleteClick={handleDeleteClick}
               />
@@ -401,7 +367,6 @@ InventoryTable.propTypes = {
   handleSort: PropTypes.func.isRequired,
   sortField: PropTypes.string.isRequired,
   sortDirection: PropTypes.string.isRequired,
-  formatNumberWithCommas: PropTypes.func.isRequired,
   allItems: PropTypes.array.isRequired,
   setAllItems: PropTypes.func.isRequired,
   setInventoryItems: PropTypes.func.isRequired,

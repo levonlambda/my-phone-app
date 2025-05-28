@@ -56,15 +56,6 @@ const InventoryEditForm = ({
           className="w-full p-1 border rounded"
         />
       </td>
-      <td className="border px-2 py-3 text-right whitespace-nowrap">
-        <input
-          type="text"
-          name="retailPrice"
-          value={editFormData.retailPrice}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded text-right"
-        />
-      </td>
       <td className="border px-2 py-3 font-mono whitespace-nowrap">
         <input
           type="text"

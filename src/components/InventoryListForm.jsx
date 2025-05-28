@@ -496,8 +496,7 @@ const InventoryListForm = () => {
                 inventoryItems={inventoryItems} 
                 handleSort={handleSort}
                 sortField={sortField}
-                sortDirection={sortDirection}
-                formatNumberWithCommas={formatNumberWithCommas}
+                sortDirection={sortDirection}                
                 allItems={allItems}
                 setAllItems={setAllItems}
                 setInventoryItems={setInventoryItems}
