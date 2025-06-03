@@ -6,7 +6,7 @@ import PhoneColorInfo from './PhoneColorInfo';
 import PhoneAdditionalInfo from './PhoneAdditionalInfo';
 import usePhoneOptions from './hooks/usePhoneOptions';
 import usePhoneCache from './hooks/usePhoneCache';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { 
   formatNumberWithCommas,
@@ -49,11 +49,8 @@ const PhoneSelectionForm = () => {
     fetchOptions
   } = usePhoneOptions();
   
-  // Get price cache from custom hook
+  // Get price cache from custom hook (keeping for backward compatibility in form submission)
   const {
-    priceCache,
-    setPriceCache,
-    loadPriceCacheFromInventory,
     updatePriceConfiguration
   } = usePhoneCache();
   
@@ -80,7 +77,7 @@ const PhoneSelectionForm = () => {
   const [lastUpdated, setLastUpdated] = useState(getCurrentDate());
   const [userEnteredBarcode, setUserEnteredBarcode] = useState(false);
 
- // ====== EVENT HANDLERS ======
+  // ====== EVENT HANDLERS ======
   // Event handlers for form inputs
   const handleManufacturerChange = (e) => {
     const newManufacturer = e.target.value;
@@ -120,13 +117,11 @@ const PhoneSelectionForm = () => {
   const handleRamChange = (e) => {
     const newRam = e.target.value;
     setSelectedRam(newRam);
-    // We're not automatically setting prices here anymore
   };
 
   const handleStorageChange = (e) => {
     const newStorage = e.target.value;
     setSelectedStorage(newStorage);
-    // We're not automatically setting prices here anymore
   };
 
   const handleImei1Change = (e) => {
@@ -146,19 +141,6 @@ const PhoneSelectionForm = () => {
     setBarcode(newBarcode);
     // Set flag that user has entered a barcode manually
     setUserEnteredBarcode(true);
-    
-    // Add to cache if we have a valid model, RAM, storage, and color
-    if (selectedManufacturer && selectedModel && selectedRam && selectedStorage && selectedColor) {
-      const cacheKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`;
-      setPriceCache(prev => ({
-        ...prev,
-        [cacheKey]: {
-          ...prev[cacheKey],
-          barcode: newBarcode,
-          lastUpdated: getCurrentDate()
-        }
-      }));
-    }
   };
 
   const handleBarcodeSearchChange = (e) => {
@@ -172,8 +154,8 @@ const PhoneSelectionForm = () => {
       handleBarcodeSearch();
     }
   };
-  
-  // Handle barcode search - FIXED VERSION
+
+  // Handle barcode search
   const handleBarcodeSearch = async () => {
     if (!barcodeSearch.trim()) {
       setBarcodeSearchError('Please enter a barcode to search');
@@ -220,8 +202,7 @@ const PhoneSelectionForm = () => {
       setDealersPrice(formatNumberWithCommas(matchingPhone.dealersPrice.toString()));
       setRetailPrice(formatNumberWithCommas(matchingPhone.retailPrice.toString()));
       
-      // IMPORTANT FIX: Set isSpecsSelected to true BEFORE setting barcode
-      // This ensures the barcode field exists when we try to set its value
+      // Set isSpecsSelected to true BEFORE setting barcode
       setIsSpecsSelected(true);
       
       // Use setTimeout to ensure the DOM has updated and the barcode field exists
@@ -249,6 +230,7 @@ const PhoneSelectionForm = () => {
       setIsBarcodeSearching(false);
     }
   };
+
   // Pricing input handlers with commas that work correctly
   const handleDealersPriceChange = (e) => {
     const rawValue = e.target.value;
@@ -283,6 +265,7 @@ const PhoneSelectionForm = () => {
     setStatus(newStatus);
     setLastUpdated(getCurrentDate());
   };
+
   // Form submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -347,34 +330,7 @@ const PhoneSelectionForm = () => {
         throw new Error(result.error || 'Failed to add phone to inventory');
       }
       
-      console.log("About to update price configurations:");
-      console.log("Dealers Price:", dealersPrice);
-      console.log("Retail Price:", retailPrice);
-
       // IMPORTANT: Update the price configuration
-      const baseUpdateResult = await updatePriceConfiguration(
-        selectedManufacturer,
-        selectedModel,
-        selectedRam,
-        selectedStorage,
-        dealersPrice,
-        retailPrice
-      );
-      
-      console.log("Base price update result:", baseUpdateResult);
-      
-      const colorUpdateResult = await updatePriceConfiguration(
-        selectedManufacturer,
-        selectedModel,
-        selectedRam,
-        selectedStorage,
-        dealersPrice,
-        retailPrice,
-        selectedColor
-      );
-      
-      console.log("Color price update result:", colorUpdateResult);
-
       // 1. First update base price (without color)
       await updatePriceConfiguration(
         selectedManufacturer,
@@ -385,8 +341,7 @@ const PhoneSelectionForm = () => {
         retailPrice
       );
       
-      
-      // 2. Then update color-specific price if different from base price
+      // 2. Then update color-specific price
       await updatePriceConfiguration(
         selectedManufacturer,
         selectedModel,
@@ -397,41 +352,13 @@ const PhoneSelectionForm = () => {
         selectedColor
       );
       
-      // Update the local cache with the new price configuration
-      const basePriceKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`;
-      const colorPriceKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`;
-      
-      // Update local cache
-      setPriceCache(prev => ({
-        ...prev,
-        [basePriceKey]: {
-          ...prev[basePriceKey],
-          dealersPrice: dealersPrice,
-          retailPrice: retailPrice,
-          lastUpdated: currentDate
-        },
-        [colorPriceKey]: {
-          ...prev[colorPriceKey],
-          dealersPrice: dealersPrice,
-          retailPrice: retailPrice,
-          barcode: barcode,
-          lastUpdated: currentDate
-        }
-      }));
-            
       // Reset fields after successful submission
       setImei1('');
       setImei2('');
-      // Do NOT reset barcode
-      // setBarcode('');
       setStatus('On-Hand');
       
-      // Set flag that the value should persist
+      // Set flag that the barcode value should persist
       setUserEnteredBarcode(true);
-      
-      // Don't reset these:
-      // selectedManufacturer, selectedModel, selectedRam,
-      // selectedStorage, selectedColor, dealersPrice, or retailPrice
       
       setLoading(false);
       setIsSubmitting(false);
@@ -444,6 +371,7 @@ const PhoneSelectionForm = () => {
       alert('Error saving phone details. Please try again.');
     }
   };
+
   // ====== EFFECT HOOKS ======
   // Fetch manufacturers on component mount
   useEffect(() => {
@@ -452,9 +380,6 @@ const PhoneSelectionForm = () => {
       try {
         // Fetch manufacturers list
         await fetchManufacturers();
-        
-        // Fetch existing inventory to build price cache
-        await loadPriceCacheFromInventory();
         
         setLoading(false);
       } catch (error) {
@@ -465,76 +390,128 @@ const PhoneSelectionForm = () => {
     }
     
     initializeForm();
-  }, [fetchManufacturers, loadPriceCacheFromInventory]);
+  }, [fetchManufacturers]);
 
-  // Check if selections are complete and fetch prices from cache when selections change
+  // Check if selections are complete and fetch prices directly from Firestore
   useEffect(() => {
-    // First, create a key to track our selections for pricing (without color)
-    const priceSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`;
-    
-    // Create a complete key that includes color for barcode lookup
-    const barcodeSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`;
-    
-    // Track if we need to reset the barcode
-    const shouldResetBarcode = prevSelectionRef.current !== priceSelectionKey;
-    
-    // Only check when we have all the necessary selections
-    if (selectedManufacturer && selectedModel && selectedRam && selectedStorage) {
-      // Only set the price if selection changed (not when price changed)
-      if (shouldResetBarcode) {
-        console.log("Selection changed - checking price cache");
-        const cacheKey = priceSelectionKey;
-        
-        if (priceCache[cacheKey]) {
-          console.log("Found cached values:", priceCache[cacheKey]);
-          if (priceCache[cacheKey].dealersPrice) {
-            // Set price from cache
-            setDealersPrice(priceCache[cacheKey].dealersPrice);
-          }
-          if (priceCache[cacheKey].retailPrice) {
-            // Set price from cache
-            setRetailPrice(priceCache[cacheKey].retailPrice);
-          }
-        }
-      }
+    const fetchPricesDirectly = async () => {
+      // First, create a key to track our selections for pricing (without color)
+      const priceSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`;
       
-      // Reset barcode when the base configuration changes (manufacturer, model, RAM, storage)
-      if (shouldResetBarcode) {
-        setBarcode('');
-        setUserEnteredBarcode(false);
-      }
+      // Create a complete key that includes color for barcode lookup
+      // const barcodeSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`;
       
-      // Check for barcode if color is also selected
-      if (selectedColor) {
-        // Check if color changed - comparing with previous color
-        const colorChanged = prevColorRef.current !== selectedColor;
+      // Track if we need to reset the barcode
+      const shouldResetBarcode = prevSelectionRef.current !== priceSelectionKey;
+      
+      // Only check when we have all the necessary selections
+      if (selectedManufacturer && selectedModel && selectedRam && selectedStorage) {
         
-        // Only set/clear barcode when color or base selections change, not every render
-        if ((shouldResetBarcode || colorChanged) && !userEnteredBarcode) {
-          if (priceCache[barcodeSelectionKey] && priceCache[barcodeSelectionKey].barcode) {
-            setBarcode(priceCache[barcodeSelectionKey].barcode);
-          } else if (colorChanged) {
-            // Only clear barcode when color changes and there's no cached barcode for this color
-            // AND the user hasn't manually entered a barcode
-            setBarcode('');
-          }
+        // Reset barcode when the base configuration changes (manufacturer, model, RAM, storage)
+        if (shouldResetBarcode) {
+          setBarcode('');
+          setUserEnteredBarcode(false);
         }
         
-        // If we have a complete selection including color, we can show the additional info section
-        setIsSpecsSelected(true);
+        // Fetch prices directly from Firestore instead of using cache
+        if (shouldResetBarcode) {
+          console.log("Selection changed - fetching prices from Firestore");
+          
+          try {
+            // Fetch base price configuration
+            const baseConfigId = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`.replace(/\s+/g, '_').toLowerCase();
+            const baseConfigRef = doc(db, 'price_configurations', baseConfigId);
+            const baseConfigSnap = await getDoc(baseConfigRef);
+            
+            if (baseConfigSnap.exists()) {
+              const baseData = baseConfigSnap.data();
+              console.log("Found base pricing:", baseData);
+              
+              if (baseData.dealersPrice) {
+                setDealersPrice(formatNumberWithCommas(baseData.dealersPrice.toString()));
+              }
+              if (baseData.retailPrice) {
+                setRetailPrice(formatNumberWithCommas(baseData.retailPrice.toString()));
+              }
+            } else {
+              console.log("No base pricing found for this configuration");
+              // Clear prices if no configuration found
+              setDealersPrice('');
+              setRetailPrice('');
+            }
+          } catch (error) {
+            console.error("Error fetching price configuration:", error);
+          }
+        }
+        
+        // Check for color-specific pricing and barcode if color is also selected
+        if (selectedColor) {
+          // Check if color changed - comparing with previous color
+          const colorChanged = prevColorRef.current !== selectedColor;
+          
+          // Fetch color-specific pricing and barcode when color changes or base selections change
+          if ((shouldResetBarcode || colorChanged) && !userEnteredBarcode) {
+            try {
+              const colorConfigId = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`.replace(/\s+/g, '_').toLowerCase();
+              const colorConfigRef = doc(db, 'price_configurations', colorConfigId);
+              const colorConfigSnap = await getDoc(colorConfigRef);
+              
+              if (colorConfigSnap.exists()) {
+                const colorData = colorConfigSnap.data();
+                console.log("Found color-specific pricing:", colorData);
+                
+                // Update prices with color-specific pricing if available
+                if (colorData.dealersPrice) {
+                  setDealersPrice(formatNumberWithCommas(colorData.dealersPrice.toString()));
+                }
+                if (colorData.retailPrice) {
+                  setRetailPrice(formatNumberWithCommas(colorData.retailPrice.toString()));
+                }
+              }
+              
+              // Also check for barcode from inventory
+              const inventoryQuery = query(
+                collection(db, 'inventory'),
+                where("manufacturer", "==", selectedManufacturer),
+                where("model", "==", selectedModel),
+                where("ram", "==", selectedRam),
+                where("storage", "==", selectedStorage),
+                where("color", "==", selectedColor),
+                limit(1)
+              );
+              
+              const inventorySnap = await getDocs(inventoryQuery);
+              if (!inventorySnap.empty) {
+                const inventoryItem = inventorySnap.docs[0].data();
+                if (inventoryItem.barcode) {
+                  setBarcode(inventoryItem.barcode);
+                }
+              } else if (colorChanged) {
+                // Only clear barcode when color changes and there's no barcode for this color
+                setBarcode('');
+              }
+            } catch (error) {
+              console.error("Error fetching color-specific pricing:", error);
+            }
+          }
+          
+          // If we have a complete selection including color, we can show the additional info section
+          setIsSpecsSelected(true);
+        } else {
+          setIsSpecsSelected(false);
+        }
       } else {
         setIsSpecsSelected(false);
       }
-    } else {
-      setIsSpecsSelected(false);
-    }
+      
+      // Update the previous selection ref
+      prevSelectionRef.current = priceSelectionKey;
+      prevColorRef.current = selectedColor;
+    };
     
-    // Update the previous selection ref
-    prevSelectionRef.current = priceSelectionKey;
-    prevColorRef.current = selectedColor;
-    // CRITICAL FIX: Removed dealersPrice and retailPrice from the dependency array
-    // This prevents the effect from running when price changes
-  }, [selectedManufacturer, selectedModel, selectedRam, selectedStorage, selectedColor, priceCache, userEnteredBarcode]);
+    fetchPricesDirectly();
+  }, [selectedManufacturer, selectedModel, selectedRam, selectedStorage, selectedColor, userEnteredBarcode]);
+
   // Show loading state for initial load
   if ((loading || optionsLoading) && manufacturers.length === 0) {
     return (
@@ -573,6 +550,7 @@ const PhoneSelectionForm = () => {
       </div>
     );
   }
+
   // Main component render
   return (
     <div className="min-h-screen bg-white p-4">

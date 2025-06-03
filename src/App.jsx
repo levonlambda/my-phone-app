@@ -5,6 +5,7 @@ import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm'
 import InventoryListForm from './components/InventoryListForm';
 import PhoneListForm from './components/PhoneListForm';
 import InventorySummaryForm from './components/InventorySummaryForm';
+import PriceManagementForm from './components/PriceManagementForm';
 // Import the hook from our consolidated file
 import { useGlobalState } from './context/GlobalStateContext';
 
@@ -51,6 +52,12 @@ function App() {
           >
             Phone Models
           </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('prices')}
+          >
+            Price Management
+          </button>
         </div>
       </div>
       
@@ -59,6 +66,7 @@ function App() {
       {activeComponent === 'form' && <PhoneSpecForm />}
       {activeComponent === 'inventory' && <InventoryListForm />}
       {activeComponent === 'phonelist' && <PhoneListForm />}
+      {activeComponent === 'prices' && <PriceManagementForm />}
     </div>
   );
 }
