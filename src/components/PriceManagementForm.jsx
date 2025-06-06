@@ -1,4 +1,4 @@
-{/* Part 1 Start - Imports and Component Setup */}
+{/* Part 1 Start - Complete File: Imports, State, and Helper Functions */}
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs, doc, setDoc, writeBatch, query, where } from 'firebase/firestore';
@@ -10,7 +10,8 @@ import {
   X,
   Edit,
   Save,
-  XCircle
+  XCircle,
+  CircleAlert  // NEW: Added for exclusion info display
 } from 'lucide-react';
 import { getCurrentDate } from './phone-selection/utils/phoneUtils';
 
@@ -36,6 +37,9 @@ const PriceManagementForm = () => {
   // Force re-render state
   const [forceUpdate, setForceUpdate] = useState(0);
   
+  // NEW: Add state for excluded models info
+  const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
+  
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -59,9 +63,35 @@ const PriceManagementForm = () => {
     rams: [],
     storages: []
   });
-{/* Part 1 End - Imports and Component Setup */}
 
-{/* Part 2 Start - Utility Functions */}
+  // NEW: Add this function to fetch excluded models info for display
+  const fetchExcludedModelsInfo = async () => {
+    try {
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedList = [];
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          excludedList.push({
+            manufacturer: phoneData.manufacturer,
+            model: phoneData.model
+          });
+        }
+      });
+      
+      setExcludedModelsInfo(excludedList.sort((a, b) => {
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        return a.model.localeCompare(b.model);
+      }));
+    } catch (error) {
+      console.error("Error fetching excluded models info:", error);
+    }
+  };
+
   // Utility functions
   const formatPrice = (price) => {
     if (!price && price !== 0) return 'N/A';
@@ -137,9 +167,9 @@ const PriceManagementForm = () => {
       return false;
     }
   };
-{/* Part 2 End - Utility Functions */}
+{/* Part 1 End - Complete File: Imports, State, and Helper Functions */}
 
-{/* Part 3 Start - Filter Handling Functions */}
+{/* Part 2 Start - Filter Handling Functions */}
   // Handle filter change
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -224,9 +254,9 @@ const PriceManagementForm = () => {
       storages: filteredStorages
     });
   }, [phoneData, filters, filterOptions]);
-{/* Part 3 End - Filter Handling Functions */}
+{/* Part 2 End - Filter Handling Functions */}
 
-{/* Part 4 Start - Edit Handling Functions */}
+{/* Part 3 Start - Edit Handling Functions */}
   // Handle edit base price
   const handleEditBasePrice = (item, index) => {
     setEditingBasePrice(index);
@@ -272,9 +302,9 @@ const PriceManagementForm = () => {
       [name]: formattedValue
     }));
   };
-{/* Part 4 End - Edit Handling Functions */}
+{/* Part 3 End - Edit Handling Functions */}
 
-{/* Part 5 Start - Save Price Functions */}
+{/* Part 4 Start - Save Price Functions */}
   // Save base price changes - FORCE RE-RENDER VERSION
   const saveBasePrice = async (item, index) => {
     setSavingPriceId(`base_${index}`);
@@ -383,60 +413,11 @@ const PriceManagementForm = () => {
       // Force component re-render
       setForceUpdate(prev => prev + 1);
       
-      // BACKUP: Force DOM update if React doesn't re-render properly
-      setTimeout(() => {
-        // Find all table rows
-        const tableRows = document.querySelectorAll('tbody tr');
-        
-        // Update the main row (base price row)
-        if (tableRows[index]) {
-          const mainRow = tableRows[index];
-          const dealerCell = mainRow.querySelector('td:nth-child(6)');
-          const retailCell = mainRow.querySelector('td:nth-child(7)');
-          const marginCell = mainRow.querySelector('td:nth-child(8)');
-          
-          if (dealerCell && retailCell && marginCell) {
-            dealerCell.textContent = formatPrice(dealersPrice);
-            retailCell.textContent = formatPrice(retailPrice);
-            marginCell.textContent = calculateMargin(dealersPrice, retailPrice);
-            console.log('Manually updated main row DOM for row', index);
-          }
-        }
-        
-        // Update expanded color rows (if any are expanded)
-        if (expandedRows.has(index)) {
-          console.log('Updating expanded color rows for base price change...');
-          
-          // Find all rows after the main row that belong to this phone's colors
-          let currentRowIndex = index + 1;
-          
-          // Look for color rows (they have gray background and indented color names)
-          for (let i = 0; i < item.colors.length; i++) {
-            const colorRow = tableRows[currentRowIndex + i];
-            
-            if (colorRow && colorRow.classList.contains('bg-gray-50')) {
-              const dealerCell = colorRow.querySelector('td:nth-child(6)');
-              const retailCell = colorRow.querySelector('td:nth-child(7)');
-              const marginCell = colorRow.querySelector('td:nth-child(8)');
-              
-              if (dealerCell && retailCell && marginCell) {
-                dealerCell.textContent = formatPrice(dealersPrice);
-                retailCell.textContent = formatPrice(retailPrice);
-                marginCell.textContent = calculateMargin(dealersPrice, retailPrice);
-                console.log(`Manually updated color row DOM for ${item.colors[i].color}`);
-              }
-            }
-          }
-        }
-      }, 100);
-      
       // Clear editing state
       handleCancelEdit();
       setSavingPriceId(null);
       
       console.log(`Successfully updated base price for ${item.manufacturer} ${item.model} to ₱${dealersPrice.toLocaleString()} / ₱${retailPrice.toLocaleString()}`);
-      console.log('New phoneData:', newPhoneData[index]);
-      console.log('New filteredData:', filteredIndex !== -1 ? newFilteredData[filteredIndex] : 'Not in filtered data');
       
       alert(`Base pricing updated successfully! All colors have been updated to the new base price.`);
       
@@ -545,18 +526,11 @@ const PriceManagementForm = () => {
       // Force component re-render
       setForceUpdate(prev => prev + 1);
       
-      // BACKUP: Force DOM update for color row if React doesn't re-render properly
-      setTimeout(() => {
-        // This is more complex for color rows, so let's just log for now
-        console.log('Color price updated in state, checking if UI reflects changes...');
-      }, 100);
-      
       // Clear editing state
       handleCancelEdit();
       setSavingPriceId(null);
       
       console.log(`Successfully updated color price for ${colorData.color} to ₱${dealersPrice.toLocaleString()} / ₱${retailPrice.toLocaleString()}`);
-      console.log('Updated color data:', newPhoneData[rowIndex].colors[colorIndex]);
       
       alert(`Color-specific pricing updated successfully! Updated prices for ${colorData.color} only.`);
       
@@ -566,15 +540,32 @@ const PriceManagementForm = () => {
       setSavingPriceId(null);
     }
   };
-{/* Part 5 End - Save Price Functions */}
+{/* Part 4 End - Save Price Functions */}
 
-{/* Part 6 Start - Data Fetching Function */}
-  // Fetch and process phone data
+{/* Part 5 Start - Data Fetching Function with Exclusion Logic */}
+  // UPDATED: Fetch and process phone data with exclusion logic
   const fetchPhoneData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
+      // NEW: First, get the list of excluded models from the phones collection
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedModels = new Set();
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        // If excludeFromSummary is true, add the manufacturer_model combination to excluded set
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          const modelKey = `${phoneData.manufacturer}_${phoneData.model}`;
+          excludedModels.add(modelKey);
+          console.log(`Excluding model from price management: ${phoneData.manufacturer} ${phoneData.model}`);
+        }
+      });
+      
+      console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
+      
       // Fetch from price_configurations collection
       const configsRef = collection(db, 'price_configurations');
       const configsSnapshot = await getDocs(configsRef);
@@ -595,6 +586,13 @@ const PriceManagementForm = () => {
         const config = { id: doc.id, ...doc.data() };
         
         if (config.manufacturer && config.model && config.ram && config.storage) {
+          // NEW: Check if this model should be excluded from price management
+          const modelKey = `${config.manufacturer}_${config.model}`;
+          if (excludedModels.has(modelKey)) {
+            console.log(`Skipping excluded model from price management: ${config.manufacturer} ${config.model}`);
+            return; // Skip this item
+          }
+          
           const baseKey = `${config.manufacturer}_${config.model}_${config.ram}_${config.storage}`;
           
           // Add to filter options
@@ -639,6 +637,12 @@ const PriceManagementForm = () => {
       inventorySnapshot.forEach(doc => {
         const item = doc.data();
         if (item.manufacturer && item.model && item.ram && item.storage && item.color) {
+          // NEW: Check if this model should be excluded
+          const modelKey = `${item.manufacturer}_${item.model}`;
+          if (excludedModels.has(modelKey)) {
+            return; // Skip this item
+          }
+          
           const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
           if (!inventoryColors[baseKey]) {
             inventoryColors[baseKey] = new Set();
@@ -699,18 +703,23 @@ const PriceManagementForm = () => {
       setPhoneData(phoneArray);
       setFilteredData(phoneArray);
       setLoading(false);
+      
+      // NEW: Log summary of excluded models for debugging
+      console.log(`Price Management loaded: ${phoneArray.length} configurations (${excludedModels.size} models excluded)`);
+      
     } catch (err) {
       console.error("Error fetching phone data:", err);
       setError(`Error fetching phone data: ${err.message}`);
       setLoading(false);
     }
   }, []);
-{/* Part 6 End - Data Fetching Function */}
+{/* Part 5 End - Data Fetching Function with Exclusion Logic */}
 
-{/* Part 7 Start - Effects and Loading/Error States */}
-  // Effects
+{/* Part 6 Start - Effects and Loading States */}
+  // UPDATED: Effects to include fetchExcludedModelsInfo
   useEffect(() => {
     fetchPhoneData();
+    fetchExcludedModelsInfo(); // NEW: Add this line
   }, [fetchPhoneData]);
   
   useEffect(() => {
@@ -761,9 +770,8 @@ const PriceManagementForm = () => {
       </div>
     );
   }
-{/* Part 7 End - Effects and Loading/Error States */}
 
-{/* Part 8 Start - Main Render - Header and Filters */}
+  {/* Part 7 Start - Main Render Header and Filters */}
   return (
     <div className="min-h-screen bg-white p-4">
       <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
@@ -867,10 +875,35 @@ const PriceManagementForm = () => {
             )}
           </div>
         )}
-{/* Part 8 End - Main Render - Header and Filters */}
 
-{/* Part 9 Start - Main Table Content and Empty State */}
+        {/* NEW: Add Excluded Models Info Display */}
         <CardContent className="p-4">
+          {excludedModelsInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CircleAlert className="h-5 w-5 text-yellow-600" />
+                <h4 className="font-medium text-yellow-800">
+                  Excluded Models ({excludedModelsInfo.length})
+                </h4>
+              </div>
+              <div className="text-sm text-yellow-700">
+                The following models are excluded from price management:
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {excludedModelsInfo.map((model, index) => (
+                  <span 
+                    key={index}
+                    className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
+                  >
+                    {model.manufacturer} {model.model}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+{/* Part 7 End - Main Render Header and Filters */}
+
+{/* Part 8 Start - Main Table Content */}
           {filteredData.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
               <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1010,9 +1043,9 @@ const PriceManagementForm = () => {
                             )}
                           </td>
                         </tr>
-{/* Part 9 End - Main Table Content and Empty State */}
+{/* Part 8 End - Main Table Content */}
 
-{/* Part 10 Start - Expanded Color Breakdown Rows and Component End */}
+{/* Part 9 Start - Expanded Color Rows and Footer */}
                         {/* Expanded color breakdown - EACH COLOR GETS ITS OWN SIMPLE ROW */}
                         {expandedRows.has(index) && 
                           item.colors.map((colorData, colorIndex) => (
@@ -1132,4 +1165,4 @@ const PriceManagementForm = () => {
 };
 
 export default PriceManagementForm;
-{/* Part 10 End - Expanded Color Breakdown Rows and Component End */}
+{/* Part 9 End - Expanded Color Rows and Footer */}

@@ -1,3 +1,4 @@
+{/* Part 1 Start - State and Form Data Updates */}
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Battery, Camera, Cpu, Monitor, Palette, Smartphone } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -177,13 +178,16 @@ const PhoneSpecForm = () => {
     battery: "",
     wiredCharging: "",
     wirelessCharging: "",
-    colors: ""
+    colors: "",
+    excludeFromSummary: false // NEW: Add exclude checkbox state
   });
   
   // State to track if we're editing an existing phone
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
-  
+{/* Part 1 End - State and Form Data Updates */}
+
+{/* Part 2 Start - Effects and Input Handling */}
   // Update form data when phoneToEdit changes
   useEffect(() => {
     if (phoneToEdit) {
@@ -206,7 +210,10 @@ const PhoneSpecForm = () => {
         weight: phoneToEdit.weight?.toString() || '',
         resolution_extra: phoneToEdit.resolution_extra?.toString() || '',
         resolution_extra2: phoneToEdit.resolution_extra2?.toString() || '',
-        chipset_extra: phoneToEdit.chipset_extra?.toString() || ''
+        chipset_extra: phoneToEdit.chipset_extra?.toString() || '',
+        
+        // NEW: Handle exclude from summary field (default to false if not present)
+        excludeFromSummary: phoneToEdit.excludeFromSummary || false
       };
       
       setFormData(formattedData);
@@ -218,7 +225,16 @@ const PhoneSpecForm = () => {
   }, [phoneToEdit]);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    
+    // NEW: Handle checkbox input for excludeFromSummary
+    if (type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: checked
+      }));
+      return;
+    }
     
     // List of fields that should be numeric
     const numericFields = [
@@ -274,7 +290,9 @@ const PhoneSpecForm = () => {
       }));
     }
   };
+{/* Part 2 End - Effects and Input Handling */}
 
+{/* Part 3 Start - Submit Handler */}
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -313,7 +331,10 @@ const PhoneSpecForm = () => {
         // Array processing for colors
         colors: formData.colors
           ? formData.colors.split(',').map(color => color.trim()).filter(color => color !== '').map(color => capitalizeWords(color))
-          : []
+          : [],
+          
+        // NEW: Include exclude from summary boolean
+        excludeFromSummary: formData.excludeFromSummary
       };
   
       if (isEditing && editId) {
@@ -350,7 +371,8 @@ const PhoneSpecForm = () => {
         battery: "",
         wiredCharging: "",
         wirelessCharging: "",
-        colors: ""
+        colors: "",
+        excludeFromSummary: false // NEW: Reset exclude checkbox
       });
       
       // Reset edit state
@@ -364,7 +386,9 @@ const PhoneSpecForm = () => {
       alert(`Error ${isEditing ? 'updating' : 'adding'} phone. Please try again.`);
     }
   };
-  
+{/* Part 3 End - Submit Handler */}
+
+{/* Part 4 Start - Cancel Handler and Render Start */}
   // Handle cancel edit
   const handleCancel = () => {
     // Clear form and exit edit mode
@@ -390,7 +414,8 @@ const PhoneSpecForm = () => {
       battery: "",
       wiredCharging: "",
       wirelessCharging: "",
-      colors: ""
+      colors: "",
+      excludeFromSummary: false // NEW: Reset exclude checkbox
     });
     
     setIsEditing(false);
@@ -492,7 +517,9 @@ const PhoneSpecForm = () => {
                 </div>
               </div>
             </div>
+{/* Part 4 End - Cancel Handler and Render Start */}
 
+{/* Part 5 Start - Render Complete with Checkbox */}
             {/* Camera Section */}
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -535,6 +562,32 @@ const PhoneSpecForm = () => {
               </div>
             </div>
 
+            {/* NEW: Exclude from Summary Section */}
+            <div className="space-y-1 pt-4 border-t border-gray-300">
+              <h3 className="text-xl font-semibold text-[rgb(52,69,157)]">Summary Settings</h3>
+              <div className="flex items-center py-2">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="excludeFromSummary"
+                    name="excludeFromSummary"
+                    checked={formData.excludeFromSummary}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 text-[rgb(52,69,157)] bg-gray-100 border-gray-300 rounded focus:ring-[rgb(52,69,157)] focus:ring-2"
+                  />
+                  <label 
+                    htmlFor="excludeFromSummary" 
+                    className="ml-2 text-base text-gray-700"
+                  >
+                    Exclude this model from Inventory Summary
+                  </label>
+                </div>
+              </div>
+              <div className="text-sm text-gray-500 ml-6">
+                When checked, this phone model will not appear in the Inventory Summary reports and calculations.
+              </div>
+            </div>
+
             <div className="pt-4 flex gap-3">
               {isEditing && (
                 <button
@@ -560,3 +613,5 @@ const PhoneSpecForm = () => {
 };
 
 export default PhoneSpecForm;
+{/* Part 5 End - Render Complete with Checkbox */}
+

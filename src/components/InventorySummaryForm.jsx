@@ -1,8 +1,17 @@
+{/* Part 1 Start - Complete File: Imports, State, and Helper Functions */}
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Smartphone, RefreshCw, ChevronDown, ChevronRight, Filter, X } from 'lucide-react';
+import { 
+  Smartphone, 
+  RefreshCw, 
+  ChevronDown, 
+  ChevronRight, 
+  Filter, 
+  X,
+  CircleAlert  // NEW: Added for exclusion info display
+} from 'lucide-react';
 
 const InventorySummaryForm = () => {
   // Main state
@@ -12,6 +21,9 @@ const InventorySummaryForm = () => {
   const [error, setError] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [expandedColorSections, setExpandedColorSections] = useState({});
+  
+  // NEW: Add state for excluded models info
+  const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
   
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
@@ -39,6 +51,34 @@ const InventorySummaryForm = () => {
     storages: [],
     colors: []
   });
+
+  // NEW: Add this function to fetch excluded models info for display
+  const fetchExcludedModelsInfo = async () => {
+    try {
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedList = [];
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          excludedList.push({
+            manufacturer: phoneData.manufacturer,
+            model: phoneData.model
+          });
+        }
+      });
+      
+      setExcludedModelsInfo(excludedList.sort((a, b) => {
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        return a.model.localeCompare(b.model);
+      }));
+    } catch (error) {
+      console.error("Error fetching excluded models info:", error);
+    }
+  };
 
   // Toggle row expansion (for base configurations)
   const toggleRowExpansion = (index) => {
@@ -137,6 +177,9 @@ const InventorySummaryForm = () => {
     }
     return `${value}GB`;
   };
+{/* Part 1 End - Complete File: Imports, State, and Helper Functions */}
+
+{/* Part 2 Start - Filter Functions and Updated fetchInventoryData */}
   // Apply filters to data
   const applyFilters = () => {
     if (!inventoryData.length) return;
@@ -220,12 +263,30 @@ const InventorySummaryForm = () => {
     });
   };
 
-  // Fetch and process inventory data
+  // UPDATED: Fetch and process inventory data with exclusion logic
   const fetchInventoryData = async () => {
     setLoading(true);
     setError(null);
     
     try {
+      // NEW: First, get the list of excluded models from the phones collection
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedModels = new Set();
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        // If excludeFromSummary is true, add the manufacturer_model combination to excluded set
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          const modelKey = `${phoneData.manufacturer}_${phoneData.model}`;
+          excludedModels.add(modelKey);
+          console.log(`Excluding model from summary: ${phoneData.manufacturer} ${phoneData.model}`);
+        }
+      });
+      
+      console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
+      
+      // Now fetch inventory data
       const inventoryRef = collection(db, 'inventory');
       const snapshot = await getDocs(inventoryRef);
       
@@ -239,6 +300,14 @@ const InventorySummaryForm = () => {
       
       snapshot.forEach(doc => {
         const item = { id: doc.id, ...doc.data() };
+        
+        // NEW: Check if this model should be excluded from summary
+        const modelKey = `${item.manufacturer}_${item.model}`;
+        if (excludedModels.has(modelKey)) {
+          console.log(`Skipping excluded model: ${item.manufacturer} ${item.model}`);
+          return; // Skip this item
+        }
+        
         const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
         
         // Add to filter options
@@ -354,6 +423,10 @@ const InventorySummaryForm = () => {
       setInventoryData(inventoryArray);
       setFilteredData(inventoryArray);
       setLoading(false);
+      
+      // NEW: Log summary of excluded models for debugging
+      console.log(`Inventory Summary loaded: ${inventoryArray.length} configurations (${excludedModels.size} models excluded)`);
+      
     } catch (err) {
       console.error("Error fetching inventory data:", err);
       setError(`Error fetching inventory: ${err.message}`);
@@ -361,9 +434,10 @@ const InventorySummaryForm = () => {
     }
   };
 
-  // Effects
+  // UPDATED: Effects to include fetchExcludedModelsInfo
   useEffect(() => {
     fetchInventoryData();
+    fetchExcludedModelsInfo(); // NEW: Add this line
   }, []);
   
   useEffect(() => {
@@ -375,7 +449,9 @@ const InventorySummaryForm = () => {
     applyFilters();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, inventoryData]);
+{/* Part 2 End - Filter Functions and Updated fetchInventoryData */}
 
+{/* Part 3 Start - Loading and Error States */}
   // Loading state
   if (loading) {
     return (
@@ -531,7 +607,34 @@ const InventorySummaryForm = () => {
           </div>
         )}
 
+        {/* NEW: Add Excluded Models Info Display */}
         <CardContent className="p-4">
+          {excludedModelsInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CircleAlert className="h-5 w-5 text-yellow-600" />
+                <h4 className="font-medium text-yellow-800">
+                  Excluded Models ({excludedModelsInfo.length})
+                </h4>
+              </div>
+              <div className="text-sm text-yellow-700">
+                The following models are excluded from this summary:
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {excludedModelsInfo.map((model, index) => (
+                  <span 
+                    key={index}
+                    className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
+                  >
+                    {model.manufacturer} {model.model}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+{/* Part 3 End - Loading and Error States */}
+
+{/* Part 4 Start - Main Table Content */}
           {filteredData.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
               <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -547,7 +650,8 @@ const InventorySummaryForm = () => {
                 <p className="text-gray-500">There are no inventory items in the database.</p>
               )}
             </div>
-          ) : (<div className="space-y-4">
+          ) : (
+            <div className="space-y-4">
               {/* Inventory list */}
               <div className="bg-white border rounded-lg overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -621,7 +725,7 @@ const InventorySummaryForm = () => {
                               {item.totalAvailable}
                             </span>
                           </td>
-                        </tr>
+                        </tr>{/* Part 5 Start - Expanded Color Breakdown Section */}
                         
                         {/* Expanded color breakdown */}
                         {expandedRows.has(index) && (
@@ -829,6 +933,9 @@ const InventorySummaryForm = () => {
                   </tbody>
                 </table>
               </div>
+{/* Part 5 End - Expanded Color Breakdown Section */}
+
+{/* Part 6 Start - Inventory Value Summary and Footer */}
               {/* Inventory Value Summary */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
@@ -931,3 +1038,4 @@ const InventorySummaryForm = () => {
 };
 
 export default InventorySummaryForm;
+{/* Part 6 End - Inventory Value Summary and Footer */}

@@ -86,1037 +86,6 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/PriceManagementForm.jsx">
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs, doc, setDoc, writeBatch, query, where } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { 
-  Smartphone, 
-  RefreshCw, 
-  Filter, 
-  X,
-  Edit,
-  Save,
-  XCircle
-} from 'lucide-react';
-import { getCurrentDate } from './phone-selection/utils/phoneUtils';
-
-const PriceManagementForm = () => {
-  // State for grouped phone data
-  const [phoneData, setPhoneData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // State for expanded rows and color sections
-  const [expandedRows, setExpandedRows] = useState(new Set());
-  
-  // State for editing
-  const [editingBasePrice, setEditingBasePrice] = useState(null);
-  const [editingColorPrice, setEditingColorPrice] = useState(null);
-  const [editFormData, setEditFormData] = useState({
-    dealersPrice: '',
-    retailPrice: ''
-  });
-  const [savingPriceId, setSavingPriceId] = useState(null);
-  
-  // Filter states
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    manufacturer: '',
-    model: '',
-    ram: '',
-    storage: ''
-  });
-  
-  // Filter options
-  const [filterOptions, setFilterOptions] = useState({
-    manufacturers: [],
-    models: [],
-    rams: [],
-    storages: []
-  });
-  
-  // Filtered options based on selections
-  const [filteredOptions, setFilteredOptions] = useState({
-    models: [],
-    rams: [],
-    storages: []
-  });
-
-  // Utility functions
-  const formatPrice = (price) => {
-    if (!price && price !== 0) return 'N/A';
-    return `₱${price.toLocaleString()}`;
-  };
-
-  const formatNumberWithCommas = (value) => {
-    if (!value && value !== 0) return '';
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
-
-  const parsePrice = (value) => {
-    if (!value) return 0;
-    return parseFloat(value.toString().replace(/,/g, '')) || 0;
-  };
-
-  const calculateMargin = (dealersPrice, retailPrice) => {
-    if (!dealersPrice || !retailPrice) return 'N/A';
-    const costPrice = typeof dealersPrice === 'string' ? parseFloat(dealersPrice.replace(/[^\d.-]/g, '')) : dealersPrice;
-    const sellPrice = typeof retailPrice === 'string' ? parseFloat(retailPrice.replace(/[^\d.-]/g, '')) : retailPrice;
-    if (costPrice <= 0) return 'N/A';
-    const marginAmount = sellPrice - costPrice;
-    const marginPercentage = (marginAmount / costPrice) * 100;
-    return `${marginPercentage.toFixed(2)}%`;
-  };
-
-  const formatWithGB = (value) => {
-    if (!value) return 'N/A';
-    if (value.includes('GB') || value.includes('TB') || value.includes('gb') || value.includes('tb')) {
-      return value;
-    }
-    return `${value}GB`;
-  };
-
-  // Toggle row expansion
-  const toggleRowExpansion = (index) => {
-    const newExpandedRows = new Set(expandedRows);
-    if (newExpandedRows.has(index)) {
-      newExpandedRows.delete(index);
-    } else {
-      newExpandedRows.add(index);
-    }
-    setExpandedRows(newExpandedRows);
-  };
-
-  // Helper function to save/update price configurations
-  const updatePriceConfiguration = async (manufacturer, model, ram, storage, dealersPrice, retailPrice, color = null) => {
-    try {
-      let configId;
-      if (color) {
-        configId = `${manufacturer}_${model}_${ram}_${storage}_${color}`.replace(/\s+/g, '_').toLowerCase();
-      } else {
-        configId = `${manufacturer}_${model}_${ram}_${storage}`.replace(/\s+/g, '_').toLowerCase();
-      }
-      
-      const dPrice = parseFloat(dealersPrice.toString().replace(/,/g, '')) || 0;
-      const rPrice = parseFloat(retailPrice.toString().replace(/,/g, '')) || 0;
-      
-      await setDoc(doc(db, 'price_configurations', configId), {
-        manufacturer,
-        model,
-        ram,
-        storage,
-        color,
-        dealersPrice: dPrice,
-        retailPrice: rPrice,
-        lastUpdated: getCurrentDate()
-      }, { merge: true });
-      
-      return true;
-    } catch (error) {
-      console.error("Error updating price configuration:", error);
-      return false;
-    }
-  };
-
-  // Handle filter change
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Clear all filters
-  const clearFilters = () => {
-    setFilters({
-      manufacturer: '',
-      model: '',
-      ram: '',
-      storage: ''
-    });
-    setFilteredOptions({
-      models: filterOptions.models,
-      rams: filterOptions.rams,
-      storages: filterOptions.storages
-    });
-  };
-
-  // Apply filters to data
-  const applyFilters = useCallback(() => {
-    if (!phoneData.length) return;
-    const filtered = phoneData.filter(item => {
-      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) return false;
-      if (filters.model && item.model !== filters.model) return false;
-      if (filters.ram && item.ram !== filters.ram) return false;
-      if (filters.storage && item.storage !== filters.storage) return false;
-      return true;
-    });
-    setFilteredData(filtered);
-  }, [phoneData, filters]);
-
-  // Update filtered options based on current selections
-  const updateFilteredOptions = useCallback(() => {
-    if (!phoneData.length) return;
-    
-    let filteredModels = filterOptions.models;
-    let filteredRams = filterOptions.rams;
-    let filteredStorages = filterOptions.storages;
-    
-    if (filters.manufacturer) {
-      filteredModels = [...new Set(
-        phoneData
-          .filter(item => item.manufacturer === filters.manufacturer)
-          .map(item => item.model)
-      )].sort();
-    }
-    
-    if (filters.manufacturer || filters.model) {
-      let filtered = phoneData;
-      if (filters.manufacturer) {
-        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
-      }
-      if (filters.model) {
-        filtered = filtered.filter(item => item.model === filters.model);
-      }
-      filteredRams = [...new Set(filtered.map(item => item.ram))].sort();
-    }
-    
-    if (filters.manufacturer || filters.model || filters.ram) {
-      let filtered = phoneData;
-      if (filters.manufacturer) {
-        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
-      }
-      if (filters.model) {
-        filtered = filtered.filter(item => item.model === filters.model);
-      }
-      if (filters.ram) {
-        filtered = filtered.filter(item => item.ram === filters.ram);
-      }
-      filteredStorages = [...new Set(filtered.map(item => item.storage))].sort();
-    }
-    
-    setFilteredOptions({
-      models: filteredModels,
-      rams: filteredRams,
-      storages: filteredStorages
-    });
-  }, [phoneData, filters, filterOptions]);
-
-  // Handle edit base price
-  const handleEditBasePrice = (item, index) => {
-    setEditingBasePrice(index);
-    setEditingColorPrice(null);
-    setEditFormData({
-      dealersPrice: formatNumberWithCommas(item.baseDealersPrice.toString()),
-      retailPrice: formatNumberWithCommas(item.baseRetailPrice.toString())
-    });
-  };
-
-  // Handle edit color price
-  const handleEditColorPrice = (item, colorData, rowIndex, colorIndex) => {
-    setEditingColorPrice(`${rowIndex}_${colorIndex}`);
-    setEditingBasePrice(null);
-    setEditFormData({
-      dealersPrice: formatNumberWithCommas(colorData.dealersPrice.toString()),
-      retailPrice: formatNumberWithCommas(colorData.retailPrice.toString())
-    });
-  };
-
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditingBasePrice(null);
-    setEditingColorPrice(null);
-    setEditFormData({
-      dealersPrice: '',
-      retailPrice: ''
-    });
-  };
-
-  // Handle form input change
-  const handleEditInputChange = (e) => {
-    const { name, value } = e.target;
-    
-    let formattedValue = value;
-    if (name === 'dealersPrice' || name === 'retailPrice') {
-      const cleanValue = value.replace(/[^\d.]/g, '');
-      formattedValue = formatNumberWithCommas(cleanValue);
-    }
-    
-    setEditFormData(prev => ({
-      ...prev,
-      [name]: formattedValue
-    }));
-  };
-
-  // Save base price changes - FIXED VERSION - CASCADES TO ALL COLORS WITH UI UPDATE
-  const saveBasePrice = async (item, index) => {
-    setSavingPriceId(`base_${index}`);
-    
-    try {
-      const dealersPrice = parsePrice(editFormData.dealersPrice);
-      const retailPrice = parsePrice(editFormData.retailPrice);
-      
-      // Update base configuration
-      await updatePriceConfiguration(
-        item.manufacturer,
-        item.model,
-        item.ram,
-        item.storage,
-        dealersPrice.toString(),
-        retailPrice.toString()
-      );
-      
-      // Update ALL colors to use the new base pricing - regardless of whether they have specific configs
-      const updatePromises = [];
-      for (const colorData of item.colors) {
-        updatePromises.push(
-          updatePriceConfiguration(
-            item.manufacturer,
-            item.model,
-            item.ram,
-            item.storage,
-            dealersPrice.toString(),
-            retailPrice.toString(),
-            colorData.color
-          )
-        );
-      }
-      await Promise.all(updatePromises);
-      
-      // Update ALL existing inventory items for this configuration - all colors
-      const inventoryQuery = query(
-        collection(db, 'inventory'),
-        where("manufacturer", "==", item.manufacturer),
-        where("model", "==", item.model),
-        where("ram", "==", item.ram),
-        where("storage", "==", item.storage)
-      );
-      
-      const inventorySnap = await getDocs(inventoryQuery);
-      
-      if (!inventorySnap.empty) {
-        const batch = writeBatch(db);
-        
-        // Update ALL inventory items regardless of color
-        inventorySnap.docs.forEach(docRef => {
-          batch.update(docRef.ref, {
-            dealersPrice: dealersPrice,
-            retailPrice: retailPrice,
-            lastUpdated: getCurrentDate()
-          });
-        });
-        
-        await batch.commit();
-        console.log(`Updated ${inventorySnap.docs.length} inventory items with new base pricing (ALL colors)`);
-      }
-      
-      // Update local state immediately - CASCADE CHANGES TO ALL COLORS AND UPDATE UI
-      const updatedPhoneData = phoneData.map((phone, i) => {
-        if (i === index) {
-          return {
-            ...phone,
-            baseDealersPrice: dealersPrice,
-            baseRetailPrice: retailPrice,
-            colors: phone.colors.map(color => {
-              // Update ALL colors to use the new base price
-              return {
-                ...color,
-                dealersPrice: dealersPrice,
-                retailPrice: retailPrice,
-                // Keep configId to maintain that they have specific configs (even if same as base)
-                configId: color.configId || 'updated'
-              };
-            })
-          };
-        }
-        return phone;
-      });
-      
-      setPhoneData(updatedPhoneData);
-      
-      // Also update filtered data to ensure UI reflects changes immediately
-      const updatedFilteredData = filteredData.map((phone) => {
-        const updatedPhone = updatedPhoneData.find(p => 
-          p.manufacturer === phone.manufacturer &&
-          p.model === phone.model &&
-          p.ram === phone.ram &&
-          p.storage === phone.storage
-        );
-        return updatedPhone || phone;
-      });
-      
-      setFilteredData(updatedFilteredData);
-      
-      handleCancelEdit();
-      setSavingPriceId(null);
-      
-      alert(`Base pricing updated successfully! All colors have been updated to the new base price.`);
-      
-    } catch (error) {
-      console.error("Error updating base price:", error);
-      alert(`Error updating price: ${error.message}`);
-      setSavingPriceId(null);
-    }
-  };
-
-  // Save color-specific price changes - ONLY AFFECTS SPECIFIC COLOR
-  const saveColorPrice = async (item, colorData, rowIndex, colorIndex) => {
-    setSavingPriceId(`color_${rowIndex}_${colorIndex}`);
-    
-    try {
-      const dealersPrice = parsePrice(editFormData.dealersPrice);
-      const retailPrice = parsePrice(editFormData.retailPrice);
-      
-      // Update color-specific configuration
-      await updatePriceConfiguration(
-        item.manufacturer,
-        item.model,
-        item.ram,
-        item.storage,
-        dealersPrice.toString(),
-        retailPrice.toString(),
-        colorData.color
-      );
-      
-      // Update all existing inventory items for THIS SPECIFIC COLOR ONLY
-      const inventoryQuery = query(
-        collection(db, 'inventory'),
-        where("manufacturer", "==", item.manufacturer),
-        where("model", "==", item.model),
-        where("ram", "==", item.ram),
-        where("storage", "==", item.storage),
-        where("color", "==", colorData.color)
-      );
-      
-      const inventorySnap = await getDocs(inventoryQuery);
-      
-      if (!inventorySnap.empty) {
-        const batch = writeBatch(db);
-        
-        inventorySnap.docs.forEach(docRef => {
-          batch.update(docRef.ref, {
-            dealersPrice: dealersPrice,
-            retailPrice: retailPrice,
-            lastUpdated: getCurrentDate()
-          });
-        });
-        
-        await batch.commit();
-        console.log(`Updated ${inventorySnap.docs.length} inventory items for color ${colorData.color}`);
-      }
-      
-      // Update local state immediately - ONLY UPDATE THE SPECIFIC COLOR
-      const updatedPhoneData = phoneData.map((phone, i) => {
-        if (i === rowIndex) {
-          return {
-            ...phone,
-            // DO NOT change base prices - only update the specific color
-            colors: phone.colors.map((color, ci) => {
-              if (ci === colorIndex) {
-                return {
-                  ...color,
-                  dealersPrice: dealersPrice,
-                  retailPrice: retailPrice,
-                  configId: color.configId || 'updated' // Mark as having specific config
-                };
-              }
-              return color; // Other colors remain unchanged
-            })
-          };
-        }
-        return phone; // Other phone configurations remain unchanged
-      });
-      
-      setPhoneData(updatedPhoneData);
-      
-      // Also update filtered data to ensure UI reflects changes immediately
-      const updatedFilteredData = filteredData.map((phone) => {
-        const updatedPhone = updatedPhoneData.find(p => 
-          p.manufacturer === phone.manufacturer &&
-          p.model === phone.model &&
-          p.ram === phone.ram &&
-          p.storage === phone.storage
-        );
-        return updatedPhone || phone;
-      });
-      
-      setFilteredData(updatedFilteredData);
-      
-      handleCancelEdit();
-      setSavingPriceId(null);
-      
-      alert(`Color-specific pricing updated successfully! Updated prices for ${colorData.color} only.`);
-      
-    } catch (error) {
-      console.error("Error updating color price:", error);
-      alert(`Error updating price: ${error.message}`);
-      setSavingPriceId(null);
-    }
-  };
-
-  // Fetch and process phone data
-  const fetchPhoneData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Fetch from price_configurations collection
-      const configsRef = collection(db, 'price_configurations');
-      const configsSnapshot = await getDocs(configsRef);
-      
-      // Fetch from inventory collection to get color information
-      const inventoryRef = collection(db, 'inventory');
-      const inventorySnapshot = await getDocs(inventoryRef);
-      
-      // Group price configurations by base configuration (without color)
-      const groupedData = {};
-      const manufacturers = new Set();
-      const models = new Set();
-      const rams = new Set();
-      const storages = new Set();
-      
-      // Process price configurations
-      configsSnapshot.forEach(doc => {
-        const config = { id: doc.id, ...doc.data() };
-        
-        if (config.manufacturer && config.model && config.ram && config.storage) {
-          const baseKey = `${config.manufacturer}_${config.model}_${config.ram}_${config.storage}`;
-          
-          // Add to filter options
-          manufacturers.add(config.manufacturer);
-          models.add(config.model);
-          rams.add(config.ram);
-          storages.add(config.storage);
-          
-          if (!groupedData[baseKey]) {
-            groupedData[baseKey] = {
-              manufacturer: config.manufacturer,
-              model: config.model,
-              ram: config.ram,
-              storage: config.storage,
-              baseDealersPrice: 0,
-              baseRetailPrice: 0,
-              colors: {}
-            };
-          }
-          
-          if (config.color) {
-            // Color-specific pricing
-            groupedData[baseKey].colors[config.color] = {
-              color: config.color,
-              dealersPrice: config.dealersPrice || 0,
-              retailPrice: config.retailPrice || 0,
-              configId: config.id,
-              lastUpdated: config.lastUpdated
-            };
-          } else {
-            // Base pricing
-            groupedData[baseKey].baseDealersPrice = config.dealersPrice || 0;
-            groupedData[baseKey].baseRetailPrice = config.retailPrice || 0;
-            groupedData[baseKey].baseConfigId = config.id;
-            groupedData[baseKey].lastUpdated = config.lastUpdated;
-          }
-        }
-      });
-      
-      // Get all available colors from inventory for each base configuration
-      const inventoryColors = {};
-      inventorySnapshot.forEach(doc => {
-        const item = doc.data();
-        if (item.manufacturer && item.model && item.ram && item.storage && item.color) {
-          const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
-          if (!inventoryColors[baseKey]) {
-            inventoryColors[baseKey] = new Set();
-          }
-          inventoryColors[baseKey].add(item.color);
-        }
-      });
-      
-      // Ensure all colors have entries (even if no specific pricing exists)
-      Object.keys(groupedData).forEach(baseKey => {
-        const colors = inventoryColors[baseKey] || new Set();
-        colors.forEach(color => {
-          if (!groupedData[baseKey].colors[color]) {
-            // Use base pricing if no color-specific pricing exists
-            groupedData[baseKey].colors[color] = {
-              color: color,
-              dealersPrice: groupedData[baseKey].baseDealersPrice,
-              retailPrice: groupedData[baseKey].baseRetailPrice,
-              configId: null, // No specific config for this color yet
-              lastUpdated: groupedData[baseKey].lastUpdated
-            };
-          }
-        });
-      });
-      
-      // Convert to array and sort colors
-      Object.values(groupedData).forEach(group => {
-        group.colors = Object.values(group.colors).sort((a, b) => a.color.localeCompare(b.color));
-      });
-      
-      const phoneArray = Object.values(groupedData).sort((a, b) => {
-        if (a.manufacturer !== b.manufacturer) {
-          return a.manufacturer.localeCompare(b.manufacturer);
-        }
-        if (a.model !== b.model) {
-          return a.model.localeCompare(b.model);
-        }
-        if (a.ram !== b.ram) {
-          return a.ram.localeCompare(b.ram);
-        }
-        return a.storage.localeCompare(b.storage);
-      });
-      
-      const filterOpts = {
-        manufacturers: [...manufacturers].sort(),
-        models: [...models].sort(),
-        rams: [...rams].sort(),
-        storages: [...storages].sort()
-      };
-      
-      setFilterOptions(filterOpts);
-      setFilteredOptions({
-        models: filterOpts.models,
-        rams: filterOpts.rams,
-        storages: filterOpts.storages
-      });
-      
-      setPhoneData(phoneArray);
-      setFilteredData(phoneArray);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error fetching phone data:", err);
-      setError(`Error fetching phone data: ${err.message}`);
-      setLoading(false);
-    }
-  }, []);
-
-  // Effects
-  useEffect(() => {
-    fetchPhoneData();
-  }, [fetchPhoneData]);
-  
-  useEffect(() => {
-    updateFilteredOptions();
-  }, [updateFilteredOptions]);
-  
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white">Price Management</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
-              <p className="mt-2 text-gray-600">Loading phone pricing data...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-red-600 py-3">
-            <CardTitle className="text-2xl text-white">Error</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-            <button 
-              onClick={fetchPhoneData}
-              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
-            >
-              Try Again
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Smartphone className="h-6 w-6 text-white" />
-            <CardTitle className="text-2xl text-white">Price Management</CardTitle>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1 ${showFilters ? 'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
-            >
-              <Filter className="h-5 w-5 mr-1" />
-              <span>Filters</span>
-            </button>
-            <button
-              onClick={fetchPhoneData}
-              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
-            >
-              <RefreshCw className="h-5 w-5 mr-1" />
-              <span>Refresh</span>
-            </button>
-          </div>
-        </CardHeader>
-
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="bg-gray-50 px-4 py-4 border-b">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
-              <button 
-                onClick={clearFilters}
-                className="text-gray-500 hover:text-red-500 flex items-center"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Clear Filters
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
-                <select name="manufacturer" value={filters.manufacturer} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All Manufacturers</option>
-                  {filterOptions.manufacturers.map(manufacturer => (
-                    <option key={manufacturer} value={manufacturer}>{manufacturer}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                <select name="model" value={filters.model} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All Models</option>
-                  {filteredOptions.models.map(model => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
-                <select name="ram" value={filters.ram} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All RAM</option>
-                  {filteredOptions.rams.map(ram => (
-                    <option key={ram} value={ram}>{ram}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Storage</label>
-                <select name="storage" value={filters.storage} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All Storage</option>
-                  {filteredOptions.storages.map(storage => (
-                    <option key={storage} value={storage}>{storage}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            {/* Active filters summary */}
-            {Object.values(filters).some(filter => filter !== '') && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {Object.entries(filters).map(([key, value]) => 
-                  value && (
-                    <div key={key} className="bg-gray-200 rounded-full px-3 py-1 text-sm flex items-center">
-                      <span className="font-medium capitalize">{key}:</span>
-                      <span className="ml-1">{value}</span>
-                      <button 
-                        onClick={() => setFilters(prev => ({ ...prev, [key]: '' }))}
-                        className="ml-2 text-gray-500 hover:text-gray-700"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        <CardContent className="p-4">
-          {filteredData.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">No pricing data found</h3>
-              {Object.values(filters).some(f => f) ? (
-                <>
-                  <p className="text-gray-500 mb-4">No items match your current filters.</p>
-                  <button onClick={clearFilters} className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-md">
-                    Clear Filters
-                  </button>
-                </>
-              ) : (
-                <p className="text-gray-500">There are no price configurations in the database.</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Main table */}
-              <div className="bg-white border rounded-lg overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      <th className="px-3 py-3 text-left">Manufacturer</th>
-                      <th className="px-3 py-3 text-left">Model</th>
-                      <th className="px-3 py-3 text-left">RAM</th>
-                      <th className="px-3 py-3 text-left">Storage</th>
-                      <th className="px-3 py-3 text-left">Colors</th>
-                      <th className="pl-0 pr-1 py-3 text-right">{"Dealer's Price"}</th>
-                      <th className="px-1 py-3 text-right">Retail Price</th>
-                      <th className="px-1 py-3 text-right">Margin</th>
-                      <th className="px-1 py-3 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredData.map((item, index) => (
-                      <React.Fragment key={index}>
-                        {/* Main row - only show if there's 1 color, otherwise show "Multiple Colors" */}
-                        <tr 
-                          className={`hover:bg-gray-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                          onClick={() => toggleRowExpansion(index)}
-                        >
-                          <td className="px-3 py-3 text-sm">{item.manufacturer}</td>
-                          <td className="px-3 py-3 text-sm font-medium">{item.model}</td>
-                          <td className="px-3 py-3 text-sm">{formatWithGB(item.ram)}</td>
-                          <td className="px-3 py-3 text-sm">{formatWithGB(item.storage)}</td>
-                          <td className="px-3 py-3 text-sm">
-                            {item.colors.length === 1 ? (
-                              <span className="inline-block px-2 py-1 text-xs bg-gray-100 rounded">
-                                {item.colors[0].color}
-                              </span>
-                            ) : (
-                              <div className="flex flex-wrap gap-1">
-                                <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                                  {item.colors.length} colors
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  (click to expand)
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="pl-0 pr-1 py-3 text-sm text-right">
-                            {editingBasePrice === index ? (
-                              <input
-                                type="text"
-                                name="dealersPrice"
-                                value={editFormData.dealersPrice}
-                                onChange={handleEditInputChange}
-                                className="w-20 p-1 border rounded text-right"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            ) : (
-                              formatPrice(item.baseDealersPrice)
-                            )}
-                          </td>
-                          <td className="px-1 py-3 text-sm text-right">
-                            {editingBasePrice === index ? (
-                              <input
-                                type="text"
-                                name="retailPrice"
-                                value={editFormData.retailPrice}
-                                onChange={handleEditInputChange}
-                                className="w-20 p-1 border rounded text-right"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            ) : (
-                              formatPrice(item.baseRetailPrice)
-                            )}
-                          </td>
-                          <td className="px-1 py-3 text-sm text-right font-medium">
-                            {editingBasePrice === index 
-                              ? calculateMargin(editFormData.dealersPrice, editFormData.retailPrice)
-                              : calculateMargin(item.baseDealersPrice, item.baseRetailPrice)
-                            }
-                          </td>
-                          <td className="px-1 py-3 text-sm text-center">
-                            {editingBasePrice === index ? (
-                              <div className="flex justify-center space-x-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    saveBasePrice(item, index);
-                                  }}
-                                  disabled={savingPriceId === `base_${index}`}
-                                  className="p-1 text-green-600 hover:text-green-800"
-                                  title="Save changes"
-                                >
-                                  {savingPriceId === `base_${index}` ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Save className="h-4 w-4" />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCancelEdit();
-                                  }}
-                                  className="p-1 text-red-600 hover:text-red-800"
-                                  title="Cancel edit"
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditBasePrice(item, index);
-                                }}
-                                className="p-1 text-blue-600 hover:text-blue-800"
-                                title="Edit base price"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                        {/* Expanded color breakdown - EACH COLOR GETS ITS OWN SIMPLE ROW */}
-                        {expandedRows.has(index) && 
-                          item.colors.map((colorData, colorIndex) => (
-                            <tr key={`color-${index}-${colorIndex}`} className="bg-gray-50">
-                              <td className="px-3 py-3 text-sm text-gray-600">
-                                └ {colorData.color}
-                              </td>
-                              <td className="px-3 py-3 text-sm text-gray-600">-</td>
-                              <td className="px-3 py-3 text-sm text-gray-600">-</td>
-                              <td className="px-3 py-3 text-sm text-gray-600">-</td>
-                              <td className="px-3 py-3 text-sm">
-                                {colorData.dealersPrice === item.baseDealersPrice && 
-                                 colorData.retailPrice === item.baseRetailPrice ? (
-                                  <span className="text-xs text-white bg-blue-500 px-2 py-1 rounded">
-                                    Base Price
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-white bg-orange-500 px-2 py-1 rounded">
-                                    Custom Price
-                                  </span>
-                                )}
-                              </td>
-                              <td className="pl-0 pr-1 py-3 text-sm text-right">
-                                {editingColorPrice === `${index}_${colorIndex}` ? (
-                                  <input
-                                    type="text"
-                                    name="dealersPrice"
-                                    value={editFormData.dealersPrice}
-                                    onChange={handleEditInputChange}
-                                    className="w-20 p-1 border rounded text-right"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                ) : (
-                                  formatPrice(colorData.dealersPrice)
-                                )}
-                              </td>
-                              <td className="px-1 py-3 text-sm text-right">
-                                {editingColorPrice === `${index}_${colorIndex}` ? (
-                                  <input
-                                    type="text"
-                                    name="retailPrice"
-                                    value={editFormData.retailPrice}
-                                    onChange={handleEditInputChange}
-                                    className="w-20 p-1 border rounded text-right"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                ) : (
-                                  formatPrice(colorData.retailPrice)
-                                )}
-                              </td>
-                              <td className="px-1 py-3 text-sm text-right font-medium">
-                                {editingColorPrice === `${index}_${colorIndex}` 
-                                  ? calculateMargin(editFormData.dealersPrice, editFormData.retailPrice)
-                                  : calculateMargin(colorData.dealersPrice, colorData.retailPrice)
-                                }
-                              </td>
-                              <td className="px-1 py-3 text-sm text-center">
-                                {editingColorPrice === `${index}_${colorIndex}` ? (
-                                  <div className="flex justify-center space-x-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        saveColorPrice(item, colorData, index, colorIndex);
-                                      }}
-                                      disabled={savingPriceId === `color_${index}_${colorIndex}`}
-                                      className="p-1 text-green-600 hover:text-green-800"
-                                      title="Save changes"
-                                    >
-                                      {savingPriceId === `color_${index}_${colorIndex}` ? (
-                                        <RefreshCw className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Save className="h-4 w-4" />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleCancelEdit();
-                                      }}
-                                      className="p-1 text-red-600 hover:text-red-800"
-                                      title="Cancel edit"
-                                    >
-                                      <XCircle className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditColorPrice(item, colorData, index, colorIndex);
-                                    }}
-                                    className="p-1 text-blue-600 hover:text-blue-800"
-                                    title="Edit color price"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        }
-                      </React.Fragment>
-                    ))}
-                    </tbody>
-                </table>
-              </div>
-
-              {/* Summary footer */}
-              <div className="text-center text-gray-600">
-                {Object.values(filters).some(f => f) 
-                  ? `Showing ${filteredData.length} of ${phoneData.length} price configurations (filtered)`
-                  : `Showing ${filteredData.length} price configurations`}
-                {expandedRows.size > 0 && ` • ${expandedRows.size} rows expanded`}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-export default PriceManagementForm;
-</file>
-
 <file path=".gitignore">
 # Logs
 logs
@@ -3567,6 +2536,7 @@ export default PhoneSpecCard;
 </file>
 
 <file path="src/components/PhoneSpecForm.jsx">
+{/* Part 1 Start - State and Form Data Updates */}
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Battery, Camera, Cpu, Monitor, Palette, Smartphone } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -3746,13 +2716,16 @@ const PhoneSpecForm = () => {
     battery: "",
     wiredCharging: "",
     wirelessCharging: "",
-    colors: ""
+    colors: "",
+    excludeFromSummary: false // NEW: Add exclude checkbox state
   });
   
   // State to track if we're editing an existing phone
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
-  
+{/* Part 1 End - State and Form Data Updates */}
+
+{/* Part 2 Start - Effects and Input Handling */}
   // Update form data when phoneToEdit changes
   useEffect(() => {
     if (phoneToEdit) {
@@ -3775,7 +2748,10 @@ const PhoneSpecForm = () => {
         weight: phoneToEdit.weight?.toString() || '',
         resolution_extra: phoneToEdit.resolution_extra?.toString() || '',
         resolution_extra2: phoneToEdit.resolution_extra2?.toString() || '',
-        chipset_extra: phoneToEdit.chipset_extra?.toString() || ''
+        chipset_extra: phoneToEdit.chipset_extra?.toString() || '',
+        
+        // NEW: Handle exclude from summary field (default to false if not present)
+        excludeFromSummary: phoneToEdit.excludeFromSummary || false
       };
       
       setFormData(formattedData);
@@ -3787,7 +2763,16 @@ const PhoneSpecForm = () => {
   }, [phoneToEdit]);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    
+    // NEW: Handle checkbox input for excludeFromSummary
+    if (type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: checked
+      }));
+      return;
+    }
     
     // List of fields that should be numeric
     const numericFields = [
@@ -3843,7 +2828,9 @@ const PhoneSpecForm = () => {
       }));
     }
   };
+{/* Part 2 End - Effects and Input Handling */}
 
+{/* Part 3 Start - Submit Handler */}
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -3882,7 +2869,10 @@ const PhoneSpecForm = () => {
         // Array processing for colors
         colors: formData.colors
           ? formData.colors.split(',').map(color => color.trim()).filter(color => color !== '').map(color => capitalizeWords(color))
-          : []
+          : [],
+          
+        // NEW: Include exclude from summary boolean
+        excludeFromSummary: formData.excludeFromSummary
       };
   
       if (isEditing && editId) {
@@ -3919,7 +2909,8 @@ const PhoneSpecForm = () => {
         battery: "",
         wiredCharging: "",
         wirelessCharging: "",
-        colors: ""
+        colors: "",
+        excludeFromSummary: false // NEW: Reset exclude checkbox
       });
       
       // Reset edit state
@@ -3933,7 +2924,9 @@ const PhoneSpecForm = () => {
       alert(`Error ${isEditing ? 'updating' : 'adding'} phone. Please try again.`);
     }
   };
-  
+{/* Part 3 End - Submit Handler */}
+
+{/* Part 4 Start - Cancel Handler and Render Start */}
   // Handle cancel edit
   const handleCancel = () => {
     // Clear form and exit edit mode
@@ -3959,7 +2952,8 @@ const PhoneSpecForm = () => {
       battery: "",
       wiredCharging: "",
       wirelessCharging: "",
-      colors: ""
+      colors: "",
+      excludeFromSummary: false // NEW: Reset exclude checkbox
     });
     
     setIsEditing(false);
@@ -4061,7 +3055,9 @@ const PhoneSpecForm = () => {
                 </div>
               </div>
             </div>
+{/* Part 4 End - Cancel Handler and Render Start */}
 
+{/* Part 5 Start - Render Complete with Checkbox */}
             {/* Camera Section */}
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -4104,6 +3100,32 @@ const PhoneSpecForm = () => {
               </div>
             </div>
 
+            {/* NEW: Exclude from Summary Section */}
+            <div className="space-y-1 pt-4 border-t border-gray-300">
+              <h3 className="text-xl font-semibold text-[rgb(52,69,157)]">Summary Settings</h3>
+              <div className="flex items-center py-2">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="excludeFromSummary"
+                    name="excludeFromSummary"
+                    checked={formData.excludeFromSummary}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 text-[rgb(52,69,157)] bg-gray-100 border-gray-300 rounded focus:ring-[rgb(52,69,157)] focus:ring-2"
+                  />
+                  <label 
+                    htmlFor="excludeFromSummary" 
+                    className="ml-2 text-base text-gray-700"
+                  >
+                    Exclude this model from Inventory Summary
+                  </label>
+                </div>
+              </div>
+              <div className="text-sm text-gray-500 ml-6">
+                When checked, this phone model will not appear in the Inventory Summary reports and calculations.
+              </div>
+            </div>
+
             <div className="pt-4 flex gap-3">
               {isEditing && (
                 <button
@@ -4129,6 +3151,1178 @@ const PhoneSpecForm = () => {
 };
 
 export default PhoneSpecForm;
+{/* Part 5 End - Render Complete with Checkbox */}
+</file>
+
+<file path="src/components/PriceManagementForm.jsx">
+{/* Part 1 Start - Complete File: Imports, State, and Helper Functions */}
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs, doc, setDoc, writeBatch, query, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { 
+  Smartphone, 
+  RefreshCw, 
+  Filter, 
+  X,
+  Edit,
+  Save,
+  XCircle,
+  CircleAlert  // NEW: Added for exclusion info display
+} from 'lucide-react';
+import { getCurrentDate } from './phone-selection/utils/phoneUtils';
+
+const PriceManagementForm = () => {
+  // State for grouped phone data
+  const [phoneData, setPhoneData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // State for expanded rows and color sections
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  
+  // State for editing
+  const [editingBasePrice, setEditingBasePrice] = useState(null);
+  const [editingColorPrice, setEditingColorPrice] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    dealersPrice: '',
+    retailPrice: ''
+  });
+  const [savingPriceId, setSavingPriceId] = useState(null);
+  
+  // Force re-render state
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // NEW: Add state for excluded models info
+  const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
+  
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: ''
+  });
+  
+  // Filter options
+  const [filterOptions, setFilterOptions] = useState({
+    manufacturers: [],
+    models: [],
+    rams: [],
+    storages: []
+  });
+  
+  // Filtered options based on selections
+  const [filteredOptions, setFilteredOptions] = useState({
+    models: [],
+    rams: [],
+    storages: []
+  });
+
+  // NEW: Add this function to fetch excluded models info for display
+  const fetchExcludedModelsInfo = async () => {
+    try {
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedList = [];
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          excludedList.push({
+            manufacturer: phoneData.manufacturer,
+            model: phoneData.model
+          });
+        }
+      });
+      
+      setExcludedModelsInfo(excludedList.sort((a, b) => {
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        return a.model.localeCompare(b.model);
+      }));
+    } catch (error) {
+      console.error("Error fetching excluded models info:", error);
+    }
+  };
+
+  // Utility functions
+  const formatPrice = (price) => {
+    if (!price && price !== 0) return 'N/A';
+    return `₱${price.toLocaleString()}`;
+  };
+
+  const formatNumberWithCommas = (value) => {
+    if (!value && value !== 0) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  const parsePrice = (value) => {
+    if (!value) return 0;
+    return parseFloat(value.toString().replace(/,/g, '')) || 0;
+  };
+
+  const calculateMargin = (dealersPrice, retailPrice) => {
+    if (!dealersPrice || !retailPrice) return 'N/A';
+    const costPrice = typeof dealersPrice === 'string' ? parseFloat(dealersPrice.replace(/[^\d.-]/g, '')) : dealersPrice;
+    const sellPrice = typeof retailPrice === 'string' ? parseFloat(retailPrice.replace(/[^\d.-]/g, '')) : retailPrice;
+    if (costPrice <= 0) return 'N/A';
+    const marginAmount = sellPrice - costPrice;
+    const marginPercentage = (marginAmount / costPrice) * 100;
+    return `${marginPercentage.toFixed(2)}%`;
+  };
+
+  const formatWithGB = (value) => {
+    if (!value) return 'N/A';
+    if (value.includes('GB') || value.includes('TB') || value.includes('gb') || value.includes('tb')) {
+      return value;
+    }
+    return `${value}GB`;
+  };
+
+  // Toggle row expansion
+  const toggleRowExpansion = (index) => {
+    const newExpandedRows = new Set(expandedRows);
+    if (newExpandedRows.has(index)) {
+      newExpandedRows.delete(index);
+    } else {
+      newExpandedRows.add(index);
+    }
+    setExpandedRows(newExpandedRows);
+  };
+
+  // Helper function to save/update price configurations
+  const updatePriceConfiguration = async (manufacturer, model, ram, storage, dealersPrice, retailPrice, color = null) => {
+    try {
+      let configId;
+      if (color) {
+        configId = `${manufacturer}_${model}_${ram}_${storage}_${color}`.replace(/\s+/g, '_').toLowerCase();
+      } else {
+        configId = `${manufacturer}_${model}_${ram}_${storage}`.replace(/\s+/g, '_').toLowerCase();
+      }
+      
+      const dPrice = parseFloat(dealersPrice.toString().replace(/,/g, '')) || 0;
+      const rPrice = parseFloat(retailPrice.toString().replace(/,/g, '')) || 0;
+      
+      await setDoc(doc(db, 'price_configurations', configId), {
+        manufacturer,
+        model,
+        ram,
+        storage,
+        color,
+        dealersPrice: dPrice,
+        retailPrice: rPrice,
+        lastUpdated: getCurrentDate()
+      }, { merge: true });
+      
+      return true;
+    } catch (error) {
+      console.error("Error updating price configuration:", error);
+      return false;
+    }
+  };
+{/* Part 1 End - Complete File: Imports, State, and Helper Functions */}
+
+{/* Part 2 Start - Filter Handling Functions */}
+  // Handle filter change
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      manufacturer: '',
+      model: '',
+      ram: '',
+      storage: ''
+    });
+    setFilteredOptions({
+      models: filterOptions.models,
+      rams: filterOptions.rams,
+      storages: filterOptions.storages
+    });
+  };
+
+  // Apply filters to data
+  const applyFilters = useCallback(() => {
+    if (!phoneData.length) return;
+    const filtered = phoneData.filter(item => {
+      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) return false;
+      if (filters.model && item.model !== filters.model) return false;
+      if (filters.ram && item.ram !== filters.ram) return false;
+      if (filters.storage && item.storage !== filters.storage) return false;
+      return true;
+    });
+    setFilteredData(filtered);
+  }, [phoneData, filters]);
+
+  // Update filtered options based on current selections
+  const updateFilteredOptions = useCallback(() => {
+    if (!phoneData.length) return;
+    
+    let filteredModels = filterOptions.models;
+    let filteredRams = filterOptions.rams;
+    let filteredStorages = filterOptions.storages;
+    
+    if (filters.manufacturer) {
+      filteredModels = [...new Set(
+        phoneData
+          .filter(item => item.manufacturer === filters.manufacturer)
+          .map(item => item.model)
+      )].sort();
+    }
+    
+    if (filters.manufacturer || filters.model) {
+      let filtered = phoneData;
+      if (filters.manufacturer) {
+        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
+      }
+      if (filters.model) {
+        filtered = filtered.filter(item => item.model === filters.model);
+      }
+      filteredRams = [...new Set(filtered.map(item => item.ram))].sort();
+    }
+    
+    if (filters.manufacturer || filters.model || filters.ram) {
+      let filtered = phoneData;
+      if (filters.manufacturer) {
+        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
+      }
+      if (filters.model) {
+        filtered = filtered.filter(item => item.model === filters.model);
+      }
+      if (filters.ram) {
+        filtered = filtered.filter(item => item.ram === filters.ram);
+      }
+      filteredStorages = [...new Set(filtered.map(item => item.storage))].sort();
+    }
+    
+    setFilteredOptions({
+      models: filteredModels,
+      rams: filteredRams,
+      storages: filteredStorages
+    });
+  }, [phoneData, filters, filterOptions]);
+{/* Part 2 End - Filter Handling Functions */}
+
+{/* Part 3 Start - Edit Handling Functions */}
+  // Handle edit base price
+  const handleEditBasePrice = (item, index) => {
+    setEditingBasePrice(index);
+    setEditingColorPrice(null);
+    setEditFormData({
+      dealersPrice: formatNumberWithCommas(item.baseDealersPrice.toString()),
+      retailPrice: formatNumberWithCommas(item.baseRetailPrice.toString())
+    });
+  };
+
+  // Handle edit color price
+  const handleEditColorPrice = (item, colorData, rowIndex, colorIndex) => {
+    setEditingColorPrice(`${rowIndex}_${colorIndex}`);
+    setEditingBasePrice(null);
+    setEditFormData({
+      dealersPrice: formatNumberWithCommas(colorData.dealersPrice.toString()),
+      retailPrice: formatNumberWithCommas(colorData.retailPrice.toString())
+    });
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingBasePrice(null);
+    setEditingColorPrice(null);
+    setEditFormData({
+      dealersPrice: '',
+      retailPrice: ''
+    });
+  };
+
+  // Handle form input change
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    let formattedValue = value;
+    if (name === 'dealersPrice' || name === 'retailPrice') {
+      const cleanValue = value.replace(/[^\d.]/g, '');
+      formattedValue = formatNumberWithCommas(cleanValue);
+    }
+    
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: formattedValue
+    }));
+  };
+{/* Part 3 End - Edit Handling Functions */}
+
+{/* Part 4 Start - Save Price Functions */}
+  // Save base price changes - FORCE RE-RENDER VERSION
+  const saveBasePrice = async (item, index) => {
+    setSavingPriceId(`base_${index}`);
+    
+    try {
+      const dealersPrice = parsePrice(editFormData.dealersPrice);
+      const retailPrice = parsePrice(editFormData.retailPrice);
+      
+      // Update base configuration
+      await updatePriceConfiguration(
+        item.manufacturer,
+        item.model,
+        item.ram,
+        item.storage,
+        dealersPrice.toString(),
+        retailPrice.toString()
+      );
+      
+      // Update ALL colors to use the new base pricing - regardless of whether they have specific configs
+      const updatePromises = [];
+      for (const colorData of item.colors) {
+        updatePromises.push(
+          updatePriceConfiguration(
+            item.manufacturer,
+            item.model,
+            item.ram,
+            item.storage,
+            dealersPrice.toString(),
+            retailPrice.toString(),
+            colorData.color
+          )
+        );
+      }
+      await Promise.all(updatePromises);
+      
+      // Update ALL existing inventory items for this configuration - all colors
+      const inventoryQuery = query(
+        collection(db, 'inventory'),
+        where("manufacturer", "==", item.manufacturer),
+        where("model", "==", item.model),
+        where("ram", "==", item.ram),
+        where("storage", "==", item.storage)
+      );
+      
+      const inventorySnap = await getDocs(inventoryQuery);
+      
+      if (!inventorySnap.empty) {
+        const batch = writeBatch(db);
+        
+        // Update ALL inventory items regardless of color
+        inventorySnap.docs.forEach(docRef => {
+          batch.update(docRef.ref, {
+            dealersPrice: dealersPrice,
+            retailPrice: retailPrice,
+            lastUpdated: getCurrentDate()
+          });
+        });
+        
+        await batch.commit();
+        console.log(`Updated ${inventorySnap.docs.length} inventory items with new base pricing (ALL colors)`);
+      }
+      
+      // FORCE STATE UPDATE - Create completely new arrays with updated data
+      const newPhoneData = [...phoneData];
+      newPhoneData[index] = {
+        ...newPhoneData[index],
+        baseDealersPrice: dealersPrice,
+        baseRetailPrice: retailPrice,
+        colors: newPhoneData[index].colors.map(color => ({
+          ...color,
+          dealersPrice: dealersPrice,
+          retailPrice: retailPrice,
+          configId: color.configId || 'updated'
+        }))
+      };
+      
+      // Update phoneData with completely new array
+      setPhoneData(newPhoneData);
+      
+      // Find and update the same item in filteredData
+      const newFilteredData = [...filteredData];
+      const filteredIndex = newFilteredData.findIndex(phone => 
+        phone.manufacturer === item.manufacturer &&
+        phone.model === item.model &&
+        phone.ram === item.ram &&
+        phone.storage === item.storage
+      );
+      
+      if (filteredIndex !== -1) {
+        newFilteredData[filteredIndex] = {
+          ...newFilteredData[filteredIndex],
+          baseDealersPrice: dealersPrice,
+          baseRetailPrice: retailPrice,
+          colors: newFilteredData[filteredIndex].colors.map(color => ({
+            ...color,
+            dealersPrice: dealersPrice,
+            retailPrice: retailPrice,
+            configId: color.configId || 'updated'
+          }))
+        };
+      }
+      
+      // Update filteredData with completely new array
+      setFilteredData(newFilteredData);
+      
+      // Force component re-render
+      setForceUpdate(prev => prev + 1);
+      
+      // Clear editing state
+      handleCancelEdit();
+      setSavingPriceId(null);
+      
+      console.log(`Successfully updated base price for ${item.manufacturer} ${item.model} to ₱${dealersPrice.toLocaleString()} / ₱${retailPrice.toLocaleString()}`);
+      
+      alert(`Base pricing updated successfully! All colors have been updated to the new base price.`);
+      
+    } catch (error) {
+      console.error("Error updating base price:", error);
+      alert(`Error updating price: ${error.message}`);
+      setSavingPriceId(null);
+    }
+  };
+
+  // Save color-specific price changes - FORCE RE-RENDER VERSION
+  const saveColorPrice = async (item, colorData, rowIndex, colorIndex) => {
+    setSavingPriceId(`color_${rowIndex}_${colorIndex}`);
+    
+    try {
+      const dealersPrice = parsePrice(editFormData.dealersPrice);
+      const retailPrice = parsePrice(editFormData.retailPrice);
+      
+      // Update color-specific configuration
+      await updatePriceConfiguration(
+        item.manufacturer,
+        item.model,
+        item.ram,
+        item.storage,
+        dealersPrice.toString(),
+        retailPrice.toString(),
+        colorData.color
+      );
+      
+      // Update all existing inventory items for THIS SPECIFIC COLOR ONLY
+      const inventoryQuery = query(
+        collection(db, 'inventory'),
+        where("manufacturer", "==", item.manufacturer),
+        where("model", "==", item.model),
+        where("ram", "==", item.ram),
+        where("storage", "==", item.storage),
+        where("color", "==", colorData.color)
+      );
+      
+      const inventorySnap = await getDocs(inventoryQuery);
+      
+      if (!inventorySnap.empty) {
+        const batch = writeBatch(db);
+        
+        inventorySnap.docs.forEach(docRef => {
+          batch.update(docRef.ref, {
+            dealersPrice: dealersPrice,
+            retailPrice: retailPrice,
+            lastUpdated: getCurrentDate()
+          });
+        });
+        
+        await batch.commit();
+        console.log(`Updated ${inventorySnap.docs.length} inventory items for color ${colorData.color}`);
+      }
+      
+      // FORCE STATE UPDATE - Create completely new arrays with updated data
+      const newPhoneData = [...phoneData];
+      newPhoneData[rowIndex] = {
+        ...newPhoneData[rowIndex],
+        colors: newPhoneData[rowIndex].colors.map((color, ci) => {
+          if (ci === colorIndex) {
+            return {
+              ...color,
+              dealersPrice: dealersPrice,
+              retailPrice: retailPrice,
+              configId: color.configId || 'updated'
+            };
+          }
+          return { ...color };
+        })
+      };
+      
+      // Update phoneData with completely new array
+      setPhoneData(newPhoneData);
+      
+      // Find and update the same item in filteredData
+      const newFilteredData = [...filteredData];
+      const filteredIndex = newFilteredData.findIndex(phone => 
+        phone.manufacturer === item.manufacturer &&
+        phone.model === item.model &&
+        phone.ram === item.ram &&
+        phone.storage === item.storage
+      );
+      
+      if (filteredIndex !== -1) {
+        newFilteredData[filteredIndex] = {
+          ...newFilteredData[filteredIndex],
+          colors: newFilteredData[filteredIndex].colors.map((color, ci) => {
+            if (ci === colorIndex) {
+              return {
+                ...color,
+                dealersPrice: dealersPrice,
+                retailPrice: retailPrice,
+                configId: color.configId || 'updated'
+              };
+            }
+            return { ...color };
+          })
+        };
+      }
+      
+      // Update filteredData with completely new array
+      setFilteredData(newFilteredData);
+      
+      // Force component re-render
+      setForceUpdate(prev => prev + 1);
+      
+      // Clear editing state
+      handleCancelEdit();
+      setSavingPriceId(null);
+      
+      console.log(`Successfully updated color price for ${colorData.color} to ₱${dealersPrice.toLocaleString()} / ₱${retailPrice.toLocaleString()}`);
+      
+      alert(`Color-specific pricing updated successfully! Updated prices for ${colorData.color} only.`);
+      
+    } catch (error) {
+      console.error("Error updating color price:", error);
+      alert(`Error updating price: ${error.message}`);
+      setSavingPriceId(null);
+    }
+  };
+{/* Part 4 End - Save Price Functions */}
+
+{/* Part 5 Start - Data Fetching Function with Exclusion Logic */}
+  // UPDATED: Fetch and process phone data with exclusion logic
+  const fetchPhoneData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // NEW: First, get the list of excluded models from the phones collection
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedModels = new Set();
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        // If excludeFromSummary is true, add the manufacturer_model combination to excluded set
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          const modelKey = `${phoneData.manufacturer}_${phoneData.model}`;
+          excludedModels.add(modelKey);
+          console.log(`Excluding model from price management: ${phoneData.manufacturer} ${phoneData.model}`);
+        }
+      });
+      
+      console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
+      
+      // Fetch from price_configurations collection
+      const configsRef = collection(db, 'price_configurations');
+      const configsSnapshot = await getDocs(configsRef);
+      
+      // Fetch from inventory collection to get color information
+      const inventoryRef = collection(db, 'inventory');
+      const inventorySnapshot = await getDocs(inventoryRef);
+      
+      // Group price configurations by base configuration (without color)
+      const groupedData = {};
+      const manufacturers = new Set();
+      const models = new Set();
+      const rams = new Set();
+      const storages = new Set();
+      
+      // Process price configurations
+      configsSnapshot.forEach(doc => {
+        const config = { id: doc.id, ...doc.data() };
+        
+        if (config.manufacturer && config.model && config.ram && config.storage) {
+          // NEW: Check if this model should be excluded from price management
+          const modelKey = `${config.manufacturer}_${config.model}`;
+          if (excludedModels.has(modelKey)) {
+            console.log(`Skipping excluded model from price management: ${config.manufacturer} ${config.model}`);
+            return; // Skip this item
+          }
+          
+          const baseKey = `${config.manufacturer}_${config.model}_${config.ram}_${config.storage}`;
+          
+          // Add to filter options
+          manufacturers.add(config.manufacturer);
+          models.add(config.model);
+          rams.add(config.ram);
+          storages.add(config.storage);
+          
+          if (!groupedData[baseKey]) {
+            groupedData[baseKey] = {
+              manufacturer: config.manufacturer,
+              model: config.model,
+              ram: config.ram,
+              storage: config.storage,
+              baseDealersPrice: 0,
+              baseRetailPrice: 0,
+              colors: {}
+            };
+          }
+          
+          if (config.color) {
+            // Color-specific pricing
+            groupedData[baseKey].colors[config.color] = {
+              color: config.color,
+              dealersPrice: config.dealersPrice || 0,
+              retailPrice: config.retailPrice || 0,
+              configId: config.id,
+              lastUpdated: config.lastUpdated
+            };
+          } else {
+            // Base pricing
+            groupedData[baseKey].baseDealersPrice = config.dealersPrice || 0;
+            groupedData[baseKey].baseRetailPrice = config.retailPrice || 0;
+            groupedData[baseKey].baseConfigId = config.id;
+            groupedData[baseKey].lastUpdated = config.lastUpdated;
+          }
+        }
+      });
+      
+      // Get all available colors from inventory for each base configuration
+      const inventoryColors = {};
+      inventorySnapshot.forEach(doc => {
+        const item = doc.data();
+        if (item.manufacturer && item.model && item.ram && item.storage && item.color) {
+          // NEW: Check if this model should be excluded
+          const modelKey = `${item.manufacturer}_${item.model}`;
+          if (excludedModels.has(modelKey)) {
+            return; // Skip this item
+          }
+          
+          const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
+          if (!inventoryColors[baseKey]) {
+            inventoryColors[baseKey] = new Set();
+          }
+          inventoryColors[baseKey].add(item.color);
+        }
+      });
+      
+      // Ensure all colors have entries (even if no specific pricing exists)
+      Object.keys(groupedData).forEach(baseKey => {
+        const colors = inventoryColors[baseKey] || new Set();
+        colors.forEach(color => {
+          if (!groupedData[baseKey].colors[color]) {
+            // Use base pricing if no color-specific pricing exists
+            groupedData[baseKey].colors[color] = {
+              color: color,
+              dealersPrice: groupedData[baseKey].baseDealersPrice,
+              retailPrice: groupedData[baseKey].baseRetailPrice,
+              configId: null, // No specific config for this color yet
+              lastUpdated: groupedData[baseKey].lastUpdated
+            };
+          }
+        });
+      });
+      
+      // Convert to array and sort colors
+      Object.values(groupedData).forEach(group => {
+        group.colors = Object.values(group.colors).sort((a, b) => a.color.localeCompare(b.color));
+      });
+      
+      const phoneArray = Object.values(groupedData).sort((a, b) => {
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        if (a.model !== b.model) {
+          return a.model.localeCompare(b.model);
+        }
+        if (a.ram !== b.ram) {
+          return a.ram.localeCompare(b.ram);
+        }
+        return a.storage.localeCompare(b.storage);
+      });
+      
+      const filterOpts = {
+        manufacturers: [...manufacturers].sort(),
+        models: [...models].sort(),
+        rams: [...rams].sort(),
+        storages: [...storages].sort()
+      };
+      
+      setFilterOptions(filterOpts);
+      setFilteredOptions({
+        models: filterOpts.models,
+        rams: filterOpts.rams,
+        storages: filterOpts.storages
+      });
+      
+      setPhoneData(phoneArray);
+      setFilteredData(phoneArray);
+      setLoading(false);
+      
+      // NEW: Log summary of excluded models for debugging
+      console.log(`Price Management loaded: ${phoneArray.length} configurations (${excludedModels.size} models excluded)`);
+      
+    } catch (err) {
+      console.error("Error fetching phone data:", err);
+      setError(`Error fetching phone data: ${err.message}`);
+      setLoading(false);
+    }
+  }, []);
+{/* Part 5 End - Data Fetching Function with Exclusion Logic */}
+
+{/* Part 6 Start - Effects and Loading States */}
+  // UPDATED: Effects to include fetchExcludedModelsInfo
+  useEffect(() => {
+    fetchPhoneData();
+    fetchExcludedModelsInfo(); // NEW: Add this line
+  }, [fetchPhoneData]);
+  
+  useEffect(() => {
+    updateFilteredOptions();
+  }, [updateFilteredOptions]);
+  
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white">Price Management</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
+              <p className="mt-2 text-gray-600">Loading phone pricing data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white">Error</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={fetchPhoneData}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
+            >
+              Try Again
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  {/* Part 7 Start - Main Render Header and Filters */}
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Smartphone className="h-6 w-6 text-white" />
+            <CardTitle className="text-2xl text-white">Price Management</CardTitle>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1 ${showFilters ? 'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
+            >
+              <Filter className="h-5 w-5 mr-1" />
+              <span>Filters</span>
+            </button>
+            <button
+              onClick={fetchPhoneData}
+              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
+            >
+              <RefreshCw className="h-5 w-5 mr-1" />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </CardHeader>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="bg-gray-50 px-4 py-4 border-b">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
+              <button 
+                onClick={clearFilters}
+                className="text-gray-500 hover:text-red-500 flex items-center"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filters
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
+                <select name="manufacturer" value={filters.manufacturer} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Manufacturers</option>
+                  {filterOptions.manufacturers.map(manufacturer => (
+                    <option key={manufacturer} value={manufacturer}>{manufacturer}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                <select name="model" value={filters.model} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Models</option>
+                  {filteredOptions.models.map(model => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
+                <select name="ram" value={filters.ram} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All RAM</option>
+                  {filteredOptions.rams.map(ram => (
+                    <option key={ram} value={ram}>{ram}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Storage</label>
+                <select name="storage" value={filters.storage} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Storage</option>
+                  {filteredOptions.storages.map(storage => (
+                    <option key={storage} value={storage}>{storage}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            {/* Active filters summary */}
+            {Object.values(filters).some(filter => filter !== '') && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {Object.entries(filters).map(([key, value]) => 
+                  value && (
+                    <div key={key} className="bg-gray-200 rounded-full px-3 py-1 text-sm flex items-center">
+                      <span className="font-medium capitalize">{key}:</span>
+                      <span className="ml-1">{value}</span>
+                      <button 
+                        onClick={() => setFilters(prev => ({ ...prev, [key]: '' }))}
+                        className="ml-2 text-gray-500 hover:text-gray-700"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* NEW: Add Excluded Models Info Display */}
+        <CardContent className="p-4">
+          {excludedModelsInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CircleAlert className="h-5 w-5 text-yellow-600" />
+                <h4 className="font-medium text-yellow-800">
+                  Excluded Models ({excludedModelsInfo.length})
+                </h4>
+              </div>
+              <div className="text-sm text-yellow-700">
+                The following models are excluded from price management:
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {excludedModelsInfo.map((model, index) => (
+                  <span 
+                    key={index}
+                    className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
+                  >
+                    {model.manufacturer} {model.model}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+{/* Part 7 End - Main Render Header and Filters */}
+
+{/* Part 8 Start - Main Table Content */}
+          {filteredData.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-700 mb-2">No pricing data found</h3>
+              {Object.values(filters).some(f => f) ? (
+                <>
+                  <p className="text-gray-500 mb-4">No items match your current filters.</p>
+                  <button onClick={clearFilters} className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-md">
+                    Clear Filters
+                  </button>
+                </>
+              ) : (
+                <p className="text-gray-500">There are no price configurations in the database.</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Main table */}
+              <div className="bg-white border rounded-lg overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left">Manufacturer</th>
+                      <th className="px-3 py-3 text-left">Model</th>
+                      <th className="px-3 py-3 text-left">RAM</th>
+                      <th className="px-3 py-3 text-left">Storage</th>
+                      <th className="px-3 py-3 text-left">Colors</th>
+                      <th className="pl-0 pr-1 py-3 text-right">{"Dealer's Price"}</th>
+                      <th className="px-1 py-3 text-right">Retail Price</th>
+                      <th className="px-1 py-3 text-right">Margin</th>
+                      <th className="px-1 py-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredData.map((item, index) => (
+                      <React.Fragment key={`${item.manufacturer}_${item.model}_${item.ram}_${item.storage}_${forceUpdate}_${index}`}>
+                        {/* Main row - show actual colors instead of "Multiple Colors" */}
+                        <tr 
+                          className={`hover:bg-gray-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          onClick={() => toggleRowExpansion(index)}
+                        >
+                          <td className="px-3 py-3 text-sm">{item.manufacturer}</td>
+                          <td className="px-3 py-3 text-sm font-medium">{item.model}</td>
+                          <td className="px-3 py-3 text-sm">{formatWithGB(item.ram)}</td>
+                          <td className="px-3 py-3 text-sm">{formatWithGB(item.storage)}</td>
+                          <td className="px-3 py-3 text-sm">
+                            <div className="flex flex-wrap gap-1">
+                              {item.colors.slice(0, 3).map((colorData, colorIndex) => (
+                                <span 
+                                  key={colorIndex} 
+                                  className="inline-block px-2 py-1 text-xs bg-gray-100 rounded"
+                                >
+                                  {colorData.color}
+                                </span>
+                              ))}
+                              {item.colors.length > 3 && (
+                                <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                  +{item.colors.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="pl-0 pr-1 py-3 text-sm text-right">
+                            {editingBasePrice === index ? (
+                              <input
+                                type="text"
+                                name="dealersPrice"
+                                value={editFormData.dealersPrice}
+                                onChange={handleEditInputChange}
+                                className="w-20 p-1 border rounded text-right"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              formatPrice(item.baseDealersPrice)
+                            )}
+                          </td>
+                          <td className="px-1 py-3 text-sm text-right">
+                            {editingBasePrice === index ? (
+                              <input
+                                type="text"
+                                name="retailPrice"
+                                value={editFormData.retailPrice}
+                                onChange={handleEditInputChange}
+                                className="w-20 p-1 border rounded text-right"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              formatPrice(item.baseRetailPrice)
+                            )}
+                          </td>
+                          <td className="px-1 py-3 text-sm text-right font-medium">
+                            {editingBasePrice === index 
+                              ? calculateMargin(editFormData.dealersPrice, editFormData.retailPrice)
+                              : calculateMargin(item.baseDealersPrice, item.baseRetailPrice)
+                            }
+                          </td>
+                          <td className="px-1 py-3 text-sm text-center">
+                            {editingBasePrice === index ? (
+                              <div className="flex justify-center space-x-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveBasePrice(item, index);
+                                  }}
+                                  disabled={savingPriceId === `base_${index}`}
+                                  className="p-1 text-green-600 hover:text-green-800"
+                                  title="Save changes"
+                                >
+                                  {savingPriceId === `base_${index}` ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Save className="h-4 w-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCancelEdit();
+                                  }}
+                                  className="p-1 text-red-600 hover:text-red-800"
+                                  title="Cancel edit"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditBasePrice(item, index);
+                                }}
+                                className="p-1 text-blue-600 hover:text-blue-800"
+                                title="Edit base price"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+{/* Part 8 End - Main Table Content */}
+
+{/* Part 9 Start - Expanded Color Rows and Footer */}
+                        {/* Expanded color breakdown - EACH COLOR GETS ITS OWN SIMPLE ROW */}
+                        {expandedRows.has(index) && 
+                          item.colors.map((colorData, colorIndex) => (
+                            <tr key={`color-${index}-${colorIndex}`} className="bg-gray-50">
+                              <td className="px-3 py-3 text-sm text-gray-600">
+                                <span className="ml-4">{colorData.color}</span>
+                              </td>
+                              <td className="px-3 py-3 text-sm text-gray-600">-</td>
+                              <td className="px-3 py-3 text-sm text-gray-600">-</td>
+                              <td className="px-3 py-3 text-sm text-gray-600">-</td>
+                              <td className="px-3 py-3 text-sm">
+                                {colorData.dealersPrice !== item.baseDealersPrice || 
+                                 colorData.retailPrice !== item.baseRetailPrice ? (
+                                  <span className="text-xs text-white bg-orange-500 px-2 py-1 rounded">
+                                    Custom Price
+                                  </span>
+                                ) : null}
+                              </td>
+                              <td className="pl-0 pr-1 py-3 text-sm text-right">
+                                {editingColorPrice === `${index}_${colorIndex}` ? (
+                                  <input
+                                    type="text"
+                                    name="dealersPrice"
+                                    value={editFormData.dealersPrice}
+                                    onChange={handleEditInputChange}
+                                    className="w-20 p-1 border rounded text-right"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  formatPrice(colorData.dealersPrice)
+                                )}
+                              </td>
+                              <td className="px-1 py-3 text-sm text-right">
+                                {editingColorPrice === `${index}_${colorIndex}` ? (
+                                  <input
+                                    type="text"
+                                    name="retailPrice"
+                                    value={editFormData.retailPrice}
+                                    onChange={handleEditInputChange}
+                                    className="w-20 p-1 border rounded text-right"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  formatPrice(colorData.retailPrice)
+                                )}
+                              </td>
+                              <td className="px-1 py-3 text-sm text-right font-medium">
+                                {editingColorPrice === `${index}_${colorIndex}` 
+                                  ? calculateMargin(editFormData.dealersPrice, editFormData.retailPrice)
+                                  : calculateMargin(colorData.dealersPrice, colorData.retailPrice)
+                                }
+                              </td>
+                              <td className="px-1 py-3 text-sm text-center">
+                                {editingColorPrice === `${index}_${colorIndex}` ? (
+                                  <div className="flex justify-center space-x-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        saveColorPrice(item, colorData, index, colorIndex);
+                                      }}
+                                      disabled={savingPriceId === `color_${index}_${colorIndex}`}
+                                      className="p-1 text-green-600 hover:text-green-800"
+                                      title="Save changes"
+                                    >
+                                      {savingPriceId === `color_${index}_${colorIndex}` ? (
+                                        <RefreshCw className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Save className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCancelEdit();
+                                      }}
+                                      className="p-1 text-red-600 hover:text-red-800"
+                                      title="Cancel edit"
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditColorPrice(item, colorData, index, colorIndex);
+                                    }}
+                                    className="p-1 text-blue-600 hover:text-blue-800"
+                                    title="Edit color price"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        }
+                      </React.Fragment>
+                    ))}
+                    </tbody>
+                </table>
+              </div>
+
+              {/* Summary footer */}
+              <div className="text-center text-gray-600">
+                {Object.values(filters).some(f => f) 
+                  ? `Showing ${filteredData.length} of ${phoneData.length} price configurations (filtered)`
+                  : `Showing ${filteredData.length} price configurations`}
+                {expandedRows.size > 0 && ` • ${expandedRows.size} rows expanded`}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default PriceManagementForm;
+{/* Part 9 End - Expanded Color Rows and Footer */}
 </file>
 
 <file path="src/components/ui/badge/index.jsx">
@@ -4400,89 +4594,21 @@ export default defineConfig({
 })
 </file>
 
-<file path="src/App.jsx">
-// src/App.jsx
-import { useEffect } from 'react';
-import PhoneSpecForm from './components/PhoneSpecForm';
-import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
-import InventoryListForm from './components/InventoryListForm';
-import PhoneListForm from './components/PhoneListForm';
-import InventorySummaryForm from './components/InventorySummaryForm';
-import PriceManagementForm from './components/PriceManagementForm';
-// Import the hook from our consolidated file
-import { useGlobalState } from './context/GlobalStateContext';
-
-function App() {
-  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
-  
-  // For debugging
-  useEffect(() => {
-    console.log("App: Active component changed to:", activeComponent);
-    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
-  }, [activeComponent, phoneToEdit]);
-
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="p-4 bg-[rgb(52,69,157)] text-white">
-        <div className="max-w-6xl mx-auto flex flex-wrap gap-4">
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'summary' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('summary')}
-          >
-            Inventory Summary
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('inventory')}
-          >
-            Inventory List
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('selection')}
-          >
-            Add Phone Inventory
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('form')}
-          >
-            Add Phone Model
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('phonelist')}
-          >
-            Phone Models
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('prices')}
-          >
-            Price Management
-          </button>
-        </div>
-      </div>
-      
-      {activeComponent === 'summary' && <InventorySummaryForm />}
-      {activeComponent === 'selection' && <PhoneSelectionForm />}
-      {activeComponent === 'form' && <PhoneSpecForm />}
-      {activeComponent === 'inventory' && <InventoryListForm />}
-      {activeComponent === 'phonelist' && <PhoneListForm />}
-      {activeComponent === 'prices' && <PriceManagementForm />}
-    </div>
-  );
-}
-
-export default App;
-</file>
-
 <file path="src/components/InventorySummaryForm.jsx">
+{/* Part 1 Start - Complete File: Imports, State, and Helper Functions */}
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Smartphone, RefreshCw, ChevronDown, ChevronRight, Filter, X } from 'lucide-react';
+import { 
+  Smartphone, 
+  RefreshCw, 
+  ChevronDown, 
+  ChevronRight, 
+  Filter, 
+  X,
+  CircleAlert  // NEW: Added for exclusion info display
+} from 'lucide-react';
 
 const InventorySummaryForm = () => {
   // Main state
@@ -4492,6 +4618,9 @@ const InventorySummaryForm = () => {
   const [error, setError] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [expandedColorSections, setExpandedColorSections] = useState({});
+  
+  // NEW: Add state for excluded models info
+  const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
   
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
@@ -4519,6 +4648,34 @@ const InventorySummaryForm = () => {
     storages: [],
     colors: []
   });
+
+  // NEW: Add this function to fetch excluded models info for display
+  const fetchExcludedModelsInfo = async () => {
+    try {
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedList = [];
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          excludedList.push({
+            manufacturer: phoneData.manufacturer,
+            model: phoneData.model
+          });
+        }
+      });
+      
+      setExcludedModelsInfo(excludedList.sort((a, b) => {
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        return a.model.localeCompare(b.model);
+      }));
+    } catch (error) {
+      console.error("Error fetching excluded models info:", error);
+    }
+  };
 
   // Toggle row expansion (for base configurations)
   const toggleRowExpansion = (index) => {
@@ -4617,6 +4774,9 @@ const InventorySummaryForm = () => {
     }
     return `${value}GB`;
   };
+{/* Part 1 End - Complete File: Imports, State, and Helper Functions */}
+
+{/* Part 2 Start - Filter Functions and Updated fetchInventoryData */}
   // Apply filters to data
   const applyFilters = () => {
     if (!inventoryData.length) return;
@@ -4700,12 +4860,30 @@ const InventorySummaryForm = () => {
     });
   };
 
-  // Fetch and process inventory data
+  // UPDATED: Fetch and process inventory data with exclusion logic
   const fetchInventoryData = async () => {
     setLoading(true);
     setError(null);
     
     try {
+      // NEW: First, get the list of excluded models from the phones collection
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedModels = new Set();
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        // If excludeFromSummary is true, add the manufacturer_model combination to excluded set
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          const modelKey = `${phoneData.manufacturer}_${phoneData.model}`;
+          excludedModels.add(modelKey);
+          console.log(`Excluding model from summary: ${phoneData.manufacturer} ${phoneData.model}`);
+        }
+      });
+      
+      console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
+      
+      // Now fetch inventory data
       const inventoryRef = collection(db, 'inventory');
       const snapshot = await getDocs(inventoryRef);
       
@@ -4719,6 +4897,14 @@ const InventorySummaryForm = () => {
       
       snapshot.forEach(doc => {
         const item = { id: doc.id, ...doc.data() };
+        
+        // NEW: Check if this model should be excluded from summary
+        const modelKey = `${item.manufacturer}_${item.model}`;
+        if (excludedModels.has(modelKey)) {
+          console.log(`Skipping excluded model: ${item.manufacturer} ${item.model}`);
+          return; // Skip this item
+        }
+        
         const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
         
         // Add to filter options
@@ -4834,6 +5020,10 @@ const InventorySummaryForm = () => {
       setInventoryData(inventoryArray);
       setFilteredData(inventoryArray);
       setLoading(false);
+      
+      // NEW: Log summary of excluded models for debugging
+      console.log(`Inventory Summary loaded: ${inventoryArray.length} configurations (${excludedModels.size} models excluded)`);
+      
     } catch (err) {
       console.error("Error fetching inventory data:", err);
       setError(`Error fetching inventory: ${err.message}`);
@@ -4841,9 +5031,10 @@ const InventorySummaryForm = () => {
     }
   };
 
-  // Effects
+  // UPDATED: Effects to include fetchExcludedModelsInfo
   useEffect(() => {
     fetchInventoryData();
+    fetchExcludedModelsInfo(); // NEW: Add this line
   }, []);
   
   useEffect(() => {
@@ -4855,7 +5046,9 @@ const InventorySummaryForm = () => {
     applyFilters();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, inventoryData]);
+{/* Part 2 End - Filter Functions and Updated fetchInventoryData */}
 
+{/* Part 3 Start - Loading and Error States */}
   // Loading state
   if (loading) {
     return (
@@ -5011,7 +5204,34 @@ const InventorySummaryForm = () => {
           </div>
         )}
 
+        {/* NEW: Add Excluded Models Info Display */}
         <CardContent className="p-4">
+          {excludedModelsInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CircleAlert className="h-5 w-5 text-yellow-600" />
+                <h4 className="font-medium text-yellow-800">
+                  Excluded Models ({excludedModelsInfo.length})
+                </h4>
+              </div>
+              <div className="text-sm text-yellow-700">
+                The following models are excluded from this summary:
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {excludedModelsInfo.map((model, index) => (
+                  <span 
+                    key={index}
+                    className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
+                  >
+                    {model.manufacturer} {model.model}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+{/* Part 3 End - Loading and Error States */}
+
+{/* Part 4 Start - Main Table Content */}
           {filteredData.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
               <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -5027,7 +5247,8 @@ const InventorySummaryForm = () => {
                 <p className="text-gray-500">There are no inventory items in the database.</p>
               )}
             </div>
-          ) : (<div className="space-y-4">
+          ) : (
+            <div className="space-y-4">
               {/* Inventory list */}
               <div className="bg-white border rounded-lg overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -5101,7 +5322,7 @@ const InventorySummaryForm = () => {
                               {item.totalAvailable}
                             </span>
                           </td>
-                        </tr>
+                        </tr>{/* Part 5 Start - Expanded Color Breakdown Section */}
                         
                         {/* Expanded color breakdown */}
                         {expandedRows.has(index) && (
@@ -5309,6 +5530,9 @@ const InventorySummaryForm = () => {
                   </tbody>
                 </table>
               </div>
+{/* Part 5 End - Expanded Color Breakdown Section */}
+
+{/* Part 6 Start - Inventory Value Summary and Footer */}
               {/* Inventory Value Summary */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
@@ -5411,6 +5635,7 @@ const InventorySummaryForm = () => {
 };
 
 export default InventorySummaryForm;
+{/* Part 6 End - Inventory Value Summary and Footer */}
 </file>
 
 <file path="src/components/phone-selection/hooks/usePhoneCache.js">
@@ -5637,6 +5862,83 @@ PhoneAdditionalInfo.propTypes = {
 };
 
 export default PhoneAdditionalInfo;
+</file>
+
+<file path="src/App.jsx">
+// src/App.jsx
+import { useEffect } from 'react';
+import PhoneSpecForm from './components/PhoneSpecForm';
+import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
+import InventoryListForm from './components/InventoryListForm';
+import PhoneListForm from './components/PhoneListForm';
+import InventorySummaryForm from './components/InventorySummaryForm';
+import PriceManagementForm from './components/PriceManagementForm';
+// Import the hook from our consolidated file
+import { useGlobalState } from './context/GlobalStateContext';
+
+function App() {
+  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
+  
+  // For debugging
+  useEffect(() => {
+    console.log("App: Active component changed to:", activeComponent);
+    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
+  }, [activeComponent, phoneToEdit]);
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="p-4 bg-[rgb(52,69,157)] text-white">
+        <div className="max-w-6xl mx-auto flex flex-wrap gap-4">
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'summary' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('summary')}
+          >
+            Inventory Summary
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('inventory')}
+          >
+            Inventory List
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('selection')}
+          >
+            Add Phone Inventory
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('form')}
+          >
+            Add Phone Model
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('phonelist')}
+          >
+            Phone Models
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('prices')}
+          >
+            Price Management
+          </button>
+        </div>
+      </div>
+      
+      {activeComponent === 'summary' && <InventorySummaryForm />}
+      {activeComponent === 'selection' && <PhoneSelectionForm />}
+      {activeComponent === 'form' && <PhoneSpecForm />}
+      {activeComponent === 'inventory' && <InventoryListForm />}
+      {activeComponent === 'phonelist' && <PhoneListForm />}
+      {activeComponent === 'prices' && <PriceManagementForm />}
+    </div>
+  );
+}
+
+export default App;
 </file>
 
 <file path="src/components/inventory/InventoryEditForm.jsx">
@@ -6392,6 +6694,385 @@ const InventoryListForm = () => {
 export default InventoryListForm;
 </file>
 
+<file path="src/components/inventory/InventoryTable.jsx">
+import { useState } from 'react';
+import PropTypes from 'prop-types';
+import { doc, updateDoc, runTransaction, increment, deleteDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import InventoryRow from './InventoryRow';
+import InventoryEditForm from './InventoryEditForm';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+// Import getCurrentDate utility function
+import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
+
+const InventoryTable = ({ 
+  inventoryItems, 
+  handleSort, 
+  sortField, 
+  sortDirection, 
+  allItems,
+  setAllItems,
+  setInventoryItems,
+  applyFilters
+}) => {
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: '',
+    color: '',
+    imei1: '',
+    barcode: '',
+    status: ''
+  });
+  const [savingItemId, setSavingItemId] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Handle edit button click
+  const handleEditClick = (item) => {
+    // If we're already editing, cancel it first
+    if (editingItemId) {
+      setEditingItemId(null);
+    }
+    
+    // Set the item to edit
+    setEditingItemId(item.id);
+    
+    // Populate form with item data
+    setEditFormData({
+      manufacturer: item.manufacturer,
+      model: item.model,
+      ram: item.ram,
+      storage: item.storage,
+      color: item.color,
+      imei1: item.imei1,
+      barcode: item.barcode || '',
+      status: item.status
+    });
+  };
+
+  // Handle delete button click
+  const handleDeleteClick = (itemId) => {
+    const item = allItems.find(item => item.id === itemId);
+    if (item) {
+      setItemToDelete(item);
+      setIsDeleteModalOpen(true);
+    }
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Get a reference to the document
+      const itemRef = doc(db, 'inventory', itemToDelete.id);
+      
+      // Delete the document
+      await deleteDoc(itemRef);
+      
+      // Update inventory counts
+      const inventoryId = `${itemToDelete.manufacturer}_${itemToDelete.model}_${itemToDelete.ram}_${itemToDelete.storage}_${itemToDelete.color}`.replace(/\s+/g, '_').toLowerCase();
+      
+      // Reference to the inventory count doc
+      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+      
+      // Update inventory counts based on the item's status
+      await runTransaction(db, async (transaction) => {
+        const inventoryDoc = await transaction.get(inventoryRef);
+        
+        if (inventoryDoc.exists()) {
+          // Determine which field to decrement based on status
+          const decrementField = 
+            itemToDelete.status === 'On-Hand' ? 'onHand' : 
+            itemToDelete.status === 'On-Display' ? 'onDisplay' : 
+            itemToDelete.status === 'Sold' ? 'sold' : 
+            itemToDelete.status === 'Reserved' ? 'reserved' : 
+            'defective';
+          
+          // Decrement total and status count
+          transaction.update(inventoryRef, {
+            total: increment(-1),
+            [decrementField]: increment(-1),
+            lastUpdated: new Date().toLocaleDateString()
+          });
+        }
+      });
+      
+      // Update local state by removing the deleted item
+      const updatedItems = allItems.filter(item => item.id !== itemToDelete.id);
+      setAllItems(updatedItems);
+      
+      // Re-apply filters
+      const filteredItems = applyFilters(updatedItems);
+      setInventoryItems(filteredItems);
+      
+      // Close the modal and reset state
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+      setIsDeleting(false);
+      
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      alert(`Error deleting item: ${error.message}`);
+      setIsDeleting(false);
+    }
+  };
+
+  // Handle cancel delete
+  const handleDeleteCancel = () => {
+    setIsDeleteModalOpen(false);
+    setItemToDelete(null);
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditFormData({
+      manufacturer: '',
+      model: '',
+      ram: '',
+      storage: '',
+      color: '',
+      imei1: '',
+      barcode: '',
+      status: ''
+    });
+  };
+
+  // Handle edit form input changes
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle save edits - includes lastUpdated
+  const handleSaveEdit = async (id) => {
+    setSavingItemId(id);
+    
+    try {
+      // Create an update object with the edited fields
+      const updateData = {
+        manufacturer: editFormData.manufacturer,
+        model: editFormData.model,
+        ram: editFormData.ram,
+        storage: editFormData.storage,
+        color: editFormData.color,
+        imei1: editFormData.imei1,
+        barcode: editFormData.barcode,
+        status: editFormData.status,
+        lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
+      };
+      
+      // Get a reference to the document
+      const itemRef = doc(db, 'inventory', id);
+      
+      // Update the document
+      await updateDoc(itemRef, updateData);
+      
+      // If the status was changed, update the inventory counts
+      const originalItem = allItems.find(item => item.id === id);
+      if (originalItem && originalItem.status !== editFormData.status) {
+        // Create a unique ID for this inventory item type
+        const inventoryId = `${editFormData.manufacturer}_${editFormData.model}_${editFormData.ram}_${editFormData.storage}_${editFormData.color}`.replace(/\s+/g, '_').toLowerCase();
+        
+        // Reference to the inventory count doc
+        const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+        
+        // Run as a transaction to ensure data consistency
+        await runTransaction(db, async (transaction) => {
+          const inventoryDoc = await transaction.get(inventoryRef);
+          
+          if (inventoryDoc.exists()) {
+            // Decrement the old status count
+            const decrementField = 
+              originalItem.status === 'On-Hand' ? 'onHand' : 
+              originalItem.status === 'On-Display' ? 'onDisplay' : 
+              originalItem.status === 'Sold' ? 'sold' : 
+              originalItem.status === 'Reserved' ? 'reserved' : 
+              'defective';
+            
+            // Increment the new status count
+            const incrementField = 
+              editFormData.status === 'On-Hand' ? 'onHand' : 
+              editFormData.status === 'On-Display' ? 'onDisplay' : 
+              editFormData.status === 'Sold' ? 'sold' : 
+              editFormData.status === 'Reserved' ? 'reserved' : 
+              'defective';
+            
+            // Update counters
+            transaction.update(inventoryRef, {
+              [decrementField]: increment(-1),
+              [incrementField]: increment(1),
+              lastUpdated: new Date().toLocaleDateString()
+            });
+          }
+        });
+      }
+      
+      // Update local state - includes lastUpdated
+      setAllItems(prevItems => 
+        prevItems.map(item => 
+          item.id === id 
+            ? { 
+                ...item, 
+                ...updateData,
+                // Keep original prices since we're not editing them
+                dealersPrice: item.dealersPrice,
+                retailPrice: item.retailPrice
+              } 
+            : item
+        )
+      );
+      
+      // Reset editing state
+      setEditingItemId(null);
+      setSavingItemId(null);
+      
+      // Re-apply filters to update the displayed inventory items - includes lastUpdated
+      const updatedItems = allItems.map(item => 
+        item.id === id 
+          ? { 
+              ...item, 
+              ...updateData,
+              // Keep original prices since we're not editing them
+              dealersPrice: item.dealersPrice,
+              retailPrice: item.retailPrice
+            } 
+          : item
+      );
+      const filteredItems = applyFilters(updatedItems);
+      setInventoryItems(filteredItems);
+      
+    } catch (error) {
+      console.error("Error updating item:", error);
+      alert(`Error updating item: ${error.message}`);
+      setSavingItemId(null);
+    }
+  };
+  
+  // Sort the inventory items based on sortField and sortDirection
+  const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
+    // Handle numeric fields
+    if (sortField === 'retailPrice') {
+      if (sortDirection === 'asc') {
+        return a.retailPrice - b.retailPrice;
+      } else {
+        return b.retailPrice - a.retailPrice;
+      }
+    }
+    
+    // Handle string fields
+    if (sortDirection === 'asc') {
+      return a[sortField]?.localeCompare(b[sortField] || '');
+    } else {
+      return b[sortField]?.localeCompare(a[sortField] || '');
+    }
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-base">
+        <thead>
+          <tr className="bg-gray-100">
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('manufacturer')}
+              style={{ width: '14%' }}
+            >
+              Manufacturer
+              {sortField === 'manufacturer' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('model')}
+              style={{ width: '14%' }}
+            >
+              Model
+              {sortField === 'model' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>RAM</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>Storage</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '14%' }}>Color</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>IMEI1</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>Barcode</th>
+            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '10%' }}>Date</th>
+            <th 
+              className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('status')}
+              style={{ width: '10%' }}
+            >
+              Status
+              {sortField === 'status' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '8%' }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedInventoryItems.map((item) => (
+            editingItemId === item.id ? (
+              <InventoryEditForm 
+                key={item.id}
+                itemId={item.id}
+                editFormData={editFormData}
+                handleEditInputChange={handleEditInputChange}
+                handleSaveEdit={handleSaveEdit}
+                handleCancelEdit={handleCancelEdit}
+                savingItemId={savingItemId}
+              />
+            ) : (
+              <InventoryRow 
+                key={item.id}
+                item={item}
+                handleEditClick={handleEditClick}
+                handleDeleteClick={handleDeleteClick}
+              />
+            )
+          ))}
+        </tbody>
+      </table>
+
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        itemToDelete={itemToDelete}
+        onCancel={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+      />
+    </div>
+  );
+};
+
+InventoryTable.propTypes = {
+  inventoryItems: PropTypes.array.isRequired,
+  handleSort: PropTypes.func.isRequired,
+  sortField: PropTypes.string.isRequired,
+  sortDirection: PropTypes.string.isRequired,
+  allItems: PropTypes.array.isRequired,
+  setAllItems: PropTypes.func.isRequired,
+  setInventoryItems: PropTypes.func.isRequired,
+  applyFilters: PropTypes.func.isRequired
+};
+
+export default InventoryTable;
+</file>
+
 <file path="src/components/phone-selection/PhoneSelectionForm.jsx">
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7080,385 +7761,6 @@ const PhoneSelectionForm = () => {
 };
 
 export default PhoneSelectionForm;
-</file>
-
-<file path="src/components/inventory/InventoryTable.jsx">
-import { useState } from 'react';
-import PropTypes from 'prop-types';
-import { doc, updateDoc, runTransaction, increment, deleteDoc } from 'firebase/firestore';
-import { db } from '../../firebase/config';
-import InventoryRow from './InventoryRow';
-import InventoryEditForm from './InventoryEditForm';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
-// Import getCurrentDate utility function
-import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
-
-const InventoryTable = ({ 
-  inventoryItems, 
-  handleSort, 
-  sortField, 
-  sortDirection, 
-  allItems,
-  setAllItems,
-  setInventoryItems,
-  applyFilters
-}) => {
-  const [editingItemId, setEditingItemId] = useState(null);
-  const [editFormData, setEditFormData] = useState({
-    manufacturer: '',
-    model: '',
-    ram: '',
-    storage: '',
-    color: '',
-    imei1: '',
-    barcode: '',
-    status: ''
-  });
-  const [savingItemId, setSavingItemId] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Handle edit button click
-  const handleEditClick = (item) => {
-    // If we're already editing, cancel it first
-    if (editingItemId) {
-      setEditingItemId(null);
-    }
-    
-    // Set the item to edit
-    setEditingItemId(item.id);
-    
-    // Populate form with item data
-    setEditFormData({
-      manufacturer: item.manufacturer,
-      model: item.model,
-      ram: item.ram,
-      storage: item.storage,
-      color: item.color,
-      imei1: item.imei1,
-      barcode: item.barcode || '',
-      status: item.status
-    });
-  };
-
-  // Handle delete button click
-  const handleDeleteClick = (itemId) => {
-    const item = allItems.find(item => item.id === itemId);
-    if (item) {
-      setItemToDelete(item);
-      setIsDeleteModalOpen(true);
-    }
-  };
-
-  // Handle delete confirmation
-  const handleDeleteConfirm = async () => {
-    if (!itemToDelete) return;
-    
-    setIsDeleting(true);
-    
-    try {
-      // Get a reference to the document
-      const itemRef = doc(db, 'inventory', itemToDelete.id);
-      
-      // Delete the document
-      await deleteDoc(itemRef);
-      
-      // Update inventory counts
-      const inventoryId = `${itemToDelete.manufacturer}_${itemToDelete.model}_${itemToDelete.ram}_${itemToDelete.storage}_${itemToDelete.color}`.replace(/\s+/g, '_').toLowerCase();
-      
-      // Reference to the inventory count doc
-      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
-      
-      // Update inventory counts based on the item's status
-      await runTransaction(db, async (transaction) => {
-        const inventoryDoc = await transaction.get(inventoryRef);
-        
-        if (inventoryDoc.exists()) {
-          // Determine which field to decrement based on status
-          const decrementField = 
-            itemToDelete.status === 'On-Hand' ? 'onHand' : 
-            itemToDelete.status === 'On-Display' ? 'onDisplay' : 
-            itemToDelete.status === 'Sold' ? 'sold' : 
-            itemToDelete.status === 'Reserved' ? 'reserved' : 
-            'defective';
-          
-          // Decrement total and status count
-          transaction.update(inventoryRef, {
-            total: increment(-1),
-            [decrementField]: increment(-1),
-            lastUpdated: new Date().toLocaleDateString()
-          });
-        }
-      });
-      
-      // Update local state by removing the deleted item
-      const updatedItems = allItems.filter(item => item.id !== itemToDelete.id);
-      setAllItems(updatedItems);
-      
-      // Re-apply filters
-      const filteredItems = applyFilters(updatedItems);
-      setInventoryItems(filteredItems);
-      
-      // Close the modal and reset state
-      setIsDeleteModalOpen(false);
-      setItemToDelete(null);
-      setIsDeleting(false);
-      
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      alert(`Error deleting item: ${error.message}`);
-      setIsDeleting(false);
-    }
-  };
-
-  // Handle cancel delete
-  const handleDeleteCancel = () => {
-    setIsDeleteModalOpen(false);
-    setItemToDelete(null);
-  };
-
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditingItemId(null);
-    setEditFormData({
-      manufacturer: '',
-      model: '',
-      ram: '',
-      storage: '',
-      color: '',
-      imei1: '',
-      barcode: '',
-      status: ''
-    });
-  };
-
-  // Handle edit form input changes
-  const handleEditInputChange = (e) => {
-    const { name, value } = e.target;
-    
-    setEditFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Handle save edits - includes lastUpdated
-  const handleSaveEdit = async (id) => {
-    setSavingItemId(id);
-    
-    try {
-      // Create an update object with the edited fields
-      const updateData = {
-        manufacturer: editFormData.manufacturer,
-        model: editFormData.model,
-        ram: editFormData.ram,
-        storage: editFormData.storage,
-        color: editFormData.color,
-        imei1: editFormData.imei1,
-        barcode: editFormData.barcode,
-        status: editFormData.status,
-        lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
-      };
-      
-      // Get a reference to the document
-      const itemRef = doc(db, 'inventory', id);
-      
-      // Update the document
-      await updateDoc(itemRef, updateData);
-      
-      // If the status was changed, update the inventory counts
-      const originalItem = allItems.find(item => item.id === id);
-      if (originalItem && originalItem.status !== editFormData.status) {
-        // Create a unique ID for this inventory item type
-        const inventoryId = `${editFormData.manufacturer}_${editFormData.model}_${editFormData.ram}_${editFormData.storage}_${editFormData.color}`.replace(/\s+/g, '_').toLowerCase();
-        
-        // Reference to the inventory count doc
-        const inventoryRef = doc(db, 'inventory_counts', inventoryId);
-        
-        // Run as a transaction to ensure data consistency
-        await runTransaction(db, async (transaction) => {
-          const inventoryDoc = await transaction.get(inventoryRef);
-          
-          if (inventoryDoc.exists()) {
-            // Decrement the old status count
-            const decrementField = 
-              originalItem.status === 'On-Hand' ? 'onHand' : 
-              originalItem.status === 'On-Display' ? 'onDisplay' : 
-              originalItem.status === 'Sold' ? 'sold' : 
-              originalItem.status === 'Reserved' ? 'reserved' : 
-              'defective';
-            
-            // Increment the new status count
-            const incrementField = 
-              editFormData.status === 'On-Hand' ? 'onHand' : 
-              editFormData.status === 'On-Display' ? 'onDisplay' : 
-              editFormData.status === 'Sold' ? 'sold' : 
-              editFormData.status === 'Reserved' ? 'reserved' : 
-              'defective';
-            
-            // Update counters
-            transaction.update(inventoryRef, {
-              [decrementField]: increment(-1),
-              [incrementField]: increment(1),
-              lastUpdated: new Date().toLocaleDateString()
-            });
-          }
-        });
-      }
-      
-      // Update local state - includes lastUpdated
-      setAllItems(prevItems => 
-        prevItems.map(item => 
-          item.id === id 
-            ? { 
-                ...item, 
-                ...updateData,
-                // Keep original prices since we're not editing them
-                dealersPrice: item.dealersPrice,
-                retailPrice: item.retailPrice
-              } 
-            : item
-        )
-      );
-      
-      // Reset editing state
-      setEditingItemId(null);
-      setSavingItemId(null);
-      
-      // Re-apply filters to update the displayed inventory items - includes lastUpdated
-      const updatedItems = allItems.map(item => 
-        item.id === id 
-          ? { 
-              ...item, 
-              ...updateData,
-              // Keep original prices since we're not editing them
-              dealersPrice: item.dealersPrice,
-              retailPrice: item.retailPrice
-            } 
-          : item
-      );
-      const filteredItems = applyFilters(updatedItems);
-      setInventoryItems(filteredItems);
-      
-    } catch (error) {
-      console.error("Error updating item:", error);
-      alert(`Error updating item: ${error.message}`);
-      setSavingItemId(null);
-    }
-  };
-  
-  // Sort the inventory items based on sortField and sortDirection
-  const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
-    // Handle numeric fields
-    if (sortField === 'retailPrice') {
-      if (sortDirection === 'asc') {
-        return a.retailPrice - b.retailPrice;
-      } else {
-        return b.retailPrice - a.retailPrice;
-      }
-    }
-    
-    // Handle string fields
-    if (sortDirection === 'asc') {
-      return a[sortField]?.localeCompare(b[sortField] || '');
-    } else {
-      return b[sortField]?.localeCompare(a[sortField] || '');
-    }
-  });
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-base">
-        <thead>
-          <tr className="bg-gray-100">
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('manufacturer')}
-              style={{ width: '14%' }}
-            >
-              Manufacturer
-              {sortField === 'manufacturer' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('model')}
-              style={{ width: '14%' }}
-            >
-              Model
-              {sortField === 'model' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>RAM</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>Storage</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '14%' }}>Color</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>IMEI1</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>Barcode</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '10%' }}>Date</th>
-            <th 
-              className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('status')}
-              style={{ width: '10%' }}
-            >
-              Status
-              {sortField === 'status' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '8%' }}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedInventoryItems.map((item) => (
-            editingItemId === item.id ? (
-              <InventoryEditForm 
-                key={item.id}
-                itemId={item.id}
-                editFormData={editFormData}
-                handleEditInputChange={handleEditInputChange}
-                handleSaveEdit={handleSaveEdit}
-                handleCancelEdit={handleCancelEdit}
-                savingItemId={savingItemId}
-              />
-            ) : (
-              <InventoryRow 
-                key={item.id}
-                item={item}
-                handleEditClick={handleEditClick}
-                handleDeleteClick={handleDeleteClick}
-              />
-            )
-          ))}
-        </tbody>
-      </table>
-
-      {/* Delete confirmation modal */}
-      <DeleteConfirmationModal
-        isOpen={isDeleteModalOpen}
-        itemToDelete={itemToDelete}
-        onCancel={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-        isDeleting={isDeleting}
-      />
-    </div>
-  );
-};
-
-InventoryTable.propTypes = {
-  inventoryItems: PropTypes.array.isRequired,
-  handleSort: PropTypes.func.isRequired,
-  sortField: PropTypes.string.isRequired,
-  sortDirection: PropTypes.string.isRequired,
-  allItems: PropTypes.array.isRequired,
-  setAllItems: PropTypes.func.isRequired,
-  setInventoryItems: PropTypes.func.isRequired,
-  applyFilters: PropTypes.func.isRequired
-};
-
-export default InventoryTable;
 </file>
 
 </files>
