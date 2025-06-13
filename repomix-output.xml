@@ -67,9 +67,11 @@ src/components/phone-selection/PhoneSelectionForm.jsx
 src/components/phone-selection/services/InventoryService.js
 src/components/phone-selection/utils/phoneUtils.js
 src/components/PhoneListForm.jsx
+src/components/PhoneProcurementForm.jsx
 src/components/PhoneSpecCard.jsx
 src/components/PhoneSpecForm.jsx
 src/components/PriceManagementForm.jsx
+src/components/SupplierManagementForm.jsx
 src/components/ui/badge/index.jsx
 src/components/ui/badge/variants.jsx
 src/components/ui/card.jsx
@@ -85,6 +87,2290 @@ vite.config.js
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/components/PhoneProcurementForm.jsx">
+{/* Part 1 Start - Imports, State, and Helper Functions with Persistence Logic */}
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { 
+  RefreshCw, 
+  Plus,
+  Minus,
+  ShoppingCart,
+  Trash2
+} from 'lucide-react';
+
+const PhoneProcurementForm = () => {
+  // ====== STATE DEFINITIONS ======
+  // Table data for multiple phone models
+  const [procurementItems, setProcurementItems] = useState([]);
+  const [nextId, setNextId] = useState(1);
+  
+  // Current item being added
+  const [currentItem, setCurrentItem] = useState({
+    id: null,
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: '',
+    color: '',
+    supplier: '',
+    quantity: 1,
+    dealersPrice: '',
+    retailPrice: '',
+    totalPrice: 0
+  });
+  
+  // Options from database
+  const [manufacturers, setManufacturers] = useState([]);
+  const [models, setModels] = useState([]);
+  const [rams, setRams] = useState([]);
+  const [storages, setStorages] = useState([]);
+  const [colors, setColors] = useState([]);
+  
+  // General procurement details
+  const [purchaseDate, setPurchaseDate] = useState('');
+  const [isPaid, setIsPaid] = useState(false);
+  const [isReceived, setIsReceived] = useState(false);
+  const [datePaid, setDatePaid] = useState('');
+  const [dateDelivered, setDateDelivered] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [accountPayable, setAccountPayable] = useState('');
+  
+  // UI state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCurrentItemValid, setIsCurrentItemValid] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
+  
+  // NEW: State for tracking available colors for each item in the table
+  const [itemColorOptions, setItemColorOptions] = useState({});
+
+  // ====== HELPER FUNCTIONS ======
+  // UPDATED: Get current date in YYYY-MM-DD format for date input
+  const getCurrentDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = (today.getMonth() + 1).toString().padStart(2, '0');
+    const day = today.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Format number with commas
+  const formatNumberWithCommas = (value) => {
+    if (!value && value !== 0) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  // Validation function for price
+  const validatePrice = (value) => {
+    return value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+  };
+
+  // Calculate total for current item
+  const calculateItemTotal = (quantity, price) => {
+    if (!price || !quantity) return 0;
+    const cleanPrice = parseFloat(price.replace(/,/g, '')) || 0;
+    return cleanPrice * quantity;
+  };
+
+  // Calculate grand total for all items
+  const calculateGrandTotal = () => {
+    return procurementItems.reduce((total, item) => total + item.totalPrice, 0);
+  };
+
+  // Format with GB suffix if needed
+  const formatWithGB = (value) => {
+    if (!value) return 'N/A';
+    if (value.includes('GB') || value.includes('TB') || value.includes('gb') || value.includes('tb')) {
+      return value;
+    }
+    return `${value}GB`;
+  };
+
+  // Calculate margin percentage
+  const calculateMargin = (dealersPrice, retailPrice) => {
+    if (!dealersPrice || !retailPrice) return 'N/A';
+    const dPrice = parseFloat(dealersPrice.replace(/,/g, '')) || 0;
+    const rPrice = parseFloat(retailPrice.replace(/,/g, '')) || 0;
+    
+    if (dPrice <= 0) return '0.00';
+    
+    const margin = ((rPrice - dPrice) / dPrice) * 100;
+    return margin.toFixed(2);
+  };
+
+  // Generate unique ID for items
+  const generateItemId = () => {
+    const id = nextId;
+    setNextId(prev => prev + 1);
+    return id;
+  };
+
+  // NEW: Handle payment status change
+  const handlePaymentStatusChange = (e) => {
+    const newPaymentStatus = e.target.value === 'Paid';
+    setIsPaid(newPaymentStatus);
+    
+    if (newPaymentStatus) {
+      // If changing to Paid, set date paid to current date
+      setDatePaid(getCurrentDate());
+    } else {
+      // If changing from Paid to Unpaid, clear the related fields
+      setDatePaid('');
+      setPaymentReference('');
+    }
+  };
+
+  // NEW: Handle delivery status change
+  const handleDeliveryStatusChange = (e) => {
+    const newDeliveryStatus = e.target.value === 'Delivered';
+    setIsReceived(newDeliveryStatus);
+    
+    if (newDeliveryStatus) {
+      // If changing to Delivered, set date delivered to current date
+      setDateDelivered(getCurrentDate());
+    } else {
+      // If changing from Delivered to Pending, clear the date delivered field
+      setDateDelivered('');
+    }
+  };
+
+  // NEW: Handle date paid change
+  const handleDatePaidChange = (e) => {
+    setDatePaid(e.target.value);
+  };
+
+  // NEW: Handle date delivered change
+  const handleDateDeliveredChange = (e) => {
+    setDateDelivered(e.target.value);
+  };
+
+  // NEW: Handle payment reference change
+  const handlePaymentReferenceChange = (e) => {
+    setPaymentReference(e.target.value);
+  };
+
+  // NEW: Handle bank name change
+  const handleBankNameChange = (e) => {
+    setBankName(e.target.value);
+  };
+
+  // NEW: Handle bank account change
+  const handleBankAccountChange = (e) => {
+    setBankAccount(e.target.value);
+  };
+
+  // NEW: Handle account payable change
+  const handleAccountPayableChange = (e) => {
+    setAccountPayable(e.target.value);
+  };
+
+  // NEW: Handle retail price change for current item
+  const handleCurrentRetailPriceChange = (e) => {
+    const rawValue = e.target.value;
+    
+    if (rawValue === '') {
+      setCurrentItem(prev => ({
+        ...prev,
+        retailPrice: ''
+      }));
+    } else {
+      const validatedPrice = validatePrice(rawValue);
+      const formattedPrice = formatNumberWithCommas(validatedPrice);
+      setCurrentItem(prev => ({
+        ...prev,
+        retailPrice: formattedPrice
+      }));
+    }
+  };
+
+  // UPDATED: Modified reset function to preserve supplier and manufacturer
+  const resetCurrentItem = () => {
+    const preservedManufacturer = currentItem.manufacturer;
+    const preservedSupplier = currentItem.supplier;
+    
+    setCurrentItem({
+      id: null,
+      manufacturer: preservedManufacturer, // KEEP manufacturer
+      model: '',
+      ram: '',
+      storage: '',
+      color: '',
+      supplier: preservedSupplier, // KEEP supplier
+      quantity: 1,
+      dealersPrice: '',
+      retailPrice: '',
+      totalPrice: 0
+    });
+    
+    // DON'T clear the options arrays if manufacturer is preserved
+    if (!preservedManufacturer) {
+      setModels([]);
+      setRams([]);
+      setStorages([]);
+      setColors([]);
+    }
+    // If manufacturer is preserved, keep the models but clear the dependent options
+    else {
+      setRams([]);
+      setStorages([]);
+      setColors([]);
+    }
+    
+    setIsCurrentItemValid(false);
+  };
+
+  // NEW: Function to increment quantity in table
+  const incrementTableQuantity = (itemId) => {
+    setProcurementItems(prev => 
+      prev.map(item => {
+        if (item.id === itemId) {
+          const newQuantity = item.quantity + 1;
+          const newTotalPrice = calculateItemTotal(newQuantity, item.dealersPrice);
+          return {
+            ...item,
+            quantity: newQuantity,
+            totalPrice: newTotalPrice
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  // NEW: Function to decrement quantity in table
+  const decrementTableQuantity = (itemId) => {
+    const item = procurementItems.find(item => item.id === itemId);
+    if (item && item.quantity === 1) {
+      // Remove item if quantity would become 0
+      setProcurementItems(prev => prev.filter(item => item.id !== itemId));
+    } else {
+      setProcurementItems(prev => 
+        prev.map(item => {
+          if (item.id === itemId) {
+            const newQuantity = Math.max(1, item.quantity - 1);
+            const newTotalPrice = calculateItemTotal(newQuantity, item.dealersPrice);
+            return {
+              ...item,
+              quantity: newQuantity,
+              totalPrice: newTotalPrice
+            };
+          }
+          return item;
+        })
+      );
+    }
+  };
+
+  // NEW: Function to handle color change in table
+  const handleTableColorChange = async (itemId, newColor) => {
+    const item = procurementItems.find(item => item.id === itemId);
+    if (!item) return;
+
+    // Fetch price for new color configuration
+    const price = await fetchPriceForConfiguration(
+      item.manufacturer, 
+      item.model, 
+      item.ram, 
+      item.storage, 
+      newColor
+    );
+
+    setProcurementItems(prev => 
+      prev.map(mappedItem => {
+        if (mappedItem.id === itemId) {
+          const newDealersPrice = price || mappedItem.dealersPrice;
+          const newTotalPrice = calculateItemTotal(mappedItem.quantity, newDealersPrice);
+          return {
+            ...mappedItem,
+            color: newColor,
+            dealersPrice: newDealersPrice,
+            totalPrice: newTotalPrice
+          };
+        }
+        return mappedItem;
+      })
+    );
+  };
+
+  // NEW: Function to get available colors for a specific item
+  const getAvailableColorsForItem = async (manufacturer, model) => {
+    try {
+      const phonesRef = collection(db, 'phones');
+      const q = query(
+        phonesRef, 
+        where("manufacturer", "==", manufacturer),
+        where("model", "==", model)
+      );
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        return Array.isArray(data.colors) ? data.colors : [];
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching colors:", error);
+      return [];
+    }
+  };
+{/* Part 1 End - Imports, State, and Helper Functions with Persistence Logic */}
+
+{/* Part 2 Start - Data Fetching Functions */}
+  // ====== DATA FETCHING FUNCTIONS ======
+  // Fetch manufacturers from phones collection
+  const fetchManufacturers = useCallback(async () => {
+    setLoading(true);
+    try {
+      console.log("Fetching manufacturers...");
+      const phonesRef = collection(db, 'phones');
+      const snapshot = await getDocs(phonesRef);
+      
+      const uniqueManufacturers = new Set();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.manufacturer) {
+          uniqueManufacturers.add(data.manufacturer);
+        }
+      });
+      
+      const manufacturerArray = Array.from(uniqueManufacturers).sort();
+      console.log("Manufacturers fetched:", manufacturerArray);
+      setManufacturers(manufacturerArray);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching manufacturers:", error);
+      setError(`Error fetching manufacturers: ${error.message}`);
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch models for a specific manufacturer
+  const fetchModels = useCallback(async (manufacturer) => {
+    if (!manufacturer) {
+      setModels([]);
+      return;
+    }
+    
+    try {
+      console.log(`Fetching models for ${manufacturer}...`);
+      const phonesRef = collection(db, 'phones');
+      const q = query(phonesRef, where("manufacturer", "==", manufacturer));
+      const snapshot = await getDocs(q);
+      
+      const uniqueModels = new Set();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.model) {
+          uniqueModels.add(data.model);
+        }
+      });
+      
+      const modelArray = Array.from(uniqueModels).sort();
+      console.log("Models fetched:", modelArray);
+      setModels(modelArray);
+    } catch (error) {
+      console.error(`Error fetching models for ${manufacturer}:`, error);
+      setError(`Error fetching models: ${error.message}`);
+    }
+  }, []);
+
+  // Fetch options (RAM, storage, colors) for a specific manufacturer and model
+  const fetchOptions = useCallback(async (manufacturer, model) => {
+    if (!manufacturer || !model) {
+      setRams([]);
+      setStorages([]);
+      setColors([]);
+      return;
+    }
+    
+    try {
+      console.log(`Fetching options for ${manufacturer} ${model}...`);
+      const phonesRef = collection(db, 'phones');
+      const q = query(
+        phonesRef, 
+        where("manufacturer", "==", manufacturer),
+        where("model", "==", model)
+      );
+      const snapshot = await getDocs(q);
+      
+      let ramArray = [];
+      let storageArray = [];
+      let colorArray = [];
+      
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        
+        ramArray = Array.isArray(data.storage_extra) ? data.storage_extra : [];
+        storageArray = Array.isArray(data.storage) ? data.storage : [];
+        colorArray = Array.isArray(data.colors) ? data.colors : [];
+        
+        setRams(ramArray);
+        setStorages(storageArray);
+        setColors(colorArray);
+        
+        console.log("Options fetched:", {
+          rams: ramArray,
+          storages: storageArray,
+          colors: colorArray
+        });
+      }
+    } catch (error) {
+      console.error(`Error fetching options for ${manufacturer} ${model}:`, error);
+      setError(`Error fetching options: ${error.message}`);
+    }
+  }, []);
+
+  // Fetch price for specific configuration - UPDATED to return both dealer and retail prices
+  const fetchPriceForConfiguration = useCallback(async (manufacturer, model, ram, storage, color) => {
+    try {
+      console.log("Fetching price for configuration...");
+      
+      // First try to get color-specific pricing
+      const colorConfigId = `${manufacturer}_${model}_${ram}_${storage}_${color}`.replace(/\s+/g, '_').toLowerCase();
+      const colorConfigRef = doc(db, 'price_configurations', colorConfigId);
+      const colorConfigSnap = await getDoc(colorConfigRef);
+      
+      if (colorConfigSnap.exists()) {
+        const colorData = colorConfigSnap.data();
+        console.log("Found color-specific pricing:", colorData);
+        
+        if (colorData.dealersPrice && colorData.retailPrice) {
+          return {
+            dealersPrice: formatNumberWithCommas(colorData.dealersPrice.toString()),
+            retailPrice: formatNumberWithCommas(colorData.retailPrice.toString())
+          };
+        }
+      }
+      
+      // If no color-specific pricing, try base pricing
+      const baseConfigId = `${manufacturer}_${model}_${ram}_${storage}`.replace(/\s+/g, '_').toLowerCase();
+      const baseConfigRef = doc(db, 'price_configurations', baseConfigId);
+      const baseConfigSnap = await getDoc(baseConfigRef);
+      
+      if (baseConfigSnap.exists()) {
+        const baseData = baseConfigSnap.data();
+        console.log("Found base pricing:", baseData);
+        
+        if (baseData.dealersPrice && baseData.retailPrice) {
+          return {
+            dealersPrice: formatNumberWithCommas(baseData.dealersPrice.toString()),
+            retailPrice: formatNumberWithCommas(baseData.retailPrice.toString())
+          };
+        }
+      }
+      
+      console.log("No pricing found for this configuration");
+      return null;
+    } catch (error) {
+      console.error("Error fetching price configuration:", error);
+      return null;
+    }
+  }, []);
+{/* Part 2 End - Data Fetching Functions */}
+
+{/* Part 3 Start - Current Item Event Handlers */}
+  // ====== CURRENT ITEM EVENT HANDLERS ======
+  // Handle manufacturer change for current item
+  const handleCurrentManufacturerChange = (e) => {
+    const newManufacturer = e.target.value;
+    setCurrentItem(prev => ({
+      ...prev,
+      manufacturer: newManufacturer,
+      model: '',
+      ram: '',
+      storage: '',
+      color: '',
+      dealersPrice: '',
+      retailPrice: '',
+      totalPrice: 0
+    }));
+    
+    if (newManufacturer) {
+      fetchModels(newManufacturer);
+    } else {
+      setModels([]);
+      setRams([]);
+      setStorages([]);
+      setColors([]);
+    }
+  };
+
+  // Handle model change for current item
+  const handleCurrentModelChange = (e) => {
+    const newModel = e.target.value;
+    setCurrentItem(prev => ({
+      ...prev,
+      model: newModel,
+      ram: '',
+      storage: '',
+      color: '',
+      dealersPrice: '',
+      retailPrice: '',
+      totalPrice: 0
+    }));
+    
+    if (currentItem.manufacturer && newModel) {
+      fetchOptions(currentItem.manufacturer, newModel);
+    } else {
+      setRams([]);
+      setStorages([]);
+      setColors([]);
+    }
+  };
+
+  // Handle RAM change for current item
+  const handleCurrentRamChange = (e) => {
+    const newRam = e.target.value;
+    setCurrentItem(prev => ({
+      ...prev,
+      ram: newRam,
+      color: '',
+      dealersPrice: '',
+      retailPrice: '',
+      totalPrice: 0
+    }));
+  };
+
+  // Handle storage change for current item
+  const handleCurrentStorageChange = (e) => {
+    const newStorage = e.target.value;
+    setCurrentItem(prev => ({
+      ...prev,
+      storage: newStorage,
+      color: '',
+      dealersPrice: '',
+      retailPrice: '',
+      totalPrice: 0
+    }));
+  };
+
+  // Handle color change for current item - UPDATED to fetch both dealer and retail prices
+  const handleCurrentColorChange = async (e) => {
+    const newColor = e.target.value;
+    setCurrentItem(prev => ({
+      ...prev,
+      color: newColor,
+      dealersPrice: '',
+      retailPrice: '',
+      totalPrice: 0
+    }));
+    
+    // Fetch prices when all selections are made
+    if (currentItem.manufacturer && currentItem.model && currentItem.ram && currentItem.storage && newColor) {
+      const price = await fetchPriceForConfiguration(
+        currentItem.manufacturer, 
+        currentItem.model, 
+        currentItem.ram, 
+        currentItem.storage, 
+        newColor
+      );
+      
+      if (price && price.dealersPrice && price.retailPrice) {
+        const totalPrice = calculateItemTotal(currentItem.quantity, price.dealersPrice);
+        setCurrentItem(prev => ({
+          ...prev,
+          dealersPrice: price.dealersPrice,
+          retailPrice: price.retailPrice,
+          totalPrice: totalPrice
+        }));
+      }
+    }
+  };
+
+  // Handle supplier change for current item
+  const handleCurrentSupplierChange = (e) => {
+    const newSupplier = e.target.value;
+    setCurrentItem(prev => ({
+      ...prev,
+      supplier: newSupplier
+    }));
+  };
+
+  // Handle quantity change for current item
+  const handleCurrentQuantityChange = (e) => {
+    const newQuantity = parseInt(e.target.value) || 1;
+    const validQuantity = Math.max(1, newQuantity);
+    const totalPrice = calculateItemTotal(validQuantity, currentItem.dealersPrice);
+    
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: validQuantity,
+      totalPrice: totalPrice
+    }));
+  };
+
+  // Handle quantity increment/decrement for current item
+  const incrementCurrentQuantity = () => {
+    const newQuantity = currentItem.quantity + 1;
+    const totalPrice = calculateItemTotal(newQuantity, currentItem.dealersPrice);
+    
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: newQuantity,
+      totalPrice: totalPrice
+    }));
+  };
+
+  const decrementCurrentQuantity = () => {
+    const newQuantity = Math.max(1, currentItem.quantity - 1);
+    const totalPrice = calculateItemTotal(newQuantity, currentItem.dealersPrice);
+    
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: newQuantity,
+      totalPrice: totalPrice
+    }));
+  };
+
+  // Handle dealers price change for current item
+  const handleCurrentDealersPriceChange = (e) => {
+    const rawValue = e.target.value;
+    
+    if (rawValue === '') {
+      setCurrentItem(prev => ({
+        ...prev,
+        dealersPrice: '',
+        totalPrice: 0
+      }));
+    } else {
+      const validatedPrice = validatePrice(rawValue);
+      const formattedPrice = formatNumberWithCommas(validatedPrice);
+      const totalPrice = calculateItemTotal(currentItem.quantity, formattedPrice);
+      
+      setCurrentItem(prev => ({
+        ...prev,
+        dealersPrice: formattedPrice,
+        totalPrice: totalPrice
+      }));
+    }
+  };
+{/* Part 3 End - Current Item Event Handlers */}
+
+{/* Part 4 Start - Table Management and Form Submission */}
+  // ====== TABLE MANAGEMENT FUNCTIONS ======
+  // Add current item to procurement table
+  const addItemToTable = async () => {
+    if (!isCurrentItemValid) {
+      alert('Please fill in all required fields for the current item');
+      return;
+    }
+
+    // Check for duplicate items (same phone configuration)
+    const isDuplicate = procurementItems.some(item => 
+      item.manufacturer === currentItem.manufacturer &&
+      item.model === currentItem.model &&
+      item.ram === currentItem.ram &&
+      item.storage === currentItem.storage &&
+      item.color === currentItem.color
+    );
+
+    if (isDuplicate) {
+      alert('This phone configuration is already in the procurement list. Please edit the existing item or select a different configuration.');
+      return;
+    }
+
+    const newItem = {
+      ...currentItem,
+      id: editingItemId || generateItemId()
+    };
+
+    if (editingItemId) {
+      // Update existing item
+      setProcurementItems(prev => 
+        prev.map(item => item.id === editingItemId ? newItem : item)
+      );
+      setEditingItemId(null);
+    } else {
+      // Add new item
+      setProcurementItems(prev => [...prev, newItem]);
+      
+      // NEW: Load available colors for this item
+      const availableColors = await getAvailableColorsForItem(currentItem.manufacturer, currentItem.model);
+      setItemColorOptions(prev => ({
+        ...prev,
+        [newItem.id]: availableColors
+      }));
+    }
+
+    // Reset current item form (keeping supplier and manufacturer)
+    resetCurrentItem();
+    
+    // NEW: If manufacturer is preserved, refetch models to ensure they're available
+    if (currentItem.manufacturer) {
+      fetchModels(currentItem.manufacturer);
+    }
+  };
+
+  // Handle purchase date change
+  const handlePurchaseDateChange = (e) => {
+    setPurchaseDate(e.target.value);
+  };
+
+  // Clear entire procurement table
+  const clearAllItems = () => {
+    if (procurementItems.length === 0) return;
+    
+    if (window.confirm('Are you sure you want to clear all items from the procurement list?')) {
+      setProcurementItems([]);
+      setEditingItemId(null);
+      resetCurrentItem();
+    }
+  };
+
+  // ====== FORM SUBMISSION ======
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (procurementItems.length === 0) {
+      alert('Please add at least one phone model to the procurement list');
+      return;
+    }
+    
+    if (!purchaseDate) {
+      alert('Please enter the purchase date');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const grandTotal = calculateGrandTotal();
+      
+      const procurementData = {
+        items: procurementItems.map(item => ({
+          manufacturer: item.manufacturer,
+          model: item.model,
+          ram: item.ram,
+          storage: item.storage,
+          color: item.color,
+          supplier: item.supplier,
+          quantity: item.quantity,
+          dealersPrice: parseFloat(item.dealersPrice.replace(/,/g, '')) || 0,
+          totalPrice: item.totalPrice
+        })),
+        totalQuantity: procurementItems.reduce((sum, item) => sum + item.quantity, 0),
+        grandTotal: grandTotal,
+        purchaseDate: purchaseDate,
+        isPaid: isPaid,
+        isReceived: isReceived,
+        dateCreated: getCurrentDate(),
+        lastUpdated: getCurrentDate()
+      };
+      
+      console.log("Submitting procurement data:", procurementData);
+      
+      // TODO: Add the actual Firebase submission here
+      // const result = await addProcurementToDatabase(procurementData);
+      
+      // For now, just simulate success
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Reset form after successful submission
+      setProcurementItems([]);
+      setEditingItemId(null);
+      resetCurrentItem();
+      setPurchaseDate(getCurrentDate());
+      setIsPaid(false);
+      setIsReceived(false);
+      
+      setIsSubmitting(false);
+      alert(`Procurement record saved successfully!\n\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatNumberWithCommas(grandTotal.toString())}`);
+      
+    } catch (error) {
+      console.error("Error saving procurement:", error);
+      setError(`Error saving procurement: ${error.message}`);
+      setIsSubmitting(false);
+      alert('Error saving procurement. Please try again.');
+    }
+  };
+
+  // ====== EFFECTS ======
+  // Initialize form on component mount
+  useEffect(() => {
+    const initializeForm = async () => {
+      try {
+        // Set default purchase date to current date
+        setPurchaseDate(getCurrentDate());
+        
+        // Fetch manufacturers list
+        await fetchManufacturers();
+        
+      } catch (error) {
+        console.error("Error initializing form:", error);
+        setError(`Error loading data: ${error.message}`);
+      }
+    };
+    
+    initializeForm();
+  }, [fetchManufacturers]);
+
+  // Check if current item is valid for adding to table
+  useEffect(() => {
+    const isValid = currentItem.manufacturer && 
+                   currentItem.model && 
+                   currentItem.ram && 
+                   currentItem.storage && 
+                   currentItem.color && 
+                   currentItem.supplier &&
+                   currentItem.dealersPrice && 
+                   currentItem.quantity > 0;
+    
+    setIsCurrentItemValid(isValid);
+  }, [currentItem]);
+
+  // Handle keyboard shortcuts
+  const handleKeyDown = (e) => {
+    // Prevent Enter key from submitting the form accidentally
+    if (e.key === 'Enter' && e.target.type !== 'submit') {
+      e.preventDefault();
+      
+      // If current item is valid and Enter is pressed, add to table
+      if (isCurrentItemValid && !editingItemId) {
+        addItemToTable();
+      }
+    }
+  };
+{/* Part 4 End - Table Management and Form Submission */}
+
+{/* Part 5 Start - Loading States and Main Form Start */}
+  // ====== LOADING AND ERROR STATES ======
+  // Show loading state for initial load
+  if (loading && manufacturers.length === 0) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <ShoppingCart className="h-6 w-6 mr-2" />
+              Phone Procurement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
+              <p className="mt-2 text-gray-600">Loading form data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <ShoppingCart className="h-6 w-6 mr-2" />
+              Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={() => {
+                setError(null);
+                fetchManufacturers();
+              }}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ====== MAIN COMPONENT RENDER ======
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <form 
+        onSubmit={handleSubmit}
+        onKeyDown={handleKeyDown}
+      >
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <ShoppingCart className="h-6 w-6 mr-2" />
+              Phone Procurement
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="bg-white p-4 space-y-6">
+            {/* Procurement Details Section - UPDATED with Supplier, Bank fields, and Payment/Delivery fields */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Procurement Details</h3>
+              
+              {/* First Row: Purchase Date, Supplier, Bank fields */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Purchase Date */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Purchase Date:</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded text-sm h-10"
+                    value={purchaseDate}
+                    onChange={handlePurchaseDateChange}
+                    required
+                  />
+                </div>
+
+                {/* Supplier - MOVED HERE */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Supplier:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10"
+                    value={currentItem.supplier}
+                    onChange={handleCurrentSupplierChange}
+                    placeholder="Enter supplier name"
+                    required
+                  />
+                </div>
+
+                {/* Bank Name - NEW FIELD */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Name:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={bankName}
+                    onChange={handleBankNameChange}
+                    placeholder="Bank name"
+                    disabled={true}
+                  />
+                </div>
+
+                {/* Bank Account - NEW FIELD */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Account:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={bankAccount}
+                    onChange={handleBankAccountChange}
+                    placeholder="Account number"
+                    disabled={true}
+                  />
+                </div>
+
+                {/* Account Payable - NEW FIELD */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Account Payable:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={accountPayable}
+                    onChange={handleAccountPayableChange}
+                    placeholder="Payable amount"
+                    disabled={true}
+                  />
+                </div>
+              </div>
+
+              {/* Second Row: Payment and Delivery Details */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Payment Status */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Status:</label>
+                  <div className="relative">
+                    <select 
+                      className="w-full p-2 border rounded text-sm h-10 opacity-0 absolute z-10 cursor-pointer"
+                      value={isPaid ? 'Paid' : 'Unpaid'}
+                      onChange={handlePaymentStatusChange}
+                    >
+                      <option value="Unpaid">Unpaid</option>
+                      <option value="Paid">Paid</option>
+                    </select>
+                    <div className="p-2 border rounded bg-gray-100 text-gray-600 text-sm h-10 flex items-center pointer-events-none">
+                      <span className={isPaid ? 'inline-block px-3 py-1 rounded-full text-sm bg-green-100 text-green-800' : 'inline-block px-3 py-1 rounded-full text-sm bg-red-100 text-red-800'}>
+                        {isPaid ? 'Paid' : 'Unpaid'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date Paid */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Paid:</label>
+                  <input 
+                    type="date" 
+                    className={!isPaid ? 'w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400' : 'w-full p-2 border rounded text-sm h-10'}
+                    value={datePaid}
+                    onChange={handleDatePaidChange}
+                    disabled={!isPaid}
+                  />
+                </div>
+
+                {/* Payment Reference */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={paymentReference}
+                    onChange={handlePaymentReferenceChange}
+                    placeholder="Receipt #"
+                    disabled={!isPaid}
+                  />
+                </div>
+
+                {/* Delivery Status - UPDATED to behave like Payment Status */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Delivery Status:</label>
+                  <div className="relative">
+                    <select 
+                      className="w-full p-2 border rounded text-sm h-10 opacity-0 absolute z-10 cursor-pointer"
+                      value={isReceived ? 'Delivered' : 'Pending'}
+                      onChange={handleDeliveryStatusChange}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Delivered">Delivered</option>
+                    </select>
+                    <div className="p-2 border rounded bg-gray-100 text-gray-600 text-sm h-10 flex items-center pointer-events-none">
+                      <span className={isReceived ? 'inline-block px-3 py-1 rounded-full text-sm bg-green-100 text-green-800' : 'inline-block px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800'}>
+                        {isReceived ? 'Delivered' : 'Pending'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date Delivered - UPDATED to behave like Date Paid */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Delivered:</label>
+                  <input 
+                    type="date" 
+                    className={!isReceived ? 'w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400' : 'w-full p-2 border rounded text-sm h-10'}
+                    value={dateDelivered}
+                    onChange={handleDateDeliveredChange}
+                    disabled={!isReceived}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Add Phone Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Add Phone Model</h3>
+              
+              {/* Phone Selection Row */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Manufacturer */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Manufacturer:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.manufacturer}
+                    onChange={handleCurrentManufacturerChange}
+                    required
+                  >
+                    <option value="">-- Select --</option>
+                    {manufacturers.map(manufacturer => (
+                      <option key={manufacturer} value={manufacturer}>
+                        {manufacturer}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Model */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Model:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.model}
+                    onChange={handleCurrentModelChange}
+                    disabled={!currentItem.manufacturer}
+                    required
+                  >
+                    <option value="">-- Select --</option>
+                    {models.map(model => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* RAM */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">RAM:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.ram}
+                    onChange={handleCurrentRamChange}
+                    disabled={!currentItem.model}
+                    required
+                  >
+                    <option value="">-- Select --</option>
+                    {rams.map(ram => (
+                      <option key={ram} value={ram}>
+                        {formatWithGB(ram)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Storage */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Storage:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.storage}
+                    onChange={handleCurrentStorageChange}
+                    disabled={!currentItem.model}
+                    required
+                  >
+                    <option value="">-- Select --</option>
+                    {storages.map(storage => (
+                      <option key={storage} value={storage}>
+                        {formatWithGB(storage)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Color */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Color:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.color}
+                    onChange={handleCurrentColorChange}
+                    disabled={!currentItem.ram || !currentItem.storage}
+                    required
+                  >
+                    <option value="">-- Select --</option>
+                    {colors.map(color => (
+                      <option key={color} value={color}>
+                        {color}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+{/* Part 5 End - Loading States and Main Form Start */}
+
+{/* Part 6 Start - Second Row with Adjusted Quantity and Procurement Details */}
+              {/* Second Row: Quantity, Dealers Price, Retail Price, Total Price, Margin % + Action */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Quantity */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Quantity:</label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={decrementCurrentQuantity}
+                      disabled={currentItem.quantity <= 1}
+                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <input 
+                      type="number" 
+                      className="w-32 p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={currentItem.quantity}
+                      onChange={handleCurrentQuantityChange}
+                      min="1"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={incrementCurrentQuantity}
+                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dealers Price */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Dealer&apos;s Price:</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
+                    <input 
+                      type="text" 
+                      className="w-full p-2 pl-6 border rounded text-sm"
+                      value={currentItem.dealersPrice}
+                      onChange={handleCurrentDealersPriceChange}
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Retail Price - NEW FIELD (disabled) */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Retail Price:</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
+                    <input 
+                      type="text" 
+                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                      value={currentItem.retailPrice}
+                      onChange={handleCurrentRetailPriceChange}
+                      placeholder="0.00"
+                      disabled={true}
+                    />
+                  </div>
+                </div>
+
+                {/* Total Price Display */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Total Price:</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
+                    <input 
+                      type="text" 
+                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                      value={currentItem.totalPrice ? formatNumberWithCommas(currentItem.totalPrice.toString()) : '0.00'}
+                      disabled={true}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                {/* Margin + Add Button - Adjusted sizing to match Color field width */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="w-20 space-y-2">
+                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Margin:</label>
+                      {/* Margin Field - Made smaller */}
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 text-center"
+                        value={currentItem.dealersPrice && currentItem.retailPrice ? `${calculateMargin(currentItem.dealersPrice, currentItem.retailPrice)}%` : '0.00%'}
+                        disabled={true}
+                        readOnly
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Action:</label>
+                      {/* Add Button - Takes remaining space */}
+                      <button
+                        type="button"
+                        onClick={addItemToTable}
+                        disabled={!isCurrentItemValid}
+                        className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+{/* Part 6 End - Second Row with Adjusted Quantity and Procurement Details */}
+
+{/* Part 7 Start - Procurement Table with Quantity Controls */}
+            {/* Section Divider */}
+            <div className="border-t border-gray-300 my-6"></div>
+
+            {/* Procurement Table Section */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
+                  Procurement List ({procurementItems.length} items)
+                </h3>
+                {procurementItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllItems}
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              {procurementItems.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h4 className="text-lg font-medium text-gray-700 mb-2">No items in procurement list</h4>
+                  <p className="text-gray-500">Add phone models above to build your procurement list</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Manufacturer</th>
+                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Model</th>
+                        <th className="border px-3 py-2 text-left font-semibold w-[22%]">Configuration</th>
+                        <th className="border px-3 py-2 text-left font-semibold w-[10%]">Color</th>
+                        <th className="border px-3 py-2 text-center font-semibold w-[12%]">Qty</th>
+                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Unit Price</th>
+                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {procurementItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="border px-3 py-2">
+                            <div className="font-medium">{item.manufacturer}</div>
+                          </td>
+                          <td className="border px-3 py-2">
+                            <div className="text-gray-700">{item.model}</div>
+                          </td>
+                          <td className="border px-3 py-2">
+                            <div className="whitespace-nowrap">{formatWithGB(item.ram)} RAM / {formatWithGB(item.storage)} Storage</div>
+                          </td>
+                          <td className="border px-3 py-2">
+                            {/* UPDATED: Color dropdown for changing colors */}
+                            <select
+                              value={item.color}
+                              onChange={(e) => handleTableColorChange(item.id, e.target.value)}
+                              className="w-full p-1 border rounded text-xs bg-white"
+                              title="Change color"
+                            >
+                              {(itemColorOptions[item.id] || [item.color]).map(color => (
+                                <option key={color} value={color}>
+                                  {color}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="border px-3 py-2 text-center">
+                            {/* UPDATED: Quantity controls with +/- buttons */}
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => decrementTableQuantity(item.id)}
+                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => incrementTableQuantity(item.id)}
+                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                title="Increase quantity"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="border px-3 py-2 text-right font-mono">
+                            ₱{item.dealersPrice}
+                          </td>
+                          <td className="border px-3 py-2 text-right font-mono font-medium">
+                            ₱{formatNumberWithCommas(item.totalPrice.toString())}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-blue-50 font-semibold">
+                        <td colSpan="4" className="border px-3 py-2 text-right">Total Items:</td>
+                        <td className="border px-3 py-2 text-center">
+                          {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
+                        </td>
+                        <td className="border px-3 py-2 text-right">Grand Total:</td>
+                        <td className="border px-3 py-2 text-right font-mono text-lg">
+                          ₱{formatNumberWithCommas(calculateGrandTotal().toString())}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+{/* Part 7 End - Procurement Table with Quantity Controls */}
+
+{/* Part 8 Start - Procurement Summary (Moved Below Table) and Submit Button */}
+            {/* Procurement Summary Section - Updated design to match Inventory Value Summary */}
+            {procurementItems.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Procurement Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Unique Models</p>
+                        <p className="text-xs text-gray-500">Different phone configurations</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-blue-600">
+                          {procurementItems.length}
+                        </p>
+                        <p className="text-xs text-gray-500">models</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Total Units</p>
+                        <p className="text-xs text-gray-500">Combined quantity ordered</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-green-600">
+                          {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
+                        </p>
+                        <p className="text-xs text-gray-500">units</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Grand Total</p>
+                        <p className="text-xs text-gray-500">Total procurement cost</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-purple-600">
+                          ₱{formatNumberWithCommas(calculateGrandTotal().toString())}
+                        </p>
+                        <p className="text-xs text-gray-500">total cost</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={procurementItems.length === 0 || isSubmitting || !purchaseDate}
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                    Saving Procurement...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Save Procurement Record ({procurementItems.length} items)
+                  </>
+                )}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </div>
+  );
+};
+
+export default PhoneProcurementForm;
+{/* Part 8 End - Procurement Summary (Moved Below Table) and Submit Button */}
+</file>
+
+<file path="src/components/SupplierManagementForm.jsx">
+{/* Part 1 Start - Imports, State, and Helper Functions */}
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  Building, 
+  RefreshCw, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Save, 
+  XCircle,
+  Search,
+  FileText
+} from 'lucide-react';
+
+const SupplierManagementForm = () => {
+  // State for suppliers list
+  const [suppliers, setSuppliers] = useState([
+    {
+      id: 1,
+      supplierName: 'Tech Distributors Inc.',
+      bankName: 'BPI',
+      bankAccount: '1234-5678-9012',
+      accountPayable: '25,000.00',
+      notes: 'Primary supplier for Samsung products',
+      balance: '15,250.00'
+    },
+    {
+      id: 2,
+      supplierName: 'Mobile World Supply',
+      bankName: 'BDO',
+      bankAccount: '9876-5432-1098',
+      accountPayable: '18,500.00',
+      notes: 'Good payment terms, reliable delivery',
+      balance: '8,750.00'
+    }
+  ]);
+
+  // State for current form
+  const [currentSupplier, setCurrentSupplier] = useState({
+    id: null,
+    supplierName: '',
+    bankName: '',
+    bankAccount: '',
+    accountPayable: '',
+    notes: ''
+  });
+
+  // State for ledger entries (sample data)
+  const [ledgerEntries, setLedgerEntries] = useState([
+    {
+      id: 1,
+      date: '2025-01-15',
+      reference: 'INV-2025-001',
+      amountDue: '25,000.00',
+      amountPaid: '',
+      balance: '25,000.00'
+    },
+    {
+      id: 2,
+      date: '2025-01-18',
+      reference: 'PAY-2025-001',
+      amountDue: '',
+      amountPaid: '10,000.00',
+      balance: '15,000.00'
+    },
+    {
+      id: 3,
+      date: '2025-01-20',
+      reference: 'INV-2025-002',
+      amountDue: '8,500.00',
+      amountPaid: '',
+      balance: '23,500.00'
+    }
+  ]);
+
+  // State for new ledger entry
+  const [newLedgerEntry, setNewLedgerEntry] = useState({
+    date: '',
+    reference: '',
+    amountDue: '',
+    amountPaid: '',
+    type: 'due' // 'due' or 'payment'
+  });
+
+  // UI State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [selectedSupplierId, setSelectedSupplierId] = useState(null);
+  const [activeTab, setActiveTab] = useState('suppliers'); // 'suppliers' or 'ledger'
+  const [showLedgerForm, setShowLedgerForm] = useState(false);
+  const [showSupplierForm, setShowSupplierForm] = useState(false); // NEW: Add state to control supplier form visibility
+
+  // Helper functions
+  const formatNumberWithCommas = (value) => {
+    if (!value && value !== 0) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+{/* Part 1 End - Imports, State, and Helper Functions */}
+
+{/* Part 2 Start - Supplier Form Event Handlers */}
+  // Supplier form handlers
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Format account payable with commas (even though it's disabled, keep for consistency)
+    if (name === 'accountPayable') {
+      const cleanValue = value.replace(/[^\d.]/g, '');
+      const formattedValue = formatNumberWithCommas(cleanValue);
+      setCurrentSupplier(prev => ({
+        ...prev,
+        [name]: formattedValue
+      }));
+    } else {
+      setCurrentSupplier(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleSubmit = (e) => {
+    if (e) e.preventDefault();
+    
+    if (isEditing) {
+      // Update existing supplier
+      setSuppliers(prev => 
+        prev.map(supplier => 
+          supplier.id === editingId 
+            ? { ...currentSupplier, id: editingId }
+            : supplier
+        )
+      );
+    } else {
+      // Add new supplier
+      const newId = Math.max(...suppliers.map(s => s.id), 0) + 1;
+      setSuppliers(prev => [...prev, { ...currentSupplier, id: newId, balance: '0.00' }]);
+    }
+    
+    // Reset form
+    setCurrentSupplier({
+      id: null,
+      supplierName: '',
+      bankName: '',
+      bankAccount: '',
+      accountPayable: '',
+      notes: ''
+    });
+    setIsEditing(false);
+    setEditingId(null);
+    setShowSupplierForm(false); // NEW: Hide supplier form after successful submission
+  };
+
+  const handleEdit = (supplier) => {
+    setCurrentSupplier(supplier);
+    setIsEditing(true);
+    setEditingId(supplier.id);
+    setShowSupplierForm(true); // NEW: Show supplier form when editing
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this supplier?')) {
+      setSuppliers(prev => prev.filter(supplier => supplier.id !== id));
+    }
+  };
+
+  const handleCancel = () => {
+    setCurrentSupplier({
+      id: null,
+      supplierName: '',
+      bankName: '',
+      bankAccount: '',
+      accountPayable: '',
+      notes: ''
+    });
+    setIsEditing(false);
+    setEditingId(null);
+    setShowSupplierForm(false); // NEW: Hide supplier form when cancelling
+  };
+
+  // NEW: Handle add new supplier button click
+  const handleAddNewSupplier = () => {
+    setShowSupplierForm(true);
+    setIsEditing(false);
+    setEditingId(null);
+    setCurrentSupplier({
+      id: null,
+      supplierName: '',
+      bankName: '',
+      bankAccount: '',
+      accountPayable: '',
+      notes: ''
+    });
+  };
+{/* Part 2 End - Supplier Form Event Handlers */}
+
+{/* Part 3 Start - Ledger Form Event Handlers */}
+  // Ledger handlers
+  const handleLedgerInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (name === 'amountDue' || name === 'amountPaid') {
+      const cleanValue = value.replace(/[^\d.]/g, '');
+      const formattedValue = formatNumberWithCommas(cleanValue);
+      setNewLedgerEntry(prev => ({
+        ...prev,
+        [name]: formattedValue
+      }));
+    } else {
+      setNewLedgerEntry(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleLedgerSubmit = (e) => {
+    if (e) e.preventDefault();
+    
+    // Calculate new balance
+    const lastBalance = ledgerEntries.length > 0 
+      ? parseFloat(ledgerEntries[ledgerEntries.length - 1].balance.replace(/,/g, '')) 
+      : 0;
+    
+    const dueAmount = newLedgerEntry.amountDue ? parseFloat(newLedgerEntry.amountDue.replace(/,/g, '')) : 0;
+    const paidAmount = newLedgerEntry.amountPaid ? parseFloat(newLedgerEntry.amountPaid.replace(/,/g, '')) : 0;
+    
+    const newBalance = lastBalance + dueAmount - paidAmount;
+    
+    const newEntry = {
+      id: Math.max(...ledgerEntries.map(e => e.id), 0) + 1,
+      date: newLedgerEntry.date,
+      reference: newLedgerEntry.reference,
+      amountDue: newLedgerEntry.amountDue,
+      amountPaid: newLedgerEntry.amountPaid,
+      balance: formatNumberWithCommas(newBalance.toFixed(2))
+    };
+    
+    setLedgerEntries(prev => [...prev, newEntry]);
+    
+    // Reset form
+    setNewLedgerEntry({
+      date: '',
+      reference: '',
+      amountDue: '',
+      amountPaid: '',
+      type: 'due'
+    });
+    setShowLedgerForm(false);
+  };
+{/* Part 3 End - Ledger Form Event Handlers */}
+
+{/* Part 4 Start - Main Component Structure and Header */}
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Building className="h-6 w-6 text-white" />
+            <CardTitle className="text-2xl text-white">Supplier Management</CardTitle>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('suppliers')}
+              className={`flex items-center gap-1 ${activeTab === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-white/20 text-white'} px-4 py-2 rounded text-base font-medium`}
+            >
+              <Building className="h-5 w-5 mr-1" />
+              <span>Suppliers</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('ledger')}
+              className={`flex items-center gap-1 ${activeTab === 'ledger' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-white/20 text-white'} px-4 py-2 rounded text-base font-medium`}
+            >
+              <FileText className="h-5 w-5 mr-1" />
+              <span>Ledger</span>
+            </button>
+            {/* NEW: Add New Supplier Button - only show on suppliers tab */}
+            {activeTab === 'suppliers' && (
+              <button
+                onClick={handleAddNewSupplier}
+                className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded text-base font-medium hover:bg-green-700"
+              >
+                <Plus className="h-5 w-5 mr-1" />
+                <span>Add New</span>
+              </button>
+            )}
+            <button
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
+            >
+              <RefreshCw className="h-5 w-5 mr-1" />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-4">
+{/* Part 4 End - Main Component Structure and Header */}
+
+{/* Part 5 Start - Suppliers Tab Content with Conditional Form Display */}
+          {/* Suppliers Tab */}
+          {activeTab === 'suppliers' && (
+            <div className="space-y-6">
+              {/* Add/Edit Supplier Form - NOW CONDITIONAL */}
+              {showSupplierForm && (
+                <div className="bg-gray-50 p-4 rounded-lg border">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">
+                      {isEditing ? 'Edit Supplier' : 'Add New Supplier'}
+                    </h3>
+                    {/* NEW: Add close button */}
+                    <button
+                      onClick={() => setShowSupplierForm(false)}
+                      className="text-gray-500 hover:text-gray-700"
+                      title="Close form"
+                    >
+                      <XCircle className="h-5 w-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* UPDATED: First Row - Supplier Name and Account Payable */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Supplier Name *
+                        </label>
+                        <input
+                          type="text"
+                          name="supplierName"
+                          value={currentSupplier.supplierName}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border rounded"
+                          required
+                        />
+                      </div>
+                      
+                      {/* UPDATED: Account Payable moved to first row and disabled */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Account Payable
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
+                          <input
+                            type="text"
+                            name="accountPayable"
+                            value={currentSupplier.accountPayable}
+                            onChange={handleInputChange}
+                            className="w-full p-2 pl-6 border rounded disabled:bg-gray-100 disabled:text-gray-400"
+                            placeholder="0.00"
+                            disabled={true}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* UPDATED: Second Row - Bank Name and Bank Account */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Bank Name
+                        </label>
+                        <input
+                          type="text"
+                          name="bankName"
+                          value={currentSupplier.bankName}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border rounded"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Bank Account
+                        </label>
+                        <input
+                          type="text"
+                          name="bankAccount"
+                          value={currentSupplier.bankAccount}
+                          onChange={handleInputChange}
+                          className="w-full p-2 border rounded"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Notes field remains in its own row */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Notes
+                      </label>
+                      <textarea
+                        name="notes"
+                        value={currentSupplier.notes}
+                        onChange={handleInputChange}
+                        className="w-full p-2 border rounded"
+                        rows={3}
+                        placeholder="Optional notes about this supplier..."
+                      />
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleSubmit}
+                        className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {isEditing ? 'Update Supplier' : 'Add Supplier'}
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={handleCancel}
+                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 flex items-center"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+{/* Part 5 End - Suppliers Tab Content with Conditional Form Display */}
+
+{/* Part 6 Start - Suppliers List Table (Unchanged) */}
+              {/* Suppliers List */}
+              <div className="bg-white border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 bg-gray-100 border-b">
+                  <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">
+                    Suppliers List ({suppliers.length})
+                  </h3>
+                </div>
+                
+                {suppliers.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    <Building className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No suppliers added yet</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Supplier Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Bank Details</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Outstanding Balance</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Notes</th>
+                            <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {suppliers.map((supplier) => (
+                            <tr key={supplier.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-gray-900">{supplier.supplierName}</div>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <div>{supplier.bankName}</div>
+                                <div className="text-gray-500">{supplier.bankAccount}</div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-medium">
+                                <span className={`${parseFloat(supplier.balance.replace(/,/g, '')) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  ₱{supplier.balance}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                                {supplier.notes || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <div className="flex justify-center space-x-2">
+                                  <button
+                                    onClick={() => handleEdit(supplier)}
+                                    className="p-1 text-blue-600 hover:text-blue-800"
+                                    title="Edit supplier"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedSupplierId(supplier.id);
+                                      setActiveTab('ledger');
+                                    }}
+                                    className="p-1 text-green-600 hover:text-green-800"
+                                    title="View ledger"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(supplier.id)}
+                                    className="p-1 text-red-600 hover:text-red-800"
+                                    title="Delete supplier"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Outstanding Balance Summary */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Outstanding Balance Summary</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-600 font-medium">Suppliers - Zero Balance</p>
+                              <p className="text-xs text-gray-500">Suppliers with zero balance</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xl font-bold text-green-600">
+                                {suppliers.filter(s => parseFloat(s.balance.replace(/,/g, '')) === 0).length}
+                              </p>
+                              <p className="text-xs text-gray-500">suppliers</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-white rounded-lg p-4 border border-orange-100 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-600 font-medium">Suppliers with Balance</p>
+                              <p className="text-xs text-gray-500">Suppliers that owe money</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xl font-bold text-orange-600">
+                                {suppliers.filter(s => parseFloat(s.balance.replace(/,/g, '')) > 0).length}
+                              </p>
+                              <p className="text-xs text-gray-500">suppliers</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-white rounded-lg p-4 border border-red-100 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-600 font-medium">Total Outstanding</p>
+                              <p className="text-xs text-gray-500">Total amount owed to suppliers</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xl font-bold text-red-600">
+                                ₱{(() => {
+                                  const total = suppliers.reduce((sum, supplier) => {
+                                    const balance = parseFloat(supplier.balance.replace(/,/g, '')) || 0;
+                                    return sum + balance;
+                                  }, 0);
+                                  return total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                })()}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {suppliers.length} supplier{suppliers.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+{/* Part 6 End - Suppliers List Table (Unchanged) */}
+
+{/* Part 7 Start - Ledger Tab and Component Export (Unchanged) */}
+          {/* Ledger Tab */}
+          {activeTab === 'ledger' && (
+            <div className="space-y-6">
+              {/* Supplier Selection */}
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                <h3 className="font-semibold text-lg text-[rgb(52,69,157)] mb-4">Supplier Ledger</h3>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Select Supplier
+                    </label>
+                    <select
+                      value={selectedSupplierId || ''}
+                      onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
+                      className="w-full p-2 border rounded"
+                    >
+                      <option value="">Choose a supplier...</option>
+                      {suppliers.map((supplier) => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.supplierName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {selectedSupplierId && (
+                    <button
+                      onClick={() => setShowLedgerForm(!showLedgerForm)}
+                      className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center mt-6"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Entry
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Add Ledger Entry Form */}
+              {showLedgerForm && selectedSupplierId && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold text-[rgb(52,69,157)] mb-4">Add Ledger Entry</h4>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Date *
+                        </label>
+                        <input
+                          type="date"
+                          name="date"
+                          value={newLedgerEntry.date}
+                          onChange={handleLedgerInputChange}
+                          className="w-full p-2 border rounded"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Reference *
+                        </label>
+                        <input
+                          type="text"
+                          name="reference"
+                          value={newLedgerEntry.reference}
+                          onChange={handleLedgerInputChange}
+                          className="w-full p-2 border rounded"
+                          placeholder="INV-001, PAY-001, etc."
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Entry Type *
+                        </label>
+                        <select
+                          name="type"
+                          value={newLedgerEntry.type}
+                          onChange={handleLedgerInputChange}
+                          className="w-full p-2 border rounded"
+                        >
+                          <option value="due">Amount Due (Invoice)</option>
+                          <option value="payment">Amount Paid (Payment)</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount Due
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
+                          <input
+                            type="text"
+                            name="amountDue"
+                            value={newLedgerEntry.amountDue}
+                            onChange={handleLedgerInputChange}
+                            className="w-full p-2 pl-6 border rounded"
+                            placeholder="0.00"
+                            disabled={newLedgerEntry.type === 'payment'}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount Paid
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
+                          <input
+                            type="text"
+                            name="amountPaid"
+                            value={newLedgerEntry.amountPaid}
+                            onChange={handleLedgerInputChange}
+                            className="w-full p-2 pl-6 border rounded"
+                            placeholder="0.00"
+                            disabled={newLedgerEntry.type === 'due'}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleLedgerSubmit}
+                        className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Add Entry
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setShowLedgerForm(false)}
+                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 flex items-center"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Ledger Table */}
+              {selectedSupplierId ? (
+                <div className="bg-white border rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-100 border-b">
+                    <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">
+                      Ledger for {suppliers.find(s => s.id === selectedSupplierId)?.supplierName}
+                    </h3>
+                  </div>
+                  
+                  {ledgerEntries.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No ledger entries yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Date</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Reference</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Amount Due</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Amount Paid</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Outstanding Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {ledgerEntries.map((entry) => (
+                            <tr key={entry.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm">{entry.date}</td>
+                              <td className="px-4 py-3 text-sm font-medium">{entry.reference}</td>
+                              <td className="px-4 py-3 text-right font-mono text-sm">
+                                {entry.amountDue && (
+                                  <span className="text-red-600">₱{entry.amountDue}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-sm">
+                                {entry.amountPaid && (
+                                  <span className="text-green-600">₱{entry.amountPaid}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-sm font-medium">
+                                ₱{entry.balance}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <Search className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>Please select a supplier to view their ledger</p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default SupplierManagementForm;
+{/* Part 7 End - Ledger Tab and Component Export (Unchanged) */}
+</file>
 
 <file path=".gitignore">
 # Logs
@@ -2535,6 +4821,501 @@ const PhoneSpecCard = () => {
 export default PhoneSpecCard;
 </file>
 
+<file path="src/components/ui/badge/index.jsx">
+import PropTypes from 'prop-types'
+import { cn } from "@/lib/utils"
+import { badgeVariants } from './variants'
+
+function Badge({
+  className = '',  // Using default parameter instead of defaultProps
+  variant = 'default', // Using default parameter instead of defaultProps
+  ...props
+}) {
+  return (
+    <div 
+      className={cn(badgeVariants({ variant }), className)} 
+      {...props} 
+    />
+  )
+}
+
+Badge.propTypes = {
+  className: PropTypes.string,
+  variant: PropTypes.oneOf(['default', 'secondary', 'destructive', 'outline'])
+}
+
+// Remove Badge.defaultProps
+
+export { Badge }
+</file>
+
+<file path="src/components/ui/badge/variants.jsx">
+import { cva } from "class-variance-authority"
+
+export const badgeVariants = cva(
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  {
+    variants: {
+      variant: {
+        default:
+          "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+        secondary:
+          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        destructive:
+          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+        outline: "text-foreground",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+</file>
+
+<file path="src/components/ui/card.jsx">
+import * as React from "react"
+import { cn } from "@/lib/utils"
+import PropTypes from 'prop-types'
+
+const Card = React.forwardRef(({ 
+  className = '', // Using default parameter
+  ...props 
+}, ref) => (
+  <div
+    ref={ref}
+    className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)}
+    {...props}
+  />
+))
+Card.displayName = "Card"
+Card.propTypes = {
+  className: PropTypes.string
+}
+
+const CardHeader = React.forwardRef(({ 
+  className = '', // Using default parameter
+  ...props 
+}, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    {...props}
+  />
+))
+CardHeader.displayName = "CardHeader"
+CardHeader.propTypes = {
+  className: PropTypes.string
+}
+
+const CardTitle = React.forwardRef(({ 
+  className = '', // Using default parameter
+  ...props 
+}, ref) => (
+  <h3
+    ref={ref}
+    className={cn("text-2xl font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+))
+CardTitle.displayName = "CardTitle"
+CardTitle.propTypes = {
+  className: PropTypes.string
+}
+
+const CardContent = React.forwardRef(({ 
+  className = '', // Using default parameter
+  ...props 
+}, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+))
+CardContent.displayName = "CardContent"
+CardContent.propTypes = {
+  className: PropTypes.string
+}
+
+export { Card, CardHeader, CardTitle, CardContent }
+</file>
+
+<file path="src/context/GlobalStateContext.jsx">
+// src/context/GlobalStateContext.jsx
+import PropTypes from 'prop-types';
+import { createContext, useState, useContext } from 'react';
+
+// Create context
+export const GlobalStateContext = createContext();
+
+// Custom hook for easier context usage
+export const useGlobalState = () => useContext(GlobalStateContext);
+
+// Create provider
+export const GlobalStateProvider = ({ children }) => {
+  const [phoneToEdit, setPhoneToEdit] = useState(null);
+  const [activeComponent, setActiveComponent] = useState('summary'); // Changed back to 'summary'
+  
+  // Function to set a phone for editing and switch to form
+  const editPhone = (phone) => {
+    console.log("GlobalStateContext: Setting phone to edit", phone?.id);
+    setPhoneToEdit(phone);
+    setActiveComponent('form');
+  };
+  
+  // Function to clear the selected phone
+  const clearPhoneToEdit = () => {
+    setPhoneToEdit(null);
+  };
+  
+  // Create a value object with all the state and functions
+  const contextValue = {
+    phoneToEdit,
+    editPhone,
+    clearPhoneToEdit,
+    activeComponent,
+    setActiveComponent
+  };
+  
+  return (
+    <GlobalStateContext.Provider value={contextValue}>
+      {children}
+    </GlobalStateContext.Provider>
+  );
+};
+
+// Add prop types for validation
+GlobalStateProvider.propTypes = {
+  children: PropTypes.node.isRequired
+};
+
+// Also provide a default export for the hook for backward compatibility
+export default useGlobalState;
+</file>
+
+<file path="src/firebase/config.js">
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+
+    apiKey: "AIzaSyAdj8EwqtB7uP_gQmevelvbxew4_X4LJyk",  
+    authDomain: "tech-city-phone-information.firebaseapp.com",  
+    projectId: "tech-city-phone-information",  
+    storageBucket: "tech-city-phone-information.firebasestorage.app",  
+    messagingSenderId: "218177382353",  
+    appId: "1:218177382353:web:cf92ab1e75bcd139a062f0"  
+};
+  
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+</file>
+
+<file path="src/index.css">
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+</file>
+
+<file path="src/lib/utils.js">
+import { clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+ 
+export function cn(...inputs) {
+  return twMerge(clsx(inputs))
+}
+</file>
+
+<file path="src/main.jsx">
+// src/main.jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+import './styles.css';
+// Import the GlobalStateProvider from our consolidated file
+import { GlobalStateProvider } from './context/GlobalStateContext';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <GlobalStateProvider>
+      <App />
+    </GlobalStateProvider>
+  </React.StrictMode>
+);
+</file>
+
+<file path="src/styles.css">
+.test-blue {
+    background-color: rgb(52,69,157);
+    padding: 20px;
+    color: white;
+  }
+</file>
+
+<file path="tailwind.config.js">
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,jsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: []
+}
+</file>
+
+<file path="vite.config.js">
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'url'
+import path from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  esbuild: {
+    loader: "jsx",
+    include: /src\/.*\.jsx?$/,
+    exclude: [],
+  },
+})
+</file>
+
+<file path="src/components/phone-selection/hooks/usePhoneCache.js">
+import { useState, useCallback } from 'react';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { db } from '../../../firebase/config';
+import { formatNumberWithCommas, getCurrentDate } from '../utils/phoneUtils';
+
+export const usePhoneCache = () => {
+  const [priceCache, setPriceCache] = useState({});
+  
+  // Load price cache from existing inventory
+  const loadPriceCacheFromInventory = useCallback(async () => {
+    try {
+      const newPriceCache = {};
+     
+      // First load price configurations (both base and color-specific)
+      const configsRef = collection(db, 'price_configurations');
+      const configsSnapshot = await getDocs(configsRef);
+     
+      configsSnapshot.forEach(doc => {
+        const data = doc.data();
+        console.log("Loading price config:", doc.id, data); // Add this line
+        if (data.manufacturer && data.model && data.ram && data.storage) {
+          let cacheKey;
+         
+          if (data.color) {
+            // Color-specific price
+            cacheKey = `${data.manufacturer}_${data.model}_${data.ram}_${data.storage}_${data.color}`;
+          } else {
+            // Base price
+            cacheKey = `${data.manufacturer}_${data.model}_${data.ram}_${data.storage}`;
+          }
+         
+          newPriceCache[cacheKey] = {
+            dealersPrice: formatNumberWithCommas(data.dealersPrice.toString()),
+            retailPrice: formatNumberWithCommas(data.retailPrice.toString()),
+            lastUpdated: data.lastUpdated
+          };
+        }
+      });
+     
+      // Then load barcodes from inventory
+      const inventoryRef = collection(db, 'inventory');
+      const inventorySnapshot = await getDocs(inventoryRef);
+     
+      inventorySnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.manufacturer && data.model && data.ram && data.storage && data.color && data.barcode) {
+          const barcodeKey = `${data.manufacturer}_${data.model}_${data.ram}_${data.storage}_${data.color}`;
+         
+          // Update existing entry or create new one
+          newPriceCache[barcodeKey] = {
+            ...newPriceCache[barcodeKey] || {},
+            barcode: data.barcode,
+            // Only update lastUpdated if this is a new entry
+            lastUpdated: newPriceCache[barcodeKey]?.lastUpdated || data.lastUpdated
+          };
+        }
+      });
+     
+      console.log("Price cache loaded:", Object.keys(newPriceCache).length, "entries");
+      setPriceCache(newPriceCache);
+    } catch (error) {
+      console.error("Error loading price cache:", error);
+    }
+  }, [setPriceCache]);
+  
+  // Helper function to save/update price configurations
+  const updatePriceConfiguration = async (manufacturer, model, ram, storage, dealersPrice, retailPrice, color = null) => {
+    try {
+      // Create a unique ID - with or without color
+      let configId;
+      if (color) {
+        // Color-specific pricing
+        configId = `${manufacturer}_${model}_${ram}_${storage}_${color}`.replace(/\s+/g, '_').toLowerCase();
+      } else {
+        // Base pricing for this configuration
+        configId = `${manufacturer}_${model}_${ram}_${storage}`.replace(/\s+/g, '_').toLowerCase();
+      }
+      
+      // Remove commas and convert to number
+      const dPrice = parseFloat(dealersPrice.toString().replace(/,/g, '')) || 0;
+      const rPrice = parseFloat(retailPrice.toString().replace(/,/g, '')) || 0;
+      
+      await setDoc(doc(db, 'price_configurations', configId), {
+        manufacturer,
+        model,
+        ram,
+        storage,
+        color, // null for base configuration
+        dealersPrice: dPrice,
+        retailPrice: rPrice,
+        lastUpdated: getCurrentDate()
+      }, { merge: true });
+      
+      return true;
+    } catch (error) {
+      console.error("Error updating price configuration:", error);
+      return false;
+    }
+  };
+
+  return {
+    priceCache,
+    setPriceCache,
+    loadPriceCacheFromInventory,
+    updatePriceConfiguration
+  };
+};
+
+export default usePhoneCache;
+</file>
+
+<file path="src/components/phone-selection/PhoneAdditionalInfo.jsx">
+import PropTypes from 'prop-types';
+
+const PhoneAdditionalInfo = ({
+  imei1,
+  imei2,
+  barcode,
+  status,
+  lastUpdated,
+  handleImei1Change,
+  handleImei2Change,
+  handleBarcodeChange,
+  handleStatusChange,
+  imei1Error,
+  imei2Error,
+}) => {
+  return (
+    <div className="pt-4 border-t border-gray-300 space-y-4">
+      <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Additional Details</h3>
+      
+      {/* IMEI Fields */}
+      <div className="flex gap-4">
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">IMEI 1:</label>
+          <input 
+            type="text" 
+            className={`w-full p-2 border rounded ${imei1Error ? 'border-red-500' : ''}`}
+            value={imei1}
+            onChange={handleImei1Change}
+            placeholder="15-digit IMEI number"
+            maxLength={15}
+            required
+          />
+          {imei1Error && (
+            <p className="text-red-500 text-sm mt-1">{imei1Error}</p>
+          )}
+        </div>
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">IMEI 2:</label>
+          <input 
+            type="text" 
+            className={`w-full p-2 border rounded ${imei2Error ? 'border-red-500' : ''}`}
+            value={imei2}
+            onChange={handleImei2Change}
+            placeholder="Optional"
+            maxLength={15}
+          />
+          {imei2Error && (
+            <p className="text-red-500 text-sm mt-1">{imei2Error}</p>
+          )}
+        </div>
+      </div>
+      
+      {/* Barcode */}
+      <div className="space-y-2">
+        <label className="block text-[rgb(52,69,157)] font-semibold">Barcode:</label>
+        <input 
+          type="text" 
+          className="w-full p-2 border rounded"
+          value={barcode}
+          onChange={handleBarcodeChange}
+          placeholder="Product barcode"
+          required
+        />
+      </div>
+      
+      {/* Status and Last Updated Fields */}
+      <div className="flex gap-4">
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">Status:</label>
+          <select
+            className="w-full p-2 border rounded"
+            value={status}
+            onChange={handleStatusChange}
+            required
+          >
+            <option value="On-Hand">Stock</option>
+            <option value="On-Display">On-Display</option>
+            <option value="Sold">Sold</option>
+            <option value="Reserved">Reserved</option>
+            <option value="Defective">Defective</option>
+          </select>
+        </div>
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">Last Updated:</label>
+          <input 
+            type="text" 
+            className="w-full p-2 border rounded bg-gray-100"
+            value={lastUpdated}
+            readOnly
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+PhoneAdditionalInfo.propTypes = {
+  imei1: PropTypes.string.isRequired,
+  imei2: PropTypes.string.isRequired,
+  barcode: PropTypes.string.isRequired,
+  status: PropTypes.string.isRequired,
+  lastUpdated: PropTypes.string.isRequired,
+  handleImei1Change: PropTypes.func.isRequired,
+  handleImei2Change: PropTypes.func.isRequired,
+  handleBarcodeChange: PropTypes.func.isRequired,
+  handleStatusChange: PropTypes.func.isRequired,
+  imei1Error: PropTypes.string,
+  imei2Error: PropTypes.string
+};
+
+export default PhoneAdditionalInfo;
+</file>
+
 <file path="src/components/PhoneSpecForm.jsx">
 {/* Part 1 Start - State and Form Data Updates */}
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -4325,273 +7106,850 @@ export default PriceManagementForm;
 {/* Part 9 End - Expanded Color Rows and Footer */}
 </file>
 
-<file path="src/components/ui/badge/index.jsx">
-import PropTypes from 'prop-types'
-import { cn } from "@/lib/utils"
-import { badgeVariants } from './variants'
+<file path="src/App.jsx">
+// src/App.jsx
+import { useEffect } from 'react';
+import PhoneSpecForm from './components/PhoneSpecForm';
+import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
+import InventoryListForm from './components/InventoryListForm';
+import PhoneListForm from './components/PhoneListForm';
+import InventorySummaryForm from './components/InventorySummaryForm';
+import PriceManagementForm from './components/PriceManagementForm';
+import PhoneProcurementForm from './components/PhoneProcurementForm';
+import SupplierManagementForm from './components/SupplierManagementForm'; // NEW: Added supplier management import
+// Import the hook from our consolidated file
+import { useGlobalState } from './context/GlobalStateContext';
 
-function Badge({
-  className = '',  // Using default parameter instead of defaultProps
-  variant = 'default', // Using default parameter instead of defaultProps
-  ...props
-}) {
+function App() {
+  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
+  
+  // For debugging
+  useEffect(() => {
+    console.log("App: Active component changed to:", activeComponent);
+    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
+  }, [activeComponent, phoneToEdit]);
+
   return (
-    <div 
-      className={cn(badgeVariants({ variant }), className)} 
-      {...props} 
-    />
-  )
+    <div className="min-h-screen bg-white">
+      <div className="p-4 bg-[rgb(52,69,157)] text-white">
+        <div className="max-w-6xl mx-auto flex flex-wrap gap-4">
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'summary' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('summary')}
+          >
+            Inventory Summary
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('inventory')}
+          >
+            Inventory List
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('selection')}
+          >
+            Add Phone Inventory
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'procurement' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('procurement')}
+          >
+            Phone Procurement
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('suppliers')}
+          >
+            Supplier Management
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('form')}
+          >
+            Add Phone Model
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('phonelist')}
+          >
+            Phone Models
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('prices')}
+          >
+            Price Management
+          </button>
+        </div>
+      </div>
+      
+      {activeComponent === 'summary' && <InventorySummaryForm />}
+      {activeComponent === 'selection' && <PhoneSelectionForm />}
+      {activeComponent === 'procurement' && <PhoneProcurementForm />}
+      {activeComponent === 'suppliers' && <SupplierManagementForm />}
+      {activeComponent === 'form' && <PhoneSpecForm />}
+      {activeComponent === 'inventory' && <InventoryListForm />}
+      {activeComponent === 'phonelist' && <PhoneListForm />}
+      {activeComponent === 'prices' && <PriceManagementForm />}
+    </div>
+  );
 }
 
-Badge.propTypes = {
-  className: PropTypes.string,
-  variant: PropTypes.oneOf(['default', 'secondary', 'destructive', 'outline'])
-}
-
-// Remove Badge.defaultProps
-
-export { Badge }
+export default App;
 </file>
 
-<file path="src/components/ui/badge/variants.jsx">
-import { cva } from "class-variance-authority"
-
-export const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-  {
-    variants: {
-      variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
-</file>
-
-<file path="src/components/ui/card.jsx">
-import * as React from "react"
-import { cn } from "@/lib/utils"
-import PropTypes from 'prop-types'
-
-const Card = React.forwardRef(({ 
-  className = '', // Using default parameter
-  ...props 
-}, ref) => (
-  <div
-    ref={ref}
-    className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)}
-    {...props}
-  />
-))
-Card.displayName = "Card"
-Card.propTypes = {
-  className: PropTypes.string
-}
-
-const CardHeader = React.forwardRef(({ 
-  className = '', // Using default parameter
-  ...props 
-}, ref) => (
-  <div
-    ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
-    {...props}
-  />
-))
-CardHeader.displayName = "CardHeader"
-CardHeader.propTypes = {
-  className: PropTypes.string
-}
-
-const CardTitle = React.forwardRef(({ 
-  className = '', // Using default parameter
-  ...props 
-}, ref) => (
-  <h3
-    ref={ref}
-    className={cn("text-2xl font-semibold leading-none tracking-tight", className)}
-    {...props}
-  />
-))
-CardTitle.displayName = "CardTitle"
-CardTitle.propTypes = {
-  className: PropTypes.string
-}
-
-const CardContent = React.forwardRef(({ 
-  className = '', // Using default parameter
-  ...props 
-}, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
-))
-CardContent.displayName = "CardContent"
-CardContent.propTypes = {
-  className: PropTypes.string
-}
-
-export { Card, CardHeader, CardTitle, CardContent }
-</file>
-
-<file path="src/context/GlobalStateContext.jsx">
-// src/context/GlobalStateContext.jsx
+<file path="src/components/inventory/InventoryEditForm.jsx">
 import PropTypes from 'prop-types';
-import { createContext, useState, useContext } from 'react';
+import { RefreshCw, Save, XCircle } from 'lucide-react';
 
-// Create context
-export const GlobalStateContext = createContext();
-
-// Custom hook for easier context usage
-export const useGlobalState = () => useContext(GlobalStateContext);
-
-// Create provider
-export const GlobalStateProvider = ({ children }) => {
-  const [phoneToEdit, setPhoneToEdit] = useState(null);
-  const [activeComponent, setActiveComponent] = useState('summary'); // Changed back to 'summary'
-  
-  // Function to set a phone for editing and switch to form
-  const editPhone = (phone) => {
-    console.log("GlobalStateContext: Setting phone to edit", phone?.id);
-    setPhoneToEdit(phone);
-    setActiveComponent('form');
-  };
-  
-  // Function to clear the selected phone
-  const clearPhoneToEdit = () => {
-    setPhoneToEdit(null);
-  };
-  
-  // Create a value object with all the state and functions
-  const contextValue = {
-    phoneToEdit,
-    editPhone,
-    clearPhoneToEdit,
-    activeComponent,
-    setActiveComponent
-  };
-  
+const InventoryEditForm = ({ 
+  editFormData, 
+  handleEditInputChange, 
+  handleSaveEdit, 
+  handleCancelEdit, 
+  itemId, 
+  savingItemId 
+}) => {
   return (
-    <GlobalStateContext.Provider value={contextValue}>
-      {children}
-    </GlobalStateContext.Provider>
+    <tr className="hover:bg-gray-50">
+      <td className="border px-2 py-3 whitespace-nowrap">
+        <input
+          type="text"
+          name="manufacturer"
+          value={editFormData.manufacturer}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded"
+        />
+      </td>
+      <td className="border px-2 py-3 whitespace-nowrap">
+        <input
+          type="text"
+          name="model"
+          value={editFormData.model}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded"
+        />
+      </td>
+      <td className="border px-2 py-3 whitespace-nowrap">
+        <input
+          type="text"
+          name="ram"
+          value={editFormData.ram}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded"
+        />
+      </td>
+      <td className="border px-2 py-3 whitespace-nowrap">
+        <input
+          type="text"
+          name="storage"
+          value={editFormData.storage}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded"
+        />
+      </td>
+      <td className="border px-2 py-3 whitespace-nowrap">
+        <input
+          type="text"
+          name="color"
+          value={editFormData.color}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded"
+        />
+      </td>
+      <td className="border px-2 py-3 font-mono whitespace-nowrap">
+        <input
+          type="text"
+          name="imei1"
+          value={editFormData.imei1}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded font-mono"
+        />
+      </td>
+      <td className="border px-2 py-3 font-mono whitespace-nowrap">
+        <input
+          type="text"
+          name="barcode"
+          value={editFormData.barcode}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded font-mono"
+        />
+      </td>
+      <td className="border px-2 py-3 whitespace-nowrap text-xs text-gray-500">
+        {new Date().toLocaleDateString('en-US')}
+      </td>
+      <td className="border px-2 py-3 text-center whitespace-nowrap">
+        <select
+          name="status"
+          value={editFormData.status}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded text-center"
+        >
+          <option value="On-Hand">Stock</option>
+          <option value="On-Display">On-Display</option>
+          <option value="Sold">Sold</option>
+          <option value="Reserved">Reserved</option>
+          <option value="Defective">Defective</option>
+        </select>
+      </td>
+      <td className="border px-2 py-3 text-center whitespace-nowrap">
+        <div className="flex justify-center space-x-2">
+          <button
+            onClick={() => handleSaveEdit(itemId)}
+            disabled={savingItemId === itemId}
+            className="p-1 text-green-600 hover:text-green-800"
+            title="Save changes"
+          >
+            {savingItemId === itemId ? (
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            ) : (
+              <Save className="h-5 w-5" />
+            )}
+          </button>
+          <button
+            onClick={handleCancelEdit}
+            className="p-1 text-red-600 hover:text-red-800"
+            title="Cancel edit"
+          >
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 };
 
-// Add prop types for validation
-GlobalStateProvider.propTypes = {
-  children: PropTypes.node.isRequired
+InventoryEditForm.propTypes = {
+  editFormData: PropTypes.object.isRequired,
+  handleEditInputChange: PropTypes.func.isRequired,
+  handleSaveEdit: PropTypes.func.isRequired,
+  handleCancelEdit: PropTypes.func.isRequired,
+  itemId: PropTypes.string.isRequired,
+  savingItemId: PropTypes.string
 };
 
-// Also provide a default export for the hook for backward compatibility
-export default useGlobalState;
+export default InventoryEditForm;
 </file>
 
-<file path="src/firebase/config.js">
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+<file path="src/components/inventory/InventoryRow.jsx">
+import PropTypes from 'prop-types';
+import { Edit } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
-const firebaseConfig = {
-
-    apiKey: "AIzaSyAdj8EwqtB7uP_gQmevelvbxew4_X4LJyk",  
-    authDomain: "tech-city-phone-information.firebaseapp.com",  
-    projectId: "tech-city-phone-information",  
-    storageBucket: "tech-city-phone-information.firebasestorage.app",  
-    messagingSenderId: "218177382353",  
-    appId: "1:218177382353:web:cf92ab1e75bcd139a062f0"  
-};
+const InventoryRow = ({ 
+  item, 
+  handleEditClick, 
+  handleDeleteClick 
+}) => {
+  // Function to format the date
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    // If it's already in MM/DD/YYYY format, return as is
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+      return dateString;
+    }
+    // Otherwise try to parse and format
+    try {
+      const date = new Date(dateString);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    } catch {
+      return dateString;
+    }
+  };
   
+  // Function to get status display text
+  const getStatusDisplay = (status) => {
+    return status === 'On-Hand' ? 'Stock' : status;
+  };
+  
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="border px-2 py-3 whitespace-nowrap">{item.manufacturer}</td>
+      <td className="border px-2 py-3 whitespace-nowrap">{item.model}</td>
+      <td className="border px-2 py-3 whitespace-nowrap">{item.ram}</td>
+      <td className="border px-2 py-3 whitespace-nowrap">{item.storage}</td>
+      <td className="border px-2 py-3 whitespace-nowrap">{item.color}</td>
+      <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.imei1}</td>
+      <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.barcode || '-'}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-xs">{formatDate(item.lastUpdated)}</td>
+      <td className="border px-2 py-3 text-center whitespace-nowrap">
+        <span className={`inline-block px-3 py-1 rounded-full text-sm ${
+          item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800' :
+          item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800' :
+          item.status === 'Sold' ? 'bg-purple-100 text-purple-800' :
+          item.status === 'Reserved' ? 'bg-orange-100 text-orange-800' :
+          'bg-gray-100 text-gray-800'
+        }`}>
+          {getStatusDisplay(item.status)}
+        </span>
+      </td>
+      <td className="border px-2 py-3 text-center whitespace-nowrap">
+        <div className="flex justify-center space-x-2">
+          <button
+            onClick={() => handleEditClick(item)}
+            className="p-1 text-blue-600 hover:text-blue-800"
+            title="Edit item"
+          >
+            <Edit className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => handleDeleteClick(item.id)}
+            className="p-1 text-red-600 hover:text-red-800"
+            title="Delete item"
+          >
+            <Trash2 className="h-5 w-5" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+};
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+InventoryRow.propTypes = {
+  item: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    manufacturer: PropTypes.string.isRequired,
+    model: PropTypes.string.isRequired,
+    ram: PropTypes.string.isRequired,
+    storage: PropTypes.string.isRequired,
+    color: PropTypes.string.isRequired,
+    imei1: PropTypes.string.isRequired,
+    barcode: PropTypes.string,
+    status: PropTypes.string.isRequired,
+    lastUpdated: PropTypes.string
+  }).isRequired,
+  handleEditClick: PropTypes.func.isRequired,
+  handleDeleteClick: PropTypes.func.isRequired
+};
+
+export default InventoryRow;
 </file>
 
-<file path="src/index.css">
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-</file>
+<file path="src/components/InventoryListForm.jsx">
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { Smartphone, RefreshCw, Filter, X, Search } from 'lucide-react';
+import InventoryTable from './inventory/InventoryTable';
+import InventoryFilters from './inventory/InventoryFilters';
 
-<file path="src/lib/utils.js">
-import { clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
- 
-export function cn(...inputs) {
-  return twMerge(clsx(inputs))
-}
-</file>
+const InventoryListForm = () => {
+  // State for inventory data
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [allItems, setAllItems] = useState([]); // Store all unfiltered items
+  const [loading, setLoading] = useState(false); // Changed to false by default
+  const [error, setError] = useState(null);
+  const [sortField, setSortField] = useState('manufacturer');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [initialLoad, setInitialLoad] = useState(true); // Track if data has been loaded
+  
+  // State for filters
+  const [filters, setFilters] = useState({
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: '',
+    status: '',
+    minPrice: '',
+    maxPrice: '',
+    color: '',
+    imei1: '',
+    barcode: ''
+  });
+  
+  // Separate state for pending filter changes (before debounce)
+  const [pendingFilters, setPendingFilters] = useState({
+    minPrice: '',
+    maxPrice: '',
+    imei1: '',
+    barcode: ''
+  });
+  
+  // Filter options lists - Updated to use 'Stock' instead of 'On-Hand'
+  const [filterOptions, setFilterOptions] = useState({
+    manufacturers: [],
+    models: [],
+    rams: [],
+    storages: [],
+    colors: [],
+    statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
+  });
+  
+  // Show/hide filters
+  const [showFilters, setShowFilters] = useState(true); // Default to showing filters
+  
+  // Debounce timer ref
+  const debounceTimerRef = useRef(null);
+  // Format number with commas
+  const formatNumberWithCommas = (value) => {
+    if (!value && value !== 0) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+  
+  // Parse price value for filters
+  const parsePrice = (value) => {
+    if (!value) return '';
+    return value.replace(/,/g, '');
+  };
+  
+  // Sync filters to pendingFilters when filters change
+  useEffect(() => {
+    setPendingFilters(prevPending => ({
+      ...prevPending,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+      imei1: filters.imei1,
+      barcode: filters.barcode
+    }));
+  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode]);
 
-<file path="src/main.jsx">
-// src/main.jsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import './index.css';
-import './styles.css';
-// Import the GlobalStateProvider from our consolidated file
-import { GlobalStateProvider } from './context/GlobalStateContext';
+  // Handle filter change
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    
+    // For debounced text inputs (price fields, imei, barcode)
+    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode') {
+      // For price fields, handle numeric input
+      if (name === 'minPrice' || name === 'maxPrice') {
+        // Allow only numbers and commas
+        const sanitizedValue = value.replace(/[^\d,]/g, '');
+        const formattedValue = formatNumberWithCommas(sanitizedValue);
+        
+        // Update pending value first (for display)
+        setPendingFilters(prev => ({
+          ...prev,
+          [name]: formattedValue
+        }));
+        
+        // Clear any existing timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        
+        // Set a new timer to update the actual filter after delay
+        debounceTimerRef.current = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            [name]: formattedValue
+          }));
+        }, 800); // 800ms delay
+      } else {
+        // For text search fields (IMEI, barcode)
+        setPendingFilters(prev => ({
+          ...prev,
+          [name]: value
+        }));
+        
+        // Clear any existing timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        
+        // Set a new timer to update the actual filter after delay
+        debounceTimerRef.current = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            [name]: value
+          }));
+        }, 500); // 500ms delay
+      }
+    } else {
+      // For dropdown selects (instant filtering)
+      setFilters(prev => ({
+        ...prev,
+        [name]: value
+      }));
+      
+      // Reset color when manufacturer or model changes
+      if (name === 'manufacturer' || name === 'model') {
+        setFilters(prev => ({
+          ...prev,
+          color: '',
+          [name]: value
+        }));
+      }
+    }
+  };
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <GlobalStateProvider>
-      <App />
-    </GlobalStateProvider>
-  </React.StrictMode>
-);
-</file>
+  // Clear all filters
+  const clearFilters = () => {
+    // Clear both actual filters and pending filters
+    setFilters({
+      manufacturer: '',
+      model: '',
+      ram: '',
+      storage: '',
+      status: '',
+      minPrice: '',
+      maxPrice: '',
+      color: '',
+      imei1: '',
+      barcode: ''
+    });
+    
+    setPendingFilters({
+      minPrice: '',
+      maxPrice: '',
+      imei1: '',
+      barcode: ''
+    });
+    
+    // Clear any active debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  };
+  // Apply filters to the data
+  const applyFilters = useCallback((items) => {
+    return items.filter(item => {
+      // Apply manufacturer filter
+      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) {
+        return false;
+      }
+      
+      // Apply model filter
+      if (filters.model && item.model !== filters.model) {
+        return false;
+      }
+      
+      // Apply RAM filter
+      if (filters.ram && item.ram !== filters.ram) {
+        return false;
+      }
+      
+      // Apply storage filter
+      if (filters.storage && item.storage !== filters.storage) {
+        return false;
+      }
+      
+      // Apply status filter - handle both 'Stock' and 'On-Hand'
+      if (filters.status) {
+        const filterStatus = filters.status === 'Stock' ? 'On-Hand' : filters.status;
+        if (item.status !== filterStatus) {
+          return false;
+        }
+      }
+      
+      // Apply color filter
+      if (filters.color && item.color !== filters.color) {
+        return false;
+      }
+      
+      // Apply IMEI1 filter (partial match)
+      if (filters.imei1 && !item.imei1.includes(filters.imei1)) {
+        return false;
+      }
+      
+      // Apply barcode filter (partial match)
+      if (filters.barcode && item.barcode && !item.barcode.includes(filters.barcode)) {
+        return false;
+      }
+      
+      // Apply min price filter (using retail price)
+      if (filters.minPrice) {
+        const minPrice = parseFloat(parsePrice(filters.minPrice));
+        if (!isNaN(minPrice) && item.retailPrice < minPrice) {
+          return false;
+        }
+      }
+      
+      // Apply max price filter (using retail price)
+      if (filters.maxPrice) {
+        const maxPrice = parseFloat(parsePrice(filters.maxPrice));
+        if (!isNaN(maxPrice) && item.retailPrice > maxPrice) {
+          return false;
+        }
+      }
+      
+      // If it passed all filters, include it
+      return true;
+    });
+  }, [filters]);
 
-<file path="src/styles.css">
-.test-blue {
-    background-color: rgb(52,69,157);
-    padding: 20px;
-    color: white;
+  // Load filter options from data
+  const loadFilterOptions = useCallback((data) => {
+    const manufacturers = [...new Set(data.map(item => item.manufacturer))].sort();
+    const models = [...new Set(data.map(item => item.model))].sort();
+    const rams = [...new Set(data.map(item => item.ram))].sort();
+    const storages = [...new Set(data.map(item => item.storage))].sort();
+    
+    // For colors, filter based on manufacturer and model if selected
+    let filteredData = data;
+    if (filters.manufacturer) {
+      filteredData = filteredData.filter(item => item.manufacturer === filters.manufacturer);
+    }
+    if (filters.model) {
+      filteredData = filteredData.filter(item => item.model === filters.model);
+    }
+    
+    const colors = [...new Set(filteredData.map(item => item.color))].sort();
+    
+    setFilterOptions({
+      manufacturers,
+      models,
+      rams,
+      storages,
+      colors,
+      statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
+    });
+  }, [filters.manufacturer, filters.model]);
+
+  // Fetch inventory data - modified to handle search constraints
+  const fetchInventoryData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const inventoryRef = collection(db, 'inventory');
+      
+      // Build query constraints
+      let queryConstraints = [orderBy(sortField, sortDirection)];
+      
+      // Add filter constraints if specified
+      if (filters.manufacturer) {
+        queryConstraints.push(where("manufacturer", "==", filters.manufacturer));
+      }
+      
+      if (filters.model) {
+        queryConstraints.push(where("model", "==", filters.model));
+      }
+      
+      // Note: Firebase can only perform inequalities on a single field
+      // For more complex filtering, we'll do it client-side
+      
+      // Create query with constraints
+      const q = query(inventoryRef, ...queryConstraints);
+      const snapshot = await getDocs(q);
+      
+      const items = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        items.push({
+          id: doc.id,
+          manufacturer: data.manufacturer || '',
+          model: data.model || '',
+          ram: data.ram || '',
+          storage: data.storage || '',
+          color: data.color || '',
+          dealersPrice: data.dealersPrice || 0,
+          retailPrice: data.retailPrice || 0,
+          imei1: data.imei1 || '',
+          barcode: data.barcode || '',
+          status: data.status || 'On-Hand',
+          dateAdded: data.dateAdded || '',
+          lastUpdated: data.lastUpdated || ''
+        });
+      });
+      
+      // Store all items
+      setAllItems(items);
+      
+      // Load filter options from the fetched data
+      loadFilterOptions(items);
+      
+      // Apply all filters client-side
+      const filteredItems = applyFilters(items);
+      setInventoryItems(filteredItems);
+      setInitialLoad(false);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching inventory data:", error);
+      setError(`Error fetching inventory: ${error.message}`);
+      setLoading(false);
+    }
+  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters]);
+
+  // Handle the search button click
+  const handleSearch = () => {
+    fetchInventoryData();
+  };
+
+  // Handle sort change
+  const handleSort = (field) => {
+    if (field === sortField) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new field and default to asc
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+  // Apply filters when they change AFTER initial data load
+  useEffect(() => {
+    if (!initialLoad && allItems.length > 0) {
+      const filtered = applyFilters(allItems);
+      setInventoryItems(filtered);
+    }
+  }, [filters, allItems, applyFilters, initialLoad]);
+
+  // Load manufacturer list on component mount
+  useEffect(() => {
+    async function loadManufacturers() {
+      try {
+        const inventoryRef = collection(db, 'inventory');
+        const snapshot = await getDocs(inventoryRef);
+        
+        const manufacturers = [...new Set(
+          snapshot.docs.map(doc => doc.data().manufacturer)
+        )].filter(Boolean).sort();
+        
+        setFilterOptions(prev => ({
+          ...prev,
+          manufacturers
+        }));
+      } catch (error) {
+        console.error("Error loading manufacturers:", error);
+      }
+    }
+    
+    loadManufacturers();
+  }, []);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white">Inventory List</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-lg">Loading inventory data...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
-</file>
 
-<file path="tailwind.config.js">
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,jsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: []
-}
-</file>
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white">Error</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p>{error}</p>
+            <button 
+              onClick={handleSearch}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
+            >
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  // Main component render
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Smartphone className="h-6 w-6 text-white" />
+            <CardTitle className="text-2xl text-white">Inventory List</CardTitle>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1 ${showFilters ? 'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
+            >
+              <Filter className="h-5 w-5 mr-1" />
+              <span>Filters</span>
+            </button>
+            <button
+              onClick={handleSearch}
+              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
+            >
+              <Search className="h-5 w-5 mr-1" />
+              <span>Search</span>
+            </button>
+            <button
+              onClick={() => fetchInventoryData()}
+              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
+            >
+              <RefreshCw className="h-5 w-5 mr-1" />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </CardHeader>
 
-<file path="vite.config.js">
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { fileURLToPath } from 'url'
-import path from 'path'
+        <CardContent className="p-4">
+          {/* Filters panel */}
+          {showFilters && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
+                <button 
+                  onClick={clearFilters}
+                  className="text-gray-500 hover:text-red-500 flex items-center"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear Filters
+                </button>
+              </div>
+              
+              <InventoryFilters 
+                filters={filters}
+                pendingFilters={pendingFilters}
+                filterOptions={filterOptions}
+                handleFilterChange={handleFilterChange}
+                allItems={allItems}
+              />
+            </div>
+          )}
+          
+          <div className="overflow-x-auto">
+            {initialLoad ? (
+              <div className="text-center py-12">
+                <p className="text-lg mb-4">Use the search button to load inventory items</p>
+                <p className="text-sm text-gray-500 mb-6">You can apply filters before searching or search all items</p>
+                <button
+                  onClick={handleSearch}
+                  className="bg-[rgb(52,69,157)] text-white px-6 py-2 rounded-md flex items-center mx-auto"
+                >
+                  <Search className="h-5 w-5 mr-2" />
+                  Search All Inventory
+                </button>
+              </div>
+            ) : inventoryItems.length === 0 ? (
+              <p className="text-center py-8 text-lg">No inventory items found matching your filters.</p>
+            ) : (
+              <InventoryTable 
+                inventoryItems={inventoryItems} 
+                handleSort={handleSort}
+                sortField={sortField}
+                sortDirection={sortDirection}                
+                allItems={allItems}
+                setAllItems={setAllItems}
+                setInventoryItems={setInventoryItems}
+                applyFilters={applyFilters}
+              />
+            )}
+            
+            {/* Inventory count summary */}
+            {!initialLoad && (
+              <div className="mt-4 text-right text-gray-600">
+                Showing {inventoryItems.length} items
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  esbuild: {
-    loader: "jsx",
-    include: /src\/.*\.jsx?$/,
-    exclude: [],
-  },
-})
+export default InventoryListForm;
 </file>
 
 <file path="src/components/InventorySummaryForm.jsx">
@@ -5636,1062 +8994,6 @@ const InventorySummaryForm = () => {
 
 export default InventorySummaryForm;
 {/* Part 6 End - Inventory Value Summary and Footer */}
-</file>
-
-<file path="src/components/phone-selection/hooks/usePhoneCache.js">
-import { useState, useCallback } from 'react';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
-import { db } from '../../../firebase/config';
-import { formatNumberWithCommas, getCurrentDate } from '../utils/phoneUtils';
-
-export const usePhoneCache = () => {
-  const [priceCache, setPriceCache] = useState({});
-  
-  // Load price cache from existing inventory
-  const loadPriceCacheFromInventory = useCallback(async () => {
-    try {
-      const newPriceCache = {};
-     
-      // First load price configurations (both base and color-specific)
-      const configsRef = collection(db, 'price_configurations');
-      const configsSnapshot = await getDocs(configsRef);
-     
-      configsSnapshot.forEach(doc => {
-        const data = doc.data();
-        console.log("Loading price config:", doc.id, data); // Add this line
-        if (data.manufacturer && data.model && data.ram && data.storage) {
-          let cacheKey;
-         
-          if (data.color) {
-            // Color-specific price
-            cacheKey = `${data.manufacturer}_${data.model}_${data.ram}_${data.storage}_${data.color}`;
-          } else {
-            // Base price
-            cacheKey = `${data.manufacturer}_${data.model}_${data.ram}_${data.storage}`;
-          }
-         
-          newPriceCache[cacheKey] = {
-            dealersPrice: formatNumberWithCommas(data.dealersPrice.toString()),
-            retailPrice: formatNumberWithCommas(data.retailPrice.toString()),
-            lastUpdated: data.lastUpdated
-          };
-        }
-      });
-     
-      // Then load barcodes from inventory
-      const inventoryRef = collection(db, 'inventory');
-      const inventorySnapshot = await getDocs(inventoryRef);
-     
-      inventorySnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.manufacturer && data.model && data.ram && data.storage && data.color && data.barcode) {
-          const barcodeKey = `${data.manufacturer}_${data.model}_${data.ram}_${data.storage}_${data.color}`;
-         
-          // Update existing entry or create new one
-          newPriceCache[barcodeKey] = {
-            ...newPriceCache[barcodeKey] || {},
-            barcode: data.barcode,
-            // Only update lastUpdated if this is a new entry
-            lastUpdated: newPriceCache[barcodeKey]?.lastUpdated || data.lastUpdated
-          };
-        }
-      });
-     
-      console.log("Price cache loaded:", Object.keys(newPriceCache).length, "entries");
-      setPriceCache(newPriceCache);
-    } catch (error) {
-      console.error("Error loading price cache:", error);
-    }
-  }, [setPriceCache]);
-  
-  // Helper function to save/update price configurations
-  const updatePriceConfiguration = async (manufacturer, model, ram, storage, dealersPrice, retailPrice, color = null) => {
-    try {
-      // Create a unique ID - with or without color
-      let configId;
-      if (color) {
-        // Color-specific pricing
-        configId = `${manufacturer}_${model}_${ram}_${storage}_${color}`.replace(/\s+/g, '_').toLowerCase();
-      } else {
-        // Base pricing for this configuration
-        configId = `${manufacturer}_${model}_${ram}_${storage}`.replace(/\s+/g, '_').toLowerCase();
-      }
-      
-      // Remove commas and convert to number
-      const dPrice = parseFloat(dealersPrice.toString().replace(/,/g, '')) || 0;
-      const rPrice = parseFloat(retailPrice.toString().replace(/,/g, '')) || 0;
-      
-      await setDoc(doc(db, 'price_configurations', configId), {
-        manufacturer,
-        model,
-        ram,
-        storage,
-        color, // null for base configuration
-        dealersPrice: dPrice,
-        retailPrice: rPrice,
-        lastUpdated: getCurrentDate()
-      }, { merge: true });
-      
-      return true;
-    } catch (error) {
-      console.error("Error updating price configuration:", error);
-      return false;
-    }
-  };
-
-  return {
-    priceCache,
-    setPriceCache,
-    loadPriceCacheFromInventory,
-    updatePriceConfiguration
-  };
-};
-
-export default usePhoneCache;
-</file>
-
-<file path="src/components/phone-selection/PhoneAdditionalInfo.jsx">
-import PropTypes from 'prop-types';
-
-const PhoneAdditionalInfo = ({
-  imei1,
-  imei2,
-  barcode,
-  status,
-  lastUpdated,
-  handleImei1Change,
-  handleImei2Change,
-  handleBarcodeChange,
-  handleStatusChange,
-  imei1Error,
-  imei2Error,
-}) => {
-  return (
-    <div className="pt-4 border-t border-gray-300 space-y-4">
-      <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Additional Details</h3>
-      
-      {/* IMEI Fields */}
-      <div className="flex gap-4">
-        <div className="flex-1 space-y-2">
-          <label className="block text-[rgb(52,69,157)] font-semibold">IMEI 1:</label>
-          <input 
-            type="text" 
-            className={`w-full p-2 border rounded ${imei1Error ? 'border-red-500' : ''}`}
-            value={imei1}
-            onChange={handleImei1Change}
-            placeholder="15-digit IMEI number"
-            maxLength={15}
-            required
-          />
-          {imei1Error && (
-            <p className="text-red-500 text-sm mt-1">{imei1Error}</p>
-          )}
-        </div>
-        <div className="flex-1 space-y-2">
-          <label className="block text-[rgb(52,69,157)] font-semibold">IMEI 2:</label>
-          <input 
-            type="text" 
-            className={`w-full p-2 border rounded ${imei2Error ? 'border-red-500' : ''}`}
-            value={imei2}
-            onChange={handleImei2Change}
-            placeholder="Optional"
-            maxLength={15}
-          />
-          {imei2Error && (
-            <p className="text-red-500 text-sm mt-1">{imei2Error}</p>
-          )}
-        </div>
-      </div>
-      
-      {/* Barcode */}
-      <div className="space-y-2">
-        <label className="block text-[rgb(52,69,157)] font-semibold">Barcode:</label>
-        <input 
-          type="text" 
-          className="w-full p-2 border rounded"
-          value={barcode}
-          onChange={handleBarcodeChange}
-          placeholder="Product barcode"
-          required
-        />
-      </div>
-      
-      {/* Status and Last Updated Fields */}
-      <div className="flex gap-4">
-        <div className="flex-1 space-y-2">
-          <label className="block text-[rgb(52,69,157)] font-semibold">Status:</label>
-          <select
-            className="w-full p-2 border rounded"
-            value={status}
-            onChange={handleStatusChange}
-            required
-          >
-            <option value="On-Hand">Stock</option>
-            <option value="On-Display">On-Display</option>
-            <option value="Sold">Sold</option>
-            <option value="Reserved">Reserved</option>
-            <option value="Defective">Defective</option>
-          </select>
-        </div>
-        <div className="flex-1 space-y-2">
-          <label className="block text-[rgb(52,69,157)] font-semibold">Last Updated:</label>
-          <input 
-            type="text" 
-            className="w-full p-2 border rounded bg-gray-100"
-            value={lastUpdated}
-            readOnly
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-PhoneAdditionalInfo.propTypes = {
-  imei1: PropTypes.string.isRequired,
-  imei2: PropTypes.string.isRequired,
-  barcode: PropTypes.string.isRequired,
-  status: PropTypes.string.isRequired,
-  lastUpdated: PropTypes.string.isRequired,
-  handleImei1Change: PropTypes.func.isRequired,
-  handleImei2Change: PropTypes.func.isRequired,
-  handleBarcodeChange: PropTypes.func.isRequired,
-  handleStatusChange: PropTypes.func.isRequired,
-  imei1Error: PropTypes.string,
-  imei2Error: PropTypes.string
-};
-
-export default PhoneAdditionalInfo;
-</file>
-
-<file path="src/App.jsx">
-// src/App.jsx
-import { useEffect } from 'react';
-import PhoneSpecForm from './components/PhoneSpecForm';
-import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
-import InventoryListForm from './components/InventoryListForm';
-import PhoneListForm from './components/PhoneListForm';
-import InventorySummaryForm from './components/InventorySummaryForm';
-import PriceManagementForm from './components/PriceManagementForm';
-// Import the hook from our consolidated file
-import { useGlobalState } from './context/GlobalStateContext';
-
-function App() {
-  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
-  
-  // For debugging
-  useEffect(() => {
-    console.log("App: Active component changed to:", activeComponent);
-    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
-  }, [activeComponent, phoneToEdit]);
-
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="p-4 bg-[rgb(52,69,157)] text-white">
-        <div className="max-w-6xl mx-auto flex flex-wrap gap-4">
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'summary' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('summary')}
-          >
-            Inventory Summary
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('inventory')}
-          >
-            Inventory List
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('selection')}
-          >
-            Add Phone Inventory
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('form')}
-          >
-            Add Phone Model
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('phonelist')}
-          >
-            Phone Models
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('prices')}
-          >
-            Price Management
-          </button>
-        </div>
-      </div>
-      
-      {activeComponent === 'summary' && <InventorySummaryForm />}
-      {activeComponent === 'selection' && <PhoneSelectionForm />}
-      {activeComponent === 'form' && <PhoneSpecForm />}
-      {activeComponent === 'inventory' && <InventoryListForm />}
-      {activeComponent === 'phonelist' && <PhoneListForm />}
-      {activeComponent === 'prices' && <PriceManagementForm />}
-    </div>
-  );
-}
-
-export default App;
-</file>
-
-<file path="src/components/inventory/InventoryEditForm.jsx">
-import PropTypes from 'prop-types';
-import { RefreshCw, Save, XCircle } from 'lucide-react';
-
-const InventoryEditForm = ({ 
-  editFormData, 
-  handleEditInputChange, 
-  handleSaveEdit, 
-  handleCancelEdit, 
-  itemId, 
-  savingItemId 
-}) => {
-  return (
-    <tr className="hover:bg-gray-50">
-      <td className="border px-2 py-3 whitespace-nowrap">
-        <input
-          type="text"
-          name="manufacturer"
-          value={editFormData.manufacturer}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded"
-        />
-      </td>
-      <td className="border px-2 py-3 whitespace-nowrap">
-        <input
-          type="text"
-          name="model"
-          value={editFormData.model}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded"
-        />
-      </td>
-      <td className="border px-2 py-3 whitespace-nowrap">
-        <input
-          type="text"
-          name="ram"
-          value={editFormData.ram}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded"
-        />
-      </td>
-      <td className="border px-2 py-3 whitespace-nowrap">
-        <input
-          type="text"
-          name="storage"
-          value={editFormData.storage}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded"
-        />
-      </td>
-      <td className="border px-2 py-3 whitespace-nowrap">
-        <input
-          type="text"
-          name="color"
-          value={editFormData.color}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded"
-        />
-      </td>
-      <td className="border px-2 py-3 font-mono whitespace-nowrap">
-        <input
-          type="text"
-          name="imei1"
-          value={editFormData.imei1}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded font-mono"
-        />
-      </td>
-      <td className="border px-2 py-3 font-mono whitespace-nowrap">
-        <input
-          type="text"
-          name="barcode"
-          value={editFormData.barcode}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded font-mono"
-        />
-      </td>
-      <td className="border px-2 py-3 whitespace-nowrap text-xs text-gray-500">
-        {new Date().toLocaleDateString('en-US')}
-      </td>
-      <td className="border px-2 py-3 text-center whitespace-nowrap">
-        <select
-          name="status"
-          value={editFormData.status}
-          onChange={handleEditInputChange}
-          className="w-full p-1 border rounded text-center"
-        >
-          <option value="On-Hand">Stock</option>
-          <option value="On-Display">On-Display</option>
-          <option value="Sold">Sold</option>
-          <option value="Reserved">Reserved</option>
-          <option value="Defective">Defective</option>
-        </select>
-      </td>
-      <td className="border px-2 py-3 text-center whitespace-nowrap">
-        <div className="flex justify-center space-x-2">
-          <button
-            onClick={() => handleSaveEdit(itemId)}
-            disabled={savingItemId === itemId}
-            className="p-1 text-green-600 hover:text-green-800"
-            title="Save changes"
-          >
-            {savingItemId === itemId ? (
-              <RefreshCw className="h-5 w-5 animate-spin" />
-            ) : (
-              <Save className="h-5 w-5" />
-            )}
-          </button>
-          <button
-            onClick={handleCancelEdit}
-            className="p-1 text-red-600 hover:text-red-800"
-            title="Cancel edit"
-          >
-            <XCircle className="h-5 w-5" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-};
-
-InventoryEditForm.propTypes = {
-  editFormData: PropTypes.object.isRequired,
-  handleEditInputChange: PropTypes.func.isRequired,
-  handleSaveEdit: PropTypes.func.isRequired,
-  handleCancelEdit: PropTypes.func.isRequired,
-  itemId: PropTypes.string.isRequired,
-  savingItemId: PropTypes.string
-};
-
-export default InventoryEditForm;
-</file>
-
-<file path="src/components/inventory/InventoryRow.jsx">
-import PropTypes from 'prop-types';
-import { Edit } from 'lucide-react';
-import { Trash2 } from 'lucide-react';
-
-const InventoryRow = ({ 
-  item, 
-  handleEditClick, 
-  handleDeleteClick 
-}) => {
-  // Function to format the date
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    // If it's already in MM/DD/YYYY format, return as is
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
-      return dateString;
-    }
-    // Otherwise try to parse and format
-    try {
-      const date = new Date(dateString);
-      const month = date.getMonth() + 1;
-      const day = date.getDate();
-      const year = date.getFullYear();
-      return `${month}/${day}/${year}`;
-    } catch {
-      return dateString;
-    }
-  };
-  
-  // Function to get status display text
-  const getStatusDisplay = (status) => {
-    return status === 'On-Hand' ? 'Stock' : status;
-  };
-  
-  return (
-    <tr className="hover:bg-gray-50">
-      <td className="border px-2 py-3 whitespace-nowrap">{item.manufacturer}</td>
-      <td className="border px-2 py-3 whitespace-nowrap">{item.model}</td>
-      <td className="border px-2 py-3 whitespace-nowrap">{item.ram}</td>
-      <td className="border px-2 py-3 whitespace-nowrap">{item.storage}</td>
-      <td className="border px-2 py-3 whitespace-nowrap">{item.color}</td>
-      <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.imei1}</td>
-      <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.barcode || '-'}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-xs">{formatDate(item.lastUpdated)}</td>
-      <td className="border px-2 py-3 text-center whitespace-nowrap">
-        <span className={`inline-block px-3 py-1 rounded-full text-sm ${
-          item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800' :
-          item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800' :
-          item.status === 'Sold' ? 'bg-purple-100 text-purple-800' :
-          item.status === 'Reserved' ? 'bg-orange-100 text-orange-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {getStatusDisplay(item.status)}
-        </span>
-      </td>
-      <td className="border px-2 py-3 text-center whitespace-nowrap">
-        <div className="flex justify-center space-x-2">
-          <button
-            onClick={() => handleEditClick(item)}
-            className="p-1 text-blue-600 hover:text-blue-800"
-            title="Edit item"
-          >
-            <Edit className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => handleDeleteClick(item.id)}
-            className="p-1 text-red-600 hover:text-red-800"
-            title="Delete item"
-          >
-            <Trash2 className="h-5 w-5" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-};
-
-InventoryRow.propTypes = {
-  item: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    manufacturer: PropTypes.string.isRequired,
-    model: PropTypes.string.isRequired,
-    ram: PropTypes.string.isRequired,
-    storage: PropTypes.string.isRequired,
-    color: PropTypes.string.isRequired,
-    imei1: PropTypes.string.isRequired,
-    barcode: PropTypes.string,
-    status: PropTypes.string.isRequired,
-    lastUpdated: PropTypes.string
-  }).isRequired,
-  handleEditClick: PropTypes.func.isRequired,
-  handleDeleteClick: PropTypes.func.isRequired
-};
-
-export default InventoryRow;
-</file>
-
-<file path="src/components/InventoryListForm.jsx">
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { Smartphone, RefreshCw, Filter, X, Search } from 'lucide-react';
-import InventoryTable from './inventory/InventoryTable';
-import InventoryFilters from './inventory/InventoryFilters';
-
-const InventoryListForm = () => {
-  // State for inventory data
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const [allItems, setAllItems] = useState([]); // Store all unfiltered items
-  const [loading, setLoading] = useState(false); // Changed to false by default
-  const [error, setError] = useState(null);
-  const [sortField, setSortField] = useState('manufacturer');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [initialLoad, setInitialLoad] = useState(true); // Track if data has been loaded
-  
-  // State for filters
-  const [filters, setFilters] = useState({
-    manufacturer: '',
-    model: '',
-    ram: '',
-    storage: '',
-    status: '',
-    minPrice: '',
-    maxPrice: '',
-    color: '',
-    imei1: '',
-    barcode: ''
-  });
-  
-  // Separate state for pending filter changes (before debounce)
-  const [pendingFilters, setPendingFilters] = useState({
-    minPrice: '',
-    maxPrice: '',
-    imei1: '',
-    barcode: ''
-  });
-  
-  // Filter options lists - Updated to use 'Stock' instead of 'On-Hand'
-  const [filterOptions, setFilterOptions] = useState({
-    manufacturers: [],
-    models: [],
-    rams: [],
-    storages: [],
-    colors: [],
-    statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
-  });
-  
-  // Show/hide filters
-  const [showFilters, setShowFilters] = useState(true); // Default to showing filters
-  
-  // Debounce timer ref
-  const debounceTimerRef = useRef(null);
-  // Format number with commas
-  const formatNumberWithCommas = (value) => {
-    if (!value && value !== 0) return '';
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
-  
-  // Parse price value for filters
-  const parsePrice = (value) => {
-    if (!value) return '';
-    return value.replace(/,/g, '');
-  };
-  
-  // Sync filters to pendingFilters when filters change
-  useEffect(() => {
-    setPendingFilters(prevPending => ({
-      ...prevPending,
-      minPrice: filters.minPrice,
-      maxPrice: filters.maxPrice,
-      imei1: filters.imei1,
-      barcode: filters.barcode
-    }));
-  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode]);
-
-  // Handle filter change
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    
-    // For debounced text inputs (price fields, imei, barcode)
-    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode') {
-      // For price fields, handle numeric input
-      if (name === 'minPrice' || name === 'maxPrice') {
-        // Allow only numbers and commas
-        const sanitizedValue = value.replace(/[^\d,]/g, '');
-        const formattedValue = formatNumberWithCommas(sanitizedValue);
-        
-        // Update pending value first (for display)
-        setPendingFilters(prev => ({
-          ...prev,
-          [name]: formattedValue
-        }));
-        
-        // Clear any existing timer
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-        
-        // Set a new timer to update the actual filter after delay
-        debounceTimerRef.current = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            [name]: formattedValue
-          }));
-        }, 800); // 800ms delay
-      } else {
-        // For text search fields (IMEI, barcode)
-        setPendingFilters(prev => ({
-          ...prev,
-          [name]: value
-        }));
-        
-        // Clear any existing timer
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-        
-        // Set a new timer to update the actual filter after delay
-        debounceTimerRef.current = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            [name]: value
-          }));
-        }, 500); // 500ms delay
-      }
-    } else {
-      // For dropdown selects (instant filtering)
-      setFilters(prev => ({
-        ...prev,
-        [name]: value
-      }));
-      
-      // Reset color when manufacturer or model changes
-      if (name === 'manufacturer' || name === 'model') {
-        setFilters(prev => ({
-          ...prev,
-          color: '',
-          [name]: value
-        }));
-      }
-    }
-  };
-
-  // Clear all filters
-  const clearFilters = () => {
-    // Clear both actual filters and pending filters
-    setFilters({
-      manufacturer: '',
-      model: '',
-      ram: '',
-      storage: '',
-      status: '',
-      minPrice: '',
-      maxPrice: '',
-      color: '',
-      imei1: '',
-      barcode: ''
-    });
-    
-    setPendingFilters({
-      minPrice: '',
-      maxPrice: '',
-      imei1: '',
-      barcode: ''
-    });
-    
-    // Clear any active debounce timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-  };
-  // Apply filters to the data
-  const applyFilters = useCallback((items) => {
-    return items.filter(item => {
-      // Apply manufacturer filter
-      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) {
-        return false;
-      }
-      
-      // Apply model filter
-      if (filters.model && item.model !== filters.model) {
-        return false;
-      }
-      
-      // Apply RAM filter
-      if (filters.ram && item.ram !== filters.ram) {
-        return false;
-      }
-      
-      // Apply storage filter
-      if (filters.storage && item.storage !== filters.storage) {
-        return false;
-      }
-      
-      // Apply status filter - handle both 'Stock' and 'On-Hand'
-      if (filters.status) {
-        const filterStatus = filters.status === 'Stock' ? 'On-Hand' : filters.status;
-        if (item.status !== filterStatus) {
-          return false;
-        }
-      }
-      
-      // Apply color filter
-      if (filters.color && item.color !== filters.color) {
-        return false;
-      }
-      
-      // Apply IMEI1 filter (partial match)
-      if (filters.imei1 && !item.imei1.includes(filters.imei1)) {
-        return false;
-      }
-      
-      // Apply barcode filter (partial match)
-      if (filters.barcode && item.barcode && !item.barcode.includes(filters.barcode)) {
-        return false;
-      }
-      
-      // Apply min price filter (using retail price)
-      if (filters.minPrice) {
-        const minPrice = parseFloat(parsePrice(filters.minPrice));
-        if (!isNaN(minPrice) && item.retailPrice < minPrice) {
-          return false;
-        }
-      }
-      
-      // Apply max price filter (using retail price)
-      if (filters.maxPrice) {
-        const maxPrice = parseFloat(parsePrice(filters.maxPrice));
-        if (!isNaN(maxPrice) && item.retailPrice > maxPrice) {
-          return false;
-        }
-      }
-      
-      // If it passed all filters, include it
-      return true;
-    });
-  }, [filters]);
-
-  // Load filter options from data
-  const loadFilterOptions = useCallback((data) => {
-    const manufacturers = [...new Set(data.map(item => item.manufacturer))].sort();
-    const models = [...new Set(data.map(item => item.model))].sort();
-    const rams = [...new Set(data.map(item => item.ram))].sort();
-    const storages = [...new Set(data.map(item => item.storage))].sort();
-    
-    // For colors, filter based on manufacturer and model if selected
-    let filteredData = data;
-    if (filters.manufacturer) {
-      filteredData = filteredData.filter(item => item.manufacturer === filters.manufacturer);
-    }
-    if (filters.model) {
-      filteredData = filteredData.filter(item => item.model === filters.model);
-    }
-    
-    const colors = [...new Set(filteredData.map(item => item.color))].sort();
-    
-    setFilterOptions({
-      manufacturers,
-      models,
-      rams,
-      storages,
-      colors,
-      statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
-    });
-  }, [filters.manufacturer, filters.model]);
-
-  // Fetch inventory data - modified to handle search constraints
-  const fetchInventoryData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const inventoryRef = collection(db, 'inventory');
-      
-      // Build query constraints
-      let queryConstraints = [orderBy(sortField, sortDirection)];
-      
-      // Add filter constraints if specified
-      if (filters.manufacturer) {
-        queryConstraints.push(where("manufacturer", "==", filters.manufacturer));
-      }
-      
-      if (filters.model) {
-        queryConstraints.push(where("model", "==", filters.model));
-      }
-      
-      // Note: Firebase can only perform inequalities on a single field
-      // For more complex filtering, we'll do it client-side
-      
-      // Create query with constraints
-      const q = query(inventoryRef, ...queryConstraints);
-      const snapshot = await getDocs(q);
-      
-      const items = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        items.push({
-          id: doc.id,
-          manufacturer: data.manufacturer || '',
-          model: data.model || '',
-          ram: data.ram || '',
-          storage: data.storage || '',
-          color: data.color || '',
-          dealersPrice: data.dealersPrice || 0,
-          retailPrice: data.retailPrice || 0,
-          imei1: data.imei1 || '',
-          barcode: data.barcode || '',
-          status: data.status || 'On-Hand',
-          dateAdded: data.dateAdded || '',
-          lastUpdated: data.lastUpdated || ''
-        });
-      });
-      
-      // Store all items
-      setAllItems(items);
-      
-      // Load filter options from the fetched data
-      loadFilterOptions(items);
-      
-      // Apply all filters client-side
-      const filteredItems = applyFilters(items);
-      setInventoryItems(filteredItems);
-      setInitialLoad(false);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching inventory data:", error);
-      setError(`Error fetching inventory: ${error.message}`);
-      setLoading(false);
-    }
-  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters]);
-
-  // Handle the search button click
-  const handleSearch = () => {
-    fetchInventoryData();
-  };
-
-  // Handle sort change
-  const handleSort = (field) => {
-    if (field === sortField) {
-      // Toggle direction if same field
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Set new field and default to asc
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-  // Apply filters when they change AFTER initial data load
-  useEffect(() => {
-    if (!initialLoad && allItems.length > 0) {
-      const filtered = applyFilters(allItems);
-      setInventoryItems(filtered);
-    }
-  }, [filters, allItems, applyFilters, initialLoad]);
-
-  // Load manufacturer list on component mount
-  useEffect(() => {
-    async function loadManufacturers() {
-      try {
-        const inventoryRef = collection(db, 'inventory');
-        const snapshot = await getDocs(inventoryRef);
-        
-        const manufacturers = [...new Set(
-          snapshot.docs.map(doc => doc.data().manufacturer)
-        )].filter(Boolean).sort();
-        
-        setFilterOptions(prev => ({
-          ...prev,
-          manufacturers
-        }));
-      } catch (error) {
-        console.error("Error loading manufacturers:", error);
-      }
-    }
-    
-    loadManufacturers();
-  }, []);
-
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white">Inventory List</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p className="text-lg">Loading inventory data...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-red-600 py-3">
-            <CardTitle className="text-2xl text-white">Error</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p>{error}</p>
-            <button 
-              onClick={handleSearch}
-              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
-            >
-              Retry
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  // Main component render
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Smartphone className="h-6 w-6 text-white" />
-            <CardTitle className="text-2xl text-white">Inventory List</CardTitle>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1 ${showFilters ? 'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
-            >
-              <Filter className="h-5 w-5 mr-1" />
-              <span>Filters</span>
-            </button>
-            <button
-              onClick={handleSearch}
-              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
-            >
-              <Search className="h-5 w-5 mr-1" />
-              <span>Search</span>
-            </button>
-            <button
-              onClick={() => fetchInventoryData()}
-              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
-            >
-              <RefreshCw className="h-5 w-5 mr-1" />
-              <span>Refresh</span>
-            </button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-4">
-          {/* Filters panel */}
-          {showFilters && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
-                <button 
-                  onClick={clearFilters}
-                  className="text-gray-500 hover:text-red-500 flex items-center"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Clear Filters
-                </button>
-              </div>
-              
-              <InventoryFilters 
-                filters={filters}
-                pendingFilters={pendingFilters}
-                filterOptions={filterOptions}
-                handleFilterChange={handleFilterChange}
-                allItems={allItems}
-              />
-            </div>
-          )}
-          
-          <div className="overflow-x-auto">
-            {initialLoad ? (
-              <div className="text-center py-12">
-                <p className="text-lg mb-4">Use the search button to load inventory items</p>
-                <p className="text-sm text-gray-500 mb-6">You can apply filters before searching or search all items</p>
-                <button
-                  onClick={handleSearch}
-                  className="bg-[rgb(52,69,157)] text-white px-6 py-2 rounded-md flex items-center mx-auto"
-                >
-                  <Search className="h-5 w-5 mr-2" />
-                  Search All Inventory
-                </button>
-              </div>
-            ) : inventoryItems.length === 0 ? (
-              <p className="text-center py-8 text-lg">No inventory items found matching your filters.</p>
-            ) : (
-              <InventoryTable 
-                inventoryItems={inventoryItems} 
-                handleSort={handleSort}
-                sortField={sortField}
-                sortDirection={sortDirection}                
-                allItems={allItems}
-                setAllItems={setAllItems}
-                setInventoryItems={setInventoryItems}
-                applyFilters={applyFilters}
-              />
-            )}
-            
-            {/* Inventory count summary */}
-            {!initialLoad && (
-              <div className="mt-4 text-right text-gray-600">
-                Showing {inventoryItems.length} items
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-export default InventoryListForm;
 </file>
 
 <file path="src/components/inventory/InventoryTable.jsx">
