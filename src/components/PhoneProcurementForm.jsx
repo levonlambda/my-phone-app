@@ -1,7 +1,7 @@
-{/* Part 1 Start - Imports, State, and Helper Functions with Persistence Logic */}
-import { useState, useEffect, useCallback } from 'react';
+{/* Part 1 Start - Imports, State, and Helper Functions */}
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { 
   RefreshCw, 
@@ -10,6 +10,8 @@ import {
   ShoppingCart,
   Trash2
 } from 'lucide-react';
+// Import supplier service
+import supplierService from '../services/supplierService';
 
 const PhoneProcurementForm = () => {
   // ====== STATE DEFINITIONS ======
@@ -25,7 +27,6 @@ const PhoneProcurementForm = () => {
     ram: '',
     storage: '',
     color: '',
-    supplier: '',
     quantity: 1,
     dealersPrice: '',
     retailPrice: '',
@@ -39,12 +40,17 @@ const PhoneProcurementForm = () => {
   const [storages, setStorages] = useState([]);
   const [colors, setColors] = useState([]);
   
+  // Supplier management
+  const [suppliers, setSuppliers] = useState([]); // Suppliers from Firebase
+  const [selectedSupplier, setSelectedSupplier] = useState(''); // Selected supplier ID
+  const [selectedSupplierData, setSelectedSupplierData] = useState(null); // Full supplier data
+  
   // General procurement details
   const [purchaseDate, setPurchaseDate] = useState('');
-  const [isPaid, setIsPaid] = useState(false);
-  const [isReceived, setIsReceived] = useState(false);
-  const [datePaid, setDatePaid] = useState('');
-  const [dateDelivered, setDateDelivered] = useState('');
+  
+  // Payment and delivery status - Read-only values for new entries
+  const [datePaid] = useState(''); // Read-only, empty for new entries
+  const [dateDelivered] = useState(''); // Read-only, empty for new entries
   const [paymentReference, setPaymentReference] = useState('');
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
@@ -55,13 +61,12 @@ const PhoneProcurementForm = () => {
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCurrentItemValid, setIsCurrentItemValid] = useState(false);
-  const [editingItemId, setEditingItemId] = useState(null);
   
-  // NEW: State for tracking available colors for each item in the table
+  // State for tracking available colors for each item in the table
   const [itemColorOptions, setItemColorOptions] = useState({});
 
   // ====== HELPER FUNCTIONS ======
-  // UPDATED: Get current date in YYYY-MM-DD format for date input
+  // Get current date in YYYY-MM-DD format for date input
   const getCurrentDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -76,665 +81,503 @@ const PhoneProcurementForm = () => {
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
 
-  // Validation function for price
+  // NEW: Format price with commas and two decimal places
+  const formatPrice = (value) => {
+    if (!value && value !== 0) return '';
+    const numValue = parseFloat(value.toString().replace(/,/g, ''));
+    if (isNaN(numValue)) return '';
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // NEW: Clean price value by removing commas and formatting characters
+  const cleanPriceValue = (value) => {
+    return value.replace(/[^\d.]/g, '');
+  };
+
+  // Validation function for price - UPDATED to work with formatted prices
   const validatePrice = (value) => {
-    return value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+    return cleanPriceValue(value);
   };
 
-  // Calculate total for current item
-  const calculateItemTotal = (quantity, price) => {
-    if (!price || !quantity) return 0;
-    const cleanPrice = parseFloat(price.replace(/,/g, '')) || 0;
-    return cleanPrice * quantity;
-  };
-
-  // Calculate grand total for all items
-  const calculateGrandTotal = () => {
-    return procurementItems.reduce((total, item) => total + item.totalPrice, 0);
-  };
-
-  // Format with GB suffix if needed
+  // Format RAM/Storage with GB suffix
   const formatWithGB = (value) => {
-    if (!value) return 'N/A';
-    if (value.includes('GB') || value.includes('TB') || value.includes('gb') || value.includes('tb')) {
-      return value;
-    }
-    return `${value}GB`;
+    return value ? `${value}GB` : value;
   };
 
   // Calculate margin percentage
   const calculateMargin = (dealersPrice, retailPrice) => {
-    if (!dealersPrice || !retailPrice) return 'N/A';
-    const dPrice = parseFloat(dealersPrice.replace(/,/g, '')) || 0;
-    const rPrice = parseFloat(retailPrice.replace(/,/g, '')) || 0;
+    const dealers = parseFloat(dealersPrice.replace(/,/g, '')) || 0;
+    const retail = parseFloat(retailPrice.replace(/,/g, '')) || 0;
     
-    if (dPrice <= 0) return '0.00';
-    
-    const margin = ((rPrice - dPrice) / dPrice) * 100;
+    if (dealers === 0) return '0.00';
+    const margin = ((retail - dealers) / dealers) * 100;
     return margin.toFixed(2);
   };
 
-  // Generate unique ID for items
-  const generateItemId = () => {
-    const id = nextId;
-    setNextId(prev => prev + 1);
-    return id;
+  // Calculate grand total
+  const calculateGrandTotal = () => {
+    return procurementItems.reduce((sum, item) => sum + item.totalPrice, 0);
   };
 
-  // NEW: Handle payment status change
-  const handlePaymentStatusChange = (e) => {
-    const newPaymentStatus = e.target.value === 'Paid';
-    setIsPaid(newPaymentStatus);
-    
-    if (newPaymentStatus) {
-      // If changing to Paid, set date paid to current date
-      setDatePaid(getCurrentDate());
-    } else {
-      // If changing from Paid to Unpaid, clear the related fields
-      setDatePaid('');
-      setPaymentReference('');
-    }
-  };
-
-  // NEW: Handle delivery status change
-  const handleDeliveryStatusChange = (e) => {
-    const newDeliveryStatus = e.target.value === 'Delivered';
-    setIsReceived(newDeliveryStatus);
-    
-    if (newDeliveryStatus) {
-      // If changing to Delivered, set date delivered to current date
-      setDateDelivered(getCurrentDate());
-    } else {
-      // If changing from Delivered to Pending, clear the date delivered field
-      setDateDelivered('');
-    }
-  };
-
-  // NEW: Handle date paid change
-  const handleDatePaidChange = (e) => {
-    setDatePaid(e.target.value);
-  };
-
-  // NEW: Handle date delivered change
-  const handleDateDeliveredChange = (e) => {
-    setDateDelivered(e.target.value);
-  };
-
-  // NEW: Handle payment reference change
-  const handlePaymentReferenceChange = (e) => {
-    setPaymentReference(e.target.value);
-  };
-
-  // NEW: Handle bank name change
-  const handleBankNameChange = (e) => {
-    setBankName(e.target.value);
-  };
-
-  // NEW: Handle bank account change
-  const handleBankAccountChange = (e) => {
-    setBankAccount(e.target.value);
-  };
-
-  // NEW: Handle account payable change
-  const handleAccountPayableChange = (e) => {
-    setAccountPayable(e.target.value);
-  };
-
-  // NEW: Handle retail price change for current item
-  const handleCurrentRetailPriceChange = (e) => {
-    const rawValue = e.target.value;
-    
-    if (rawValue === '') {
-      setCurrentItem(prev => ({
-        ...prev,
-        retailPrice: ''
-      }));
-    } else {
-      const validatedPrice = validatePrice(rawValue);
-      const formattedPrice = formatNumberWithCommas(validatedPrice);
-      setCurrentItem(prev => ({
-        ...prev,
-        retailPrice: formattedPrice
-      }));
-    }
-  };
-
-  // UPDATED: Modified reset function to preserve supplier and manufacturer
+  // Reset current item to initial state
   const resetCurrentItem = () => {
-    const preservedManufacturer = currentItem.manufacturer;
-    const preservedSupplier = currentItem.supplier;
-    
     setCurrentItem({
       id: null,
-      manufacturer: preservedManufacturer, // KEEP manufacturer
+      manufacturer: '',
       model: '',
       ram: '',
       storage: '',
       color: '',
-      supplier: preservedSupplier, // KEEP supplier
       quantity: 1,
       dealersPrice: '',
       retailPrice: '',
       totalPrice: 0
     });
-    
-    // DON'T clear the options arrays if manufacturer is preserved
-    if (!preservedManufacturer) {
-      setModels([]);
-      setRams([]);
-      setStorages([]);
-      setColors([]);
-    }
-    // If manufacturer is preserved, keep the models but clear the dependent options
-    else {
-      setRams([]);
-      setStorages([]);
-      setColors([]);
-    }
-    
-    setIsCurrentItemValid(false);
   };
+{/* Part 1 End - Imports, State, and Helper Functions */}
 
-  // NEW: Function to increment quantity in table
-  const incrementTableQuantity = (itemId) => {
-    setProcurementItems(prev => 
-      prev.map(item => {
-        if (item.id === itemId) {
-          const newQuantity = item.quantity + 1;
-          const newTotalPrice = calculateItemTotal(newQuantity, item.dealersPrice);
-          return {
-            ...item,
-            quantity: newQuantity,
-            totalPrice: newTotalPrice
-          };
-        }
-        return item;
-      })
-    );
-  };
-
-  // NEW: Function to decrement quantity in table
-  const decrementTableQuantity = (itemId) => {
-    const item = procurementItems.find(item => item.id === itemId);
-    if (item && item.quantity === 1) {
-      // Remove item if quantity would become 0
-      setProcurementItems(prev => prev.filter(item => item.id !== itemId));
-    } else {
-      setProcurementItems(prev => 
-        prev.map(item => {
-          if (item.id === itemId) {
-            const newQuantity = Math.max(1, item.quantity - 1);
-            const newTotalPrice = calculateItemTotal(newQuantity, item.dealersPrice);
-            return {
-              ...item,
-              quantity: newQuantity,
-              totalPrice: newTotalPrice
-            };
-          }
-          return item;
-        })
-      );
-    }
-  };
-
-  // NEW: Function to handle color change in table
-  const handleTableColorChange = async (itemId, newColor) => {
-    const item = procurementItems.find(item => item.id === itemId);
-    if (!item) return;
-
-    // Fetch price for new color configuration
-    const price = await fetchPriceForConfiguration(
-      item.manufacturer, 
-      item.model, 
-      item.ram, 
-      item.storage, 
-      newColor
-    );
-
-    setProcurementItems(prev => 
-      prev.map(mappedItem => {
-        if (mappedItem.id === itemId) {
-          const newDealersPrice = price || mappedItem.dealersPrice;
-          const newTotalPrice = calculateItemTotal(mappedItem.quantity, newDealersPrice);
-          return {
-            ...mappedItem,
-            color: newColor,
-            dealersPrice: newDealersPrice,
-            totalPrice: newTotalPrice
-          };
-        }
-        return mappedItem;
-      })
-    );
-  };
-
-  // NEW: Function to get available colors for a specific item
-  const getAvailableColorsForItem = async (manufacturer, model) => {
-    try {
-      const phonesRef = collection(db, 'phones');
-      const q = query(
-        phonesRef, 
-        where("manufacturer", "==", manufacturer),
-        where("model", "==", model)
-      );
-      const snapshot = await getDocs(q);
-      
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        return Array.isArray(data.colors) ? data.colors : [];
-      }
-      return [];
-    } catch (error) {
-      console.error("Error fetching colors:", error);
-      return [];
-    }
-  };
-{/* Part 1 End - Imports, State, and Helper Functions with Persistence Logic */}
-
-{/* Part 2 Start - Data Fetching Functions */}
-  // ====== DATA FETCHING FUNCTIONS ======
-  // Fetch manufacturers from phones collection
-  const fetchManufacturers = useCallback(async () => {
-    setLoading(true);
-    try {
-      console.log("Fetching manufacturers...");
-      const phonesRef = collection(db, 'phones');
-      const snapshot = await getDocs(phonesRef);
-      
-      const uniqueManufacturers = new Set();
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.manufacturer) {
-          uniqueManufacturers.add(data.manufacturer);
-        }
-      });
-      
-      const manufacturerArray = Array.from(uniqueManufacturers).sort();
-      console.log("Manufacturers fetched:", manufacturerArray);
-      setManufacturers(manufacturerArray);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching manufacturers:", error);
-      setError(`Error fetching manufacturers: ${error.message}`);
-      setLoading(false);
-    }
+{/* Part 2 Start - Data Fetching and useEffect Hooks with Suppliers */}
+  // Initialize purchase date to current date
+  useEffect(() => {
+    setPurchaseDate(getCurrentDate());
   }, []);
 
-  // Fetch models for a specific manufacturer
-  const fetchModels = useCallback(async (manufacturer) => {
-    if (!manufacturer) {
-      setModels([]);
-      return;
-    }
-    
-    try {
-      console.log(`Fetching models for ${manufacturer}...`);
-      const phonesRef = collection(db, 'phones');
-      const q = query(phonesRef, where("manufacturer", "==", manufacturer));
-      const snapshot = await getDocs(q);
-      
-      const uniqueModels = new Set();
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.model) {
-          uniqueModels.add(data.model);
+  // Fetch suppliers on component mount
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const supplierResult = await supplierService.getAllSuppliers();
+        if (supplierResult.success) {
+          setSuppliers(supplierResult.suppliers);
         }
-      });
-      
-      const modelArray = Array.from(uniqueModels).sort();
-      console.log("Models fetched:", modelArray);
-      setModels(modelArray);
-    } catch (error) {
-      console.error(`Error fetching models for ${manufacturer}:`, error);
-      setError(`Error fetching models: ${error.message}`);
-    }
-  }, []);
-
-  // Fetch options (RAM, storage, colors) for a specific manufacturer and model
-  const fetchOptions = useCallback(async (manufacturer, model) => {
-    if (!manufacturer || !model) {
-      setRams([]);
-      setStorages([]);
-      setColors([]);
-      return;
-    }
-    
-    try {
-      console.log(`Fetching options for ${manufacturer} ${model}...`);
-      const phonesRef = collection(db, 'phones');
-      const q = query(
-        phonesRef, 
-        where("manufacturer", "==", manufacturer),
-        where("model", "==", model)
-      );
-      const snapshot = await getDocs(q);
-      
-      let ramArray = [];
-      let storageArray = [];
-      let colorArray = [];
-      
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        
-        ramArray = Array.isArray(data.storage_extra) ? data.storage_extra : [];
-        storageArray = Array.isArray(data.storage) ? data.storage : [];
-        colorArray = Array.isArray(data.colors) ? data.colors : [];
-        
-        setRams(ramArray);
-        setStorages(storageArray);
-        setColors(colorArray);
-        
-        console.log("Options fetched:", {
-          rams: ramArray,
-          storages: storageArray,
-          colors: colorArray
-        });
+      } catch (error) {
+        console.error("Error fetching suppliers:", error);
       }
-    } catch (error) {
-      console.error(`Error fetching options for ${manufacturer} ${model}:`, error);
-      setError(`Error fetching options: ${error.message}`);
-    }
-  }, []);
-
-  // Fetch price for specific configuration - UPDATED to return both dealer and retail prices
-  const fetchPriceForConfiguration = useCallback(async (manufacturer, model, ram, storage, color) => {
-    try {
-      console.log("Fetching price for configuration...");
-      
-      // First try to get color-specific pricing
-      const colorConfigId = `${manufacturer}_${model}_${ram}_${storage}_${color}`.replace(/\s+/g, '_').toLowerCase();
-      const colorConfigRef = doc(db, 'price_configurations', colorConfigId);
-      const colorConfigSnap = await getDoc(colorConfigRef);
-      
-      if (colorConfigSnap.exists()) {
-        const colorData = colorConfigSnap.data();
-        console.log("Found color-specific pricing:", colorData);
-        
-        if (colorData.dealersPrice && colorData.retailPrice) {
-          return {
-            dealersPrice: formatNumberWithCommas(colorData.dealersPrice.toString()),
-            retailPrice: formatNumberWithCommas(colorData.retailPrice.toString())
-          };
-        }
-      }
-      
-      // If no color-specific pricing, try base pricing
-      const baseConfigId = `${manufacturer}_${model}_${ram}_${storage}`.replace(/\s+/g, '_').toLowerCase();
-      const baseConfigRef = doc(db, 'price_configurations', baseConfigId);
-      const baseConfigSnap = await getDoc(baseConfigRef);
-      
-      if (baseConfigSnap.exists()) {
-        const baseData = baseConfigSnap.data();
-        console.log("Found base pricing:", baseData);
-        
-        if (baseData.dealersPrice && baseData.retailPrice) {
-          return {
-            dealersPrice: formatNumberWithCommas(baseData.dealersPrice.toString()),
-            retailPrice: formatNumberWithCommas(baseData.retailPrice.toString())
-          };
-        }
-      }
-      
-      console.log("No pricing found for this configuration");
-      return null;
-    } catch (error) {
-      console.error("Error fetching price configuration:", error);
-      return null;
-    }
-  }, []);
-{/* Part 2 End - Data Fetching Functions */}
-
-{/* Part 3 Start - Current Item Event Handlers */}
-  // ====== CURRENT ITEM EVENT HANDLERS ======
-  // Handle manufacturer change for current item
-  const handleCurrentManufacturerChange = (e) => {
-    const newManufacturer = e.target.value;
-    setCurrentItem(prev => ({
-      ...prev,
-      manufacturer: newManufacturer,
-      model: '',
-      ram: '',
-      storage: '',
-      color: '',
-      dealersPrice: '',
-      retailPrice: '',
-      totalPrice: 0
-    }));
-    
-    if (newManufacturer) {
-      fetchModels(newManufacturer);
-    } else {
-      setModels([]);
-      setRams([]);
-      setStorages([]);
-      setColors([]);
-    }
-  };
-
-  // Handle model change for current item
-  const handleCurrentModelChange = (e) => {
-    const newModel = e.target.value;
-    setCurrentItem(prev => ({
-      ...prev,
-      model: newModel,
-      ram: '',
-      storage: '',
-      color: '',
-      dealersPrice: '',
-      retailPrice: '',
-      totalPrice: 0
-    }));
-    
-    if (currentItem.manufacturer && newModel) {
-      fetchOptions(currentItem.manufacturer, newModel);
-    } else {
-      setRams([]);
-      setStorages([]);
-      setColors([]);
-    }
-  };
-
-  // Handle RAM change for current item
-  const handleCurrentRamChange = (e) => {
-    const newRam = e.target.value;
-    setCurrentItem(prev => ({
-      ...prev,
-      ram: newRam,
-      color: '',
-      dealersPrice: '',
-      retailPrice: '',
-      totalPrice: 0
-    }));
-  };
-
-  // Handle storage change for current item
-  const handleCurrentStorageChange = (e) => {
-    const newStorage = e.target.value;
-    setCurrentItem(prev => ({
-      ...prev,
-      storage: newStorage,
-      color: '',
-      dealersPrice: '',
-      retailPrice: '',
-      totalPrice: 0
-    }));
-  };
-
-  // Handle color change for current item - UPDATED to fetch both dealer and retail prices
-  const handleCurrentColorChange = async (e) => {
-    const newColor = e.target.value;
-    setCurrentItem(prev => ({
-      ...prev,
-      color: newColor,
-      dealersPrice: '',
-      retailPrice: '',
-      totalPrice: 0
-    }));
-    
-    // Fetch prices when all selections are made
-    if (currentItem.manufacturer && currentItem.model && currentItem.ram && currentItem.storage && newColor) {
-      const price = await fetchPriceForConfiguration(
-        currentItem.manufacturer, 
-        currentItem.model, 
-        currentItem.ram, 
-        currentItem.storage, 
-        newColor
-      );
-      
-      if (price && price.dealersPrice && price.retailPrice) {
-        const totalPrice = calculateItemTotal(currentItem.quantity, price.dealersPrice);
-        setCurrentItem(prev => ({
-          ...prev,
-          dealersPrice: price.dealersPrice,
-          retailPrice: price.retailPrice,
-          totalPrice: totalPrice
-        }));
-      }
-    }
-  };
-
-  // Handle supplier change for current item
-  const handleCurrentSupplierChange = (e) => {
-    const newSupplier = e.target.value;
-    setCurrentItem(prev => ({
-      ...prev,
-      supplier: newSupplier
-    }));
-  };
-
-  // Handle quantity change for current item
-  const handleCurrentQuantityChange = (e) => {
-    const newQuantity = parseInt(e.target.value) || 1;
-    const validQuantity = Math.max(1, newQuantity);
-    const totalPrice = calculateItemTotal(validQuantity, currentItem.dealersPrice);
-    
-    setCurrentItem(prev => ({
-      ...prev,
-      quantity: validQuantity,
-      totalPrice: totalPrice
-    }));
-  };
-
-  // Handle quantity increment/decrement for current item
-  const incrementCurrentQuantity = () => {
-    const newQuantity = currentItem.quantity + 1;
-    const totalPrice = calculateItemTotal(newQuantity, currentItem.dealersPrice);
-    
-    setCurrentItem(prev => ({
-      ...prev,
-      quantity: newQuantity,
-      totalPrice: totalPrice
-    }));
-  };
-
-  const decrementCurrentQuantity = () => {
-    const newQuantity = Math.max(1, currentItem.quantity - 1);
-    const totalPrice = calculateItemTotal(newQuantity, currentItem.dealersPrice);
-    
-    setCurrentItem(prev => ({
-      ...prev,
-      quantity: newQuantity,
-      totalPrice: totalPrice
-    }));
-  };
-
-  // Handle dealers price change for current item
-  const handleCurrentDealersPriceChange = (e) => {
-    const rawValue = e.target.value;
-    
-    if (rawValue === '') {
-      setCurrentItem(prev => ({
-        ...prev,
-        dealersPrice: '',
-        totalPrice: 0
-      }));
-    } else {
-      const validatedPrice = validatePrice(rawValue);
-      const formattedPrice = formatNumberWithCommas(validatedPrice);
-      const totalPrice = calculateItemTotal(currentItem.quantity, formattedPrice);
-      
-      setCurrentItem(prev => ({
-        ...prev,
-        dealersPrice: formattedPrice,
-        totalPrice: totalPrice
-      }));
-    }
-  };
-{/* Part 3 End - Current Item Event Handlers */}
-
-{/* Part 4 Start - Table Management and Form Submission */}
-  // ====== TABLE MANAGEMENT FUNCTIONS ======
-  // Add current item to procurement table
-  const addItemToTable = async () => {
-    if (!isCurrentItemValid) {
-      alert('Please fill in all required fields for the current item');
-      return;
-    }
-
-    // Check for duplicate items (same phone configuration)
-    const isDuplicate = procurementItems.some(item => 
-      item.manufacturer === currentItem.manufacturer &&
-      item.model === currentItem.model &&
-      item.ram === currentItem.ram &&
-      item.storage === currentItem.storage &&
-      item.color === currentItem.color
-    );
-
-    if (isDuplicate) {
-      alert('This phone configuration is already in the procurement list. Please edit the existing item or select a different configuration.');
-      return;
-    }
-
-    const newItem = {
-      ...currentItem,
-      id: editingItemId || generateItemId()
     };
 
-    if (editingItemId) {
-      // Update existing item
-      setProcurementItems(prev => 
-        prev.map(item => item.id === editingItemId ? newItem : item)
-      );
-      setEditingItemId(null);
-    } else {
-      // Add new item
-      setProcurementItems(prev => [...prev, newItem]);
+    fetchSuppliers();
+  }, []);
+
+  // Fetch manufacturers
+  useEffect(() => {
+    const fetchManufacturers = async () => {
+      setLoading(true);
+      try {
+        const q = query(collection(db, 'phones'));
+        const querySnapshot = await getDocs(q);
+        const manufacturerSet = new Set();
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.manufacturer) {
+            manufacturerSet.add(data.manufacturer);
+          }
+        });
+        
+        setManufacturers(Array.from(manufacturerSet).sort());
+      } catch (error) {
+        console.error("Error fetching manufacturers:", error);
+        setError(`Error fetching manufacturers: ${error.message}`);
+      }
+      setLoading(false);
+    };
+
+    fetchManufacturers();
+  }, []);
+
+  // Fetch models
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (!currentItem.manufacturer) {
+        setModels([]);
+        return;
+      }
       
-      // NEW: Load available colors for this item
-      const availableColors = await getAvailableColorsForItem(currentItem.manufacturer, currentItem.model);
-      setItemColorOptions(prev => ({
+      try {
+        const q = query(
+          collection(db, 'phones'),
+          where('manufacturer', '==', currentItem.manufacturer)
+        );
+        const querySnapshot = await getDocs(q);
+        const modelSet = new Set();
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.model) {
+            modelSet.add(data.model);
+          }
+        });
+        
+        setModels(Array.from(modelSet).sort());
+      } catch (error) {
+        console.error("Error fetching models:", error);
+      }
+    };
+
+    fetchModels();
+  }, [currentItem.manufacturer]);
+
+  // Fetch RAM, Storage, Colors from arrays in the document
+  useEffect(() => {
+    const fetchOptions = async () => {
+      if (!currentItem.manufacturer || !currentItem.model) {
+        setRams([]);
+        setStorages([]);
+        setColors([]);
+        return;
+      }
+      
+      try {
+        const q = query(
+          collection(db, 'phones'),
+          where('manufacturer', '==', currentItem.manufacturer),
+          where('model', '==', currentItem.model)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const data = querySnapshot.docs[0].data();
+          
+          const ramArray = Array.isArray(data.storage_extra) ? data.storage_extra : [];
+          setRams(ramArray.sort());
+          
+          const storageArray = Array.isArray(data.storage) ? data.storage : [];
+          setStorages(storageArray.sort());
+          
+          const colorArray = Array.isArray(data.colors) ? data.colors : [];
+          setColors(colorArray.sort());
+        } else {
+          setRams([]);
+          setStorages([]);
+          setColors([]);
+        }
+      } catch (error) {
+        console.error("Error fetching options:", error);
+        setRams([]);
+        setStorages([]);
+        setColors([]);
+      }
+    };
+
+    fetchOptions();
+  }, [currentItem.manufacturer, currentItem.model]);
+
+  // NEW: Fetch pricing when complete configuration is selected
+  useEffect(() => {
+    const fetchPricing = async () => {
+      if (!currentItem.manufacturer || !currentItem.model || !currentItem.ram || !currentItem.storage || !currentItem.color) {
+        // Clear pricing if configuration is incomplete
+        setCurrentItem(prev => ({
+          ...prev,
+          dealersPrice: '',
+          retailPrice: ''
+        }));
+        return;
+      }
+      
+      try {
+        const q = query(
+          collection(db, 'price_configurations'),
+          where('manufacturer', '==', currentItem.manufacturer),
+          where('model', '==', currentItem.model),
+          where('ram', '==', currentItem.ram),
+          where('storage', '==', currentItem.storage),
+          where('color', '==', currentItem.color)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const priceData = querySnapshot.docs[0].data();
+          console.log("Found pricing data:", priceData);
+          
+          setCurrentItem(prev => ({
+            ...prev,
+            dealersPrice: priceData.dealersPrice ? priceData.dealersPrice.toString() : '',
+            retailPrice: priceData.retailPrice ? priceData.retailPrice.toString() : ''
+          }));
+        } else {
+          console.log("No pricing found for configuration");
+          // Clear pricing if no configuration found
+          setCurrentItem(prev => ({
+            ...prev,
+            dealersPrice: '',
+            retailPrice: ''
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching pricing:", error);
+        setCurrentItem(prev => ({
+          ...prev,
+          dealersPrice: '',
+          retailPrice: ''
+        }));
+      }
+    };
+
+    fetchPricing();
+  }, [currentItem.manufacturer, currentItem.model, currentItem.ram, currentItem.storage, currentItem.color]);
+
+  // Validate current item and calculate totals
+  useEffect(() => {
+    const isValid = 
+      currentItem.manufacturer &&
+      currentItem.model &&
+      currentItem.ram &&
+      currentItem.storage &&
+      currentItem.color &&
+      currentItem.quantity > 0 &&
+      currentItem.dealersPrice &&
+      parseFloat(currentItem.dealersPrice.replace(/,/g, '')) > 0;
+    
+    setIsCurrentItemValid(isValid);
+    
+    if (currentItem.dealersPrice && currentItem.quantity) {
+      const price = parseFloat(currentItem.dealersPrice.replace(/,/g, '')) || 0;
+      const total = price * currentItem.quantity;
+      
+      setCurrentItem(prev => ({
         ...prev,
-        [newItem.id]: availableColors
+        totalPrice: total
       }));
     }
+  }, [
+    currentItem.manufacturer,
+    currentItem.model,
+    currentItem.ram,
+    currentItem.storage,
+    currentItem.color,
+    currentItem.quantity,
+    currentItem.dealersPrice
+  ]);
+{/* Part 2 End - Data Fetching and useEffect Hooks with Suppliers */}
 
-    // Reset current item form (keeping supplier and manufacturer)
-    resetCurrentItem();
-    
-    // NEW: If manufacturer is preserved, refetch models to ensure they're available
-    if (currentItem.manufacturer) {
-      fetchModels(currentItem.manufacturer);
-    }
-  };
-
+{/* Part 3 Start - Event Handlers */}
   // Handle purchase date change
   const handlePurchaseDateChange = (e) => {
     setPurchaseDate(e.target.value);
   };
 
-  // Clear entire procurement table
-  const clearAllItems = () => {
-    if (procurementItems.length === 0) return;
+  // Handle supplier selection - UPDATED: Auto-populate account payable from supplier's outstanding balance
+  const handleSupplierChange = (e) => {
+    const supplierId = e.target.value;
+    setSelectedSupplier(supplierId);
     
+    if (supplierId) {
+      const supplierData = suppliers.find(s => s.id === supplierId);
+      setSelectedSupplierData(supplierData);
+      
+      // Auto-populate bank fields and account payable when supplier is selected
+      if (supplierData) {
+        setBankName(supplierData.bankName || '');
+        setBankAccount(supplierData.bankAccount || '');
+        
+        // NEW: Auto-populate account payable from supplier's outstanding balance
+        const outstandingBalance = supplierData.totalOutstanding || 0;
+        setAccountPayable(formatNumberWithCommas(outstandingBalance.toString()));
+      }
+    } else {
+      setSelectedSupplierData(null);
+      setBankName('');
+      setBankAccount('');
+      setAccountPayable(''); // Clear account payable when no supplier selected
+    }
+  };
+
+  // Handle current item field changes
+  const handleCurrentManufacturerChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      manufacturer: e.target.value,
+      model: '',
+      ram: '',
+      storage: '',
+      color: ''
+    }));
+  };
+
+  const handleCurrentModelChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      model: e.target.value,
+      ram: '',
+      storage: '',
+      color: ''
+    }));
+  };
+
+  const handleCurrentRamChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      ram: e.target.value,
+      storage: '',
+      color: ''
+    }));
+  };
+
+  const handleCurrentStorageChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      storage: e.target.value,
+      color: ''
+    }));
+  };
+
+  const handleCurrentColorChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      color: e.target.value
+    }));
+  };
+
+  const handleCurrentQuantityChange = (e) => {
+    const quantity = parseInt(e.target.value) || 1;
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: Math.max(1, quantity)
+    }));
+  };
+
+  const handleCurrentDealersPriceChange = (e) => {
+    const cleanValue = validatePrice(e.target.value);
+    setCurrentItem(prev => ({
+      ...prev,
+      dealersPrice: cleanValue
+    }));
+  };
+
+  const handleCurrentRetailPriceChange = (e) => {
+    const cleanValue = validatePrice(e.target.value);
+    setCurrentItem(prev => ({
+      ...prev,
+      retailPrice: cleanValue
+    }));
+  };
+
+  const handlePaymentReferenceChange = (e) => {
+    setPaymentReference(e.target.value);
+  };
+
+  const handleBankNameChange = (e) => {
+    setBankName(e.target.value);
+  };
+
+  const handleBankAccountChange = (e) => {
+    setBankAccount(e.target.value);
+  };
+
+  const handleAccountPayableChange = (e) => {
+    setAccountPayable(e.target.value);
+  };
+{/* Part 3 End - Event Handlers */}
+
+{/* Part 4 Start - Essential Functions */}
+  // Clear all items from procurement list
+  const clearAllItems = () => {
     if (window.confirm('Are you sure you want to clear all items from the procurement list?')) {
       setProcurementItems([]);
-      setEditingItemId(null);
       resetCurrentItem();
     }
   };
 
-  // ====== FORM SUBMISSION ======
-  // Handle form submission
+  // Increment current item quantity
+  const incrementCurrentQuantity = () => {
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: prev.quantity + 1
+    }));
+  };
+
+  // Decrement current item quantity
+  const decrementCurrentQuantity = () => {
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: Math.max(1, prev.quantity - 1)
+    }));
+  };
+
+  // Increment table item quantity
+  const incrementTableQuantity = (itemId) => {
+    setProcurementItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId 
+          ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
+          : item
+      )
+    );
+  };
+
+  // Decrement table item quantity (remove if quantity becomes 0)
+  const decrementTableQuantity = (itemId) => {
+    setProcurementItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId 
+          ? item.quantity === 1 
+            ? null // Will be filtered out
+            : { ...item, quantity: item.quantity - 1, totalPrice: (item.quantity - 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
+          : item
+      ).filter(Boolean) // Remove null items
+    );
+  };
+
+  // Handle color change in table
+  const handleTableColorChange = (itemId, newColor) => {
+    setProcurementItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId 
+          ? { ...item, color: newColor }
+          : item
+      )
+    );
+  };
+
+  // Handle form key events
+  const handleKeyDown = (e) => {
+    // Allow form submission on Ctrl+Enter
+    if (e.ctrlKey && e.key === 'Enter') {
+      e.preventDefault();
+      if (procurementItems.length > 0 && purchaseDate && selectedSupplier) {
+        handleSubmit(e);
+      }
+    }
+  };
+
+  // Add item to procurement table
+  const addItemToTable = () => {
+    if (!isCurrentItemValid) return;
+    
+    const dealersPrice = parseFloat(currentItem.dealersPrice.replace(/,/g, '')) || 0;
+    const totalPrice = currentItem.quantity * dealersPrice;
+    
+    const newItem = {
+      id: nextId,
+      manufacturer: currentItem.manufacturer,
+      model: currentItem.model,
+      ram: currentItem.ram,
+      storage: currentItem.storage,
+      color: currentItem.color,
+      quantity: currentItem.quantity,
+      dealersPrice: formatNumberWithCommas(dealersPrice.toString()),
+      retailPrice: currentItem.retailPrice,
+      totalPrice: totalPrice
+    };
+    
+    // Store available colors for this item
+    setItemColorOptions(prev => ({
+      ...prev,
+      [nextId]: colors
+    }));
+    
+    setProcurementItems(prev => [...prev, newItem]);
+    setNextId(prev => prev + 1);
+    resetCurrentItem();
+  };
+{/* Part 4 End - Essential Functions */}
+
+{/* Part 5 Start - Form Submission with Supplier Service Integration */}
+  // Handle form submission using supplier service for proper balance updates
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -749,111 +592,87 @@ const PhoneProcurementForm = () => {
       return;
     }
     
+    // Supplier validation - Required for saving
+    if (!selectedSupplier) {
+      alert('Please select a supplier before saving the procurement record');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
       const grandTotal = calculateGrandTotal();
       
+      // Prepare procurement data for supplier service
       const procurementData = {
+        // Items array
         items: procurementItems.map(item => ({
           manufacturer: item.manufacturer,
           model: item.model,
           ram: item.ram,
           storage: item.storage,
           color: item.color,
-          supplier: item.supplier,
           quantity: item.quantity,
           dealersPrice: parseFloat(item.dealersPrice.replace(/,/g, '')) || 0,
+          retailPrice: parseFloat(item.retailPrice.replace(/,/g, '')) || 0,
           totalPrice: item.totalPrice
         })),
+        
+        // Summary data
         totalQuantity: procurementItems.reduce((sum, item) => sum + item.quantity, 0),
         grandTotal: grandTotal,
+        
+        // Procurement details
         purchaseDate: purchaseDate,
-        isPaid: isPaid,
-        isReceived: isReceived,
-        dateCreated: getCurrentDate(),
-        lastUpdated: getCurrentDate()
+        paymentStatus: 'pending',
+        deliveryStatus: 'pending',
+        paymentReference: paymentReference || '',
+        bankName: bankName || '',
+        bankAccount: bankAccount || '',
+        accountPayable: accountPayable || ''
       };
       
-      console.log("Submitting procurement data:", procurementData);
+      console.log("Submitting procurement data to supplier service:", procurementData);
       
-      // TODO: Add the actual Firebase submission here
-      // const result = await addProcurementToDatabase(procurementData);
+      // USE SUPPLIER SERVICE - This will update supplier balance and create ledger entries
+      const result = await supplierService.createProcurement(procurementData, selectedSupplier);
       
-      // For now, just simulate success
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create procurement');
+      }
+      
+      console.log("Procurement created successfully:", result);
       
       // Reset form after successful submission
       setProcurementItems([]);
-      setEditingItemId(null);
       resetCurrentItem();
       setPurchaseDate(getCurrentDate());
-      setIsPaid(false);
-      setIsReceived(false);
+      setSelectedSupplier('');
+      setSelectedSupplierData(null);
+      setBankName('');
+      setBankAccount('');
+      setAccountPayable('');
+      setPaymentReference('');
       
       setIsSubmitting(false);
-      alert(`Procurement record saved successfully!\n\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatNumberWithCommas(grandTotal.toString())}`);
+      
+      // Success message with procurement details
+      alert(`Procurement record saved successfully!\n\nProcurement ID: ${result.procurementId}\nReference: ${result.reference}\nSupplier: ${selectedSupplierData?.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatPrice(grandTotal.toString())}\n\nSupplier outstanding balance has been updated.`);
       
     } catch (error) {
       console.error("Error saving procurement:", error);
       setError(`Error saving procurement: ${error.message}`);
       setIsSubmitting(false);
-      alert('Error saving procurement. Please try again.');
-    }
-  };
-
-  // ====== EFFECTS ======
-  // Initialize form on component mount
-  useEffect(() => {
-    const initializeForm = async () => {
-      try {
-        // Set default purchase date to current date
-        setPurchaseDate(getCurrentDate());
-        
-        // Fetch manufacturers list
-        await fetchManufacturers();
-        
-      } catch (error) {
-        console.error("Error initializing form:", error);
-        setError(`Error loading data: ${error.message}`);
-      }
-    };
-    
-    initializeForm();
-  }, [fetchManufacturers]);
-
-  // Check if current item is valid for adding to table
-  useEffect(() => {
-    const isValid = currentItem.manufacturer && 
-                   currentItem.model && 
-                   currentItem.ram && 
-                   currentItem.storage && 
-                   currentItem.color && 
-                   currentItem.supplier &&
-                   currentItem.dealersPrice && 
-                   currentItem.quantity > 0;
-    
-    setIsCurrentItemValid(isValid);
-  }, [currentItem]);
-
-  // Handle keyboard shortcuts
-  const handleKeyDown = (e) => {
-    // Prevent Enter key from submitting the form accidentally
-    if (e.key === 'Enter' && e.target.type !== 'submit') {
-      e.preventDefault();
       
-      // If current item is valid and Enter is pressed, add to table
-      if (isCurrentItemValid && !editingItemId) {
-        addItemToTable();
-      }
+      // Show user-friendly error message
+      alert(`Error saving procurement record: ${error.message}\n\nPlease check your internet connection and try again.`);
     }
   };
-{/* Part 4 End - Table Management and Form Submission */}
+{/* Part 5 End - Form Submission with Supplier Service Integration */}
 
-{/* Part 5 Start - Loading States and Main Form Start */}
-  // ====== LOADING AND ERROR STATES ======
-  // Show loading state for initial load
-  if (loading && manufacturers.length === 0) {
+{/* Part 6 Start - Loading States and Form Start */}
+  // Show loading state ONLY when actually loading
+  if (loading) {
     return (
       <div className="min-h-screen bg-white p-4">
         <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
@@ -890,7 +709,7 @@ const PhoneProcurementForm = () => {
             <button 
               onClick={() => {
                 setError(null);
-                fetchManufacturers();
+                window.location.reload();
               }}
               className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
             >
@@ -903,7 +722,7 @@ const PhoneProcurementForm = () => {
     );
   }
 
-  // ====== MAIN COMPONENT RENDER ======
+  // Main component render
   return (
     <div className="min-h-screen bg-white p-4">
       <form 
@@ -919,11 +738,14 @@ const PhoneProcurementForm = () => {
           </CardHeader>
 
           <CardContent className="bg-white p-4 space-y-6">
-            {/* Procurement Details Section - UPDATED with Supplier, Bank fields, and Payment/Delivery fields */}
+{/* Part 6 End - Loading States and Form Start */}
+
+{/* Part 7 Start - Procurement Details Section */}
+            {/* Procurement Details Section */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Procurement Details</h3>
               
-              {/* First Row: Purchase Date, Supplier, Bank fields */}
+              {/* First Row: Purchase Date, Supplier, Bank Name, Bank Account, Account Payable */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 {/* Purchase Date */}
                 <div className="space-y-2">
@@ -937,20 +759,25 @@ const PhoneProcurementForm = () => {
                   />
                 </div>
 
-                {/* Supplier - MOVED HERE */}
+                {/* Supplier - Dropdown */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Supplier:</label>
-                  <input 
-                    type="text" 
+                  <select 
                     className="w-full p-2 border rounded text-sm h-10"
-                    value={currentItem.supplier}
-                    onChange={handleCurrentSupplierChange}
-                    placeholder="Enter supplier name"
+                    value={selectedSupplier}
+                    onChange={handleSupplierChange}
                     required
-                  />
+                  >
+                    <option value="">-- Select Supplier --</option>
+                    {suppliers.map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.supplierName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Bank Name - NEW FIELD */}
+                {/* Bank Name - DISABLED */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Name:</label>
                   <input 
@@ -963,7 +790,7 @@ const PhoneProcurementForm = () => {
                   />
                 </div>
 
-                {/* Bank Account - NEW FIELD */}
+                {/* Bank Account - DISABLED */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Account:</label>
                   <input 
@@ -976,7 +803,7 @@ const PhoneProcurementForm = () => {
                   />
                 </div>
 
-                {/* Account Payable - NEW FIELD */}
+                {/* Account Payable - DISABLED */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Account Payable:</label>
                   <input 
@@ -990,25 +817,15 @@ const PhoneProcurementForm = () => {
                 </div>
               </div>
 
-              {/* Second Row: Payment and Delivery Details */}
+              {/* Second Row: Payment Status, Date Paid, Payment Reference, Delivery Status, Date Delivered */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Payment Status */}
+                {/* Payment Status - Read-only */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Status:</label>
-                  <div className="relative">
-                    <select 
-                      className="w-full p-2 border rounded text-sm h-10 opacity-0 absolute z-10 cursor-pointer"
-                      value={isPaid ? 'Paid' : 'Unpaid'}
-                      onChange={handlePaymentStatusChange}
-                    >
-                      <option value="Unpaid">Unpaid</option>
-                      <option value="Paid">Paid</option>
-                    </select>
-                    <div className="p-2 border rounded bg-gray-100 text-gray-600 text-sm h-10 flex items-center pointer-events-none">
-                      <span className={isPaid ? 'inline-block px-3 py-1 rounded-full text-sm bg-green-100 text-green-800' : 'inline-block px-3 py-1 rounded-full text-sm bg-red-100 text-red-800'}>
-                        {isPaid ? 'Paid' : 'Unpaid'}
-                      </span>
-                    </div>
+                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
+                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
+                      Unpaid
+                    </span>
                   </div>
                 </div>
 
@@ -1017,14 +834,13 @@ const PhoneProcurementForm = () => {
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Paid:</label>
                   <input 
                     type="date" 
-                    className={!isPaid ? 'w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400' : 'w-full p-2 border rounded text-sm h-10'}
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
                     value={datePaid}
-                    onChange={handleDatePaidChange}
-                    disabled={!isPaid}
+                    disabled
                   />
                 </div>
 
-                {/* Payment Reference */}
+                {/* Payment Reference - DISABLED */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
                   <input 
@@ -1033,58 +849,48 @@ const PhoneProcurementForm = () => {
                     value={paymentReference}
                     onChange={handlePaymentReferenceChange}
                     placeholder="Receipt #"
-                    disabled={!isPaid}
+                    disabled={true}
                   />
                 </div>
 
-                {/* Delivery Status - UPDATED to behave like Payment Status */}
+                {/* Delivery Status - Read-only */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Delivery Status:</label>
-                  <div className="relative">
-                    <select 
-                      className="w-full p-2 border rounded text-sm h-10 opacity-0 absolute z-10 cursor-pointer"
-                      value={isReceived ? 'Delivered' : 'Pending'}
-                      onChange={handleDeliveryStatusChange}
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="Delivered">Delivered</option>
-                    </select>
-                    <div className="p-2 border rounded bg-gray-100 text-gray-600 text-sm h-10 flex items-center pointer-events-none">
-                      <span className={isReceived ? 'inline-block px-3 py-1 rounded-full text-sm bg-green-100 text-green-800' : 'inline-block px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800'}>
-                        {isReceived ? 'Delivered' : 'Pending'}
-                      </span>
-                    </div>
+                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
+                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
+                      Pending
+                    </span>
                   </div>
                 </div>
 
-                {/* Date Delivered - UPDATED to behave like Date Paid */}
+                {/* Date Delivered */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Delivered:</label>
                   <input 
                     type="date" 
-                    className={!isReceived ? 'w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400' : 'w-full p-2 border rounded text-sm h-10'}
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
                     value={dateDelivered}
-                    onChange={handleDateDeliveredChange}
-                    disabled={!isReceived}
+                    disabled
                   />
                 </div>
               </div>
             </div>
+{/* Part 7 End - Procurement Details Section */}
 
+{/* Part 8 Start - Phone Selection Section */}
             {/* Add Phone Section */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Add Phone Model</h3>
               
               {/* Phone Selection Row */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Manufacturer */}
+                {/* Manufacturer - REMOVED required */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Manufacturer:</label>
                   <select 
                     className="w-full p-2 border rounded text-sm"
                     value={currentItem.manufacturer}
                     onChange={handleCurrentManufacturerChange}
-                    required
                   >
                     <option value="">-- Select --</option>
                     {manufacturers.map(manufacturer => (
@@ -1095,7 +901,7 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* Model */}
+                {/* Model - REMOVED required */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Model:</label>
                   <select 
@@ -1103,7 +909,6 @@ const PhoneProcurementForm = () => {
                     value={currentItem.model}
                     onChange={handleCurrentModelChange}
                     disabled={!currentItem.manufacturer}
-                    required
                   >
                     <option value="">-- Select --</option>
                     {models.map(model => (
@@ -1114,7 +919,7 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* RAM */}
+                {/* RAM - REMOVED required */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">RAM:</label>
                   <select 
@@ -1122,7 +927,6 @@ const PhoneProcurementForm = () => {
                     value={currentItem.ram}
                     onChange={handleCurrentRamChange}
                     disabled={!currentItem.model}
-                    required
                   >
                     <option value="">-- Select --</option>
                     {rams.map(ram => (
@@ -1133,7 +937,7 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* Storage */}
+                {/* Storage - REMOVED required */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Storage:</label>
                   <select 
@@ -1141,7 +945,6 @@ const PhoneProcurementForm = () => {
                     value={currentItem.storage}
                     onChange={handleCurrentStorageChange}
                     disabled={!currentItem.model}
-                    required
                   >
                     <option value="">-- Select --</option>
                     {storages.map(storage => (
@@ -1152,7 +955,7 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* Color */}
+                {/* Color - REMOVED required */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Color:</label>
                   <select 
@@ -1160,7 +963,6 @@ const PhoneProcurementForm = () => {
                     value={currentItem.color}
                     onChange={handleCurrentColorChange}
                     disabled={!currentItem.ram || !currentItem.storage}
-                    required
                   >
                     <option value="">-- Select --</option>
                     {colors.map(color => (
@@ -1171,12 +973,10 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
               </div>
-{/* Part 5 End - Loading States and Main Form Start */}
 
-{/* Part 6 Start - Second Row with Adjusted Quantity and Procurement Details */}
               {/* Second Row: Quantity, Dealers Price, Retail Price, Total Price, Margin % + Action */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Quantity */}
+                {/* Quantity - REMOVED required */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Quantity:</label>
                   <div className="flex items-center gap-1">
@@ -1194,7 +994,6 @@ const PhoneProcurementForm = () => {
                       value={currentItem.quantity}
                       onChange={handleCurrentQuantityChange}
                       min="1"
-                      required
                     />
                     <button
                       type="button"
@@ -1206,7 +1005,7 @@ const PhoneProcurementForm = () => {
                   </div>
                 </div>
 
-                {/* Dealers Price */}
+                {/* Dealers Price - UPDATED with formatted display */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Dealer&apos;s Price:</label>
                   <div className="relative">
@@ -1214,15 +1013,14 @@ const PhoneProcurementForm = () => {
                     <input 
                       type="text" 
                       className="w-full p-2 pl-6 border rounded text-sm"
-                      value={currentItem.dealersPrice}
+                      value={currentItem.dealersPrice ? formatPrice(currentItem.dealersPrice) : ''}
                       onChange={handleCurrentDealersPriceChange}
                       placeholder="0.00"
-                      required
                     />
                   </div>
                 </div>
 
-                {/* Retail Price - NEW FIELD (disabled) */}
+                {/* Retail Price - UPDATED with formatted display */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Retail Price:</label>
                   <div className="relative">
@@ -1230,7 +1028,7 @@ const PhoneProcurementForm = () => {
                     <input 
                       type="text" 
                       className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                      value={currentItem.retailPrice}
+                      value={currentItem.retailPrice ? formatPrice(currentItem.retailPrice) : ''}
                       onChange={handleCurrentRetailPriceChange}
                       placeholder="0.00"
                       disabled={true}
@@ -1246,19 +1044,18 @@ const PhoneProcurementForm = () => {
                     <input 
                       type="text" 
                       className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                      value={currentItem.totalPrice ? formatNumberWithCommas(currentItem.totalPrice.toString()) : '0.00'}
+                      value={currentItem.totalPrice ? formatPrice(currentItem.totalPrice.toString()) : '0.00'}
                       disabled={true}
                       readOnly
                     />
                   </div>
                 </div>
 
-                {/* Margin + Add Button - Adjusted sizing to match Color field width */}
+                {/* Margin + Add Button */}
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <div className="w-20 space-y-2">
                       <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Margin:</label>
-                      {/* Margin Field - Made smaller */}
                       <input 
                         type="text" 
                         className="w-full p-2 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 text-center"
@@ -1269,7 +1066,6 @@ const PhoneProcurementForm = () => {
                     </div>
                     <div className="flex-1 space-y-2">
                       <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Action:</label>
-                      {/* Add Button - Takes remaining space */}
                       <button
                         type="button"
                         onClick={addItemToTable}
@@ -1284,9 +1080,9 @@ const PhoneProcurementForm = () => {
                 </div>
               </div>
             </div>
-{/* Part 6 End - Second Row with Adjusted Quantity and Procurement Details */}
+{/* Part 8 End - Phone Selection Section */}
 
-{/* Part 7 Start - Procurement Table with Quantity Controls */}
+{/* Part 9 Start - Procurement Table */}
             {/* Section Divider */}
             <div className="border-t border-gray-300 my-6"></div>
 
@@ -1341,7 +1137,6 @@ const PhoneProcurementForm = () => {
                             <div className="whitespace-nowrap">{formatWithGB(item.ram)} RAM / {formatWithGB(item.storage)} Storage</div>
                           </td>
                           <td className="border px-3 py-2">
-                            {/* UPDATED: Color dropdown for changing colors */}
                             <select
                               value={item.color}
                               onChange={(e) => handleTableColorChange(item.id, e.target.value)}
@@ -1356,7 +1151,6 @@ const PhoneProcurementForm = () => {
                             </select>
                           </td>
                           <td className="border px-3 py-2 text-center">
-                            {/* UPDATED: Quantity controls with +/- buttons */}
                             <div className="flex items-center justify-center gap-1">
                               <button
                                 type="button"
@@ -1380,10 +1174,10 @@ const PhoneProcurementForm = () => {
                             </div>
                           </td>
                           <td className="border px-3 py-2 text-right font-mono">
-                            ₱{item.dealersPrice}
+                            ₱{formatPrice(item.dealersPrice)}
                           </td>
                           <td className="border px-3 py-2 text-right font-mono font-medium">
-                            ₱{formatNumberWithCommas(item.totalPrice.toString())}
+                            ₱{formatPrice(item.totalPrice.toString())}
                           </td>
                         </tr>
                       ))}
@@ -1396,7 +1190,7 @@ const PhoneProcurementForm = () => {
                         </td>
                         <td className="border px-3 py-2 text-right">Grand Total:</td>
                         <td className="border px-3 py-2 text-right font-mono text-lg">
-                          ₱{formatNumberWithCommas(calculateGrandTotal().toString())}
+                          ₱{formatPrice(calculateGrandTotal().toString())}
                         </td>
                       </tr>
                     </tfoot>
@@ -1404,10 +1198,10 @@ const PhoneProcurementForm = () => {
                 </div>
               )}
             </div>
-{/* Part 7 End - Procurement Table with Quantity Controls */}
+{/* Part 9 End - Procurement Table */}
 
-{/* Part 8 Start - Procurement Summary (Moved Below Table) and Submit Button */}
-            {/* Procurement Summary Section - Updated design to match Inventory Value Summary */}
+{/* Part 10 Start - Summary and Submit Button */}
+            {/* Procurement Summary Section */}
             {procurementItems.length > 0 && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Procurement Summary</h3>
@@ -1450,7 +1244,7 @@ const PhoneProcurementForm = () => {
                       </div>
                       <div className="text-right">
                         <p className="text-xl font-bold text-purple-600">
-                          ₱{formatNumberWithCommas(calculateGrandTotal().toString())}
+                          ₱{formatPrice(calculateGrandTotal().toString())}
                         </p>
                         <p className="text-xs text-gray-500">total cost</p>
                       </div>
@@ -1460,12 +1254,17 @@ const PhoneProcurementForm = () => {
               </div>
             )}
 
-            {/* Submit Button */}
+            {/* Submit Button - UPDATED: Simplified validation */}
             <div className="pt-4">
               <button
                 type="submit"
                 className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={procurementItems.length === 0 || isSubmitting || !purchaseDate}
+                disabled={
+                  procurementItems.length === 0 || 
+                  isSubmitting || 
+                  !purchaseDate || 
+                  !selectedSupplier
+                }
               >
                 {isSubmitting ? (
                   <>
@@ -1488,4 +1287,4 @@ const PhoneProcurementForm = () => {
 };
 
 export default PhoneProcurementForm;
-{/* Part 8 End - Procurement Summary (Moved Below Table) and Submit Button */}
+{/* Part 10 End - Summary and Submit Button */}
