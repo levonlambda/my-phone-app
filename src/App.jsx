@@ -8,6 +8,7 @@ import InventorySummaryForm from './components/InventorySummaryForm';
 import PriceManagementForm from './components/PriceManagementForm';
 import PhoneProcurementForm from './components/PhoneProcurementForm';
 import SupplierManagementForm from './components/SupplierManagementForm'; // NEW: Added supplier management import
+import ProcurementManagementForm from './components/ProcurementManagementForm'; // NEW: Added procurement management import
 // Import the hook from our consolidated file
 import { useGlobalState } from './context/GlobalStateContext';
 
@@ -49,6 +50,12 @@ function App() {
             Phone Procurement
           </button>
           <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'procurementmgmt' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('procurementmgmt')}
+          >
+            Procurement Management
+          </button>
+          <button 
             className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
             onClick={() => setActiveComponent('suppliers')}
           >
@@ -78,6 +85,7 @@ function App() {
       {activeComponent === 'summary' && <InventorySummaryForm />}
       {activeComponent === 'selection' && <PhoneSelectionForm />}
       {activeComponent === 'procurement' && <PhoneProcurementForm />}
+      {activeComponent === 'procurementmgmt' && <ProcurementManagementForm />}
       {activeComponent === 'suppliers' && <SupplierManagementForm />}
       {activeComponent === 'form' && <PhoneSpecForm />}
       {activeComponent === 'inventory' && <InventoryListForm />}

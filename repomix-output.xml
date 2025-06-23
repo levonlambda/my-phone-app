@@ -71,6 +71,7 @@ src/components/PhoneProcurementForm.jsx
 src/components/PhoneSpecCard.jsx
 src/components/PhoneSpecForm.jsx
 src/components/PriceManagementForm.jsx
+src/components/ProcurementManagementForm.jsx
 src/components/SupplierManagementForm.jsx
 src/components/ui/badge/index.jsx
 src/components/ui/badge/variants.jsx
@@ -88,6 +89,517 @@ vite.config.js
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/components/ProcurementManagementForm.jsx">
+{/* Part 1 Start - Imports, State, and Helper Functions */}
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { 
+  RefreshCw, 
+  Package,
+  Search,
+  Calendar,
+  Building2,
+  Hash,
+  DollarSign,
+  CreditCard,
+  Truck,
+  Eye,
+  Edit,
+  Trash2,
+  Settings
+} from 'lucide-react';
+import { useGlobalState } from '../context/GlobalStateContext'; // NEW: Import global state
+
+const ProcurementManagementForm = () => {
+  // ====== GLOBAL STATE ======
+  const { editProcurement } = useGlobalState(); // NEW: Get editProcurement function
+
+  // ====== STATE DEFINITIONS ======
+  // State for procurement data
+  const [procurements, setProcurements] = useState([]);
+  const [filteredProcurements, setFilteredProcurements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // ====== HELPER FUNCTIONS ======
+  // Format price with commas and two decimal places
+  const formatPrice = (value) => {
+    if (!value && value !== 0) return '0.00';
+    const numValue = parseFloat(value.toString().replace(/,/g, ''));
+    if (isNaN(numValue)) return '0.00';
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Get payment status display
+  const getPaymentStatus = (procurement) => {
+    if (procurement.isPaid === true || procurement.paymentStatus === 'paid') {
+      return {
+        label: 'Paid',
+        className: 'bg-green-100 text-green-800'
+      };
+    }
+    return {
+      label: 'Unpaid',
+      className: 'bg-red-100 text-red-800'
+    };
+  };
+
+  // Get delivery status display
+  const getDeliveryStatus = (procurement) => {
+    if (procurement.isReceived === true || procurement.deliveryStatus === 'delivered') {
+      return {
+        label: 'Delivered',
+        className: 'bg-green-100 text-green-800'
+      };
+    }
+    return {
+      label: 'Pending',
+      className: 'bg-yellow-100 text-yellow-800'
+    };
+  };
+{/* Part 1 End - Imports, State, and Helper Functions */}
+
+{/* Part 2 Start - Data Fetching Functions */}
+  // Fetch all procurement entries
+  const fetchProcurements = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const procurementsRef = collection(db, 'procurements');
+      const q = query(procurementsRef, orderBy('purchaseDate', 'desc'));
+      const snapshot = await getDocs(q);
+      
+      const procurementsList = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        procurementsList.push({
+          id: doc.id,
+          ...data,
+          // Ensure we have the necessary fields with fallbacks
+          totalQuantity: data.totalQuantity || (data.items ? data.items.reduce((sum, item) => sum + (item.quantity || 0), 0) : 0),
+          grandTotal: data.grandTotal || 0,
+          paymentStatus: data.paymentStatus || (data.isPaid ? 'paid' : 'pending'),
+          deliveryStatus: data.deliveryStatus || (data.isReceived ? 'delivered' : 'pending')
+        });
+      });
+      
+      setProcurements(procurementsList);
+      setFilteredProcurements(procurementsList);
+      
+    } catch (error) {
+      console.error("Error fetching procurements:", error);
+      setError(`Error fetching procurements: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load procurements on component mount
+  useEffect(() => {
+    fetchProcurements();
+  }, []);
+{/* Part 2 End - Data Fetching Functions */}
+
+{/* Part 3 Start - Event Handlers and Filter Logic */}
+  // Filter procurements based on search term and status
+  useEffect(() => {
+    let filtered = procurements;
+    
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(procurement => 
+        procurement.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        procurement.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        procurement.purchaseDate?.includes(searchTerm)
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'paid') {
+        filtered = filtered.filter(p => p.isPaid === true || p.paymentStatus === 'paid');
+      } else if (statusFilter === 'unpaid') {
+        filtered = filtered.filter(p => p.isPaid !== true && p.paymentStatus !== 'paid');
+      } else if (statusFilter === 'delivered') {
+        filtered = filtered.filter(p => p.isReceived === true || p.deliveryStatus === 'delivered');
+      } else if (statusFilter === 'pending') {
+        filtered = filtered.filter(p => p.isReceived !== true && p.deliveryStatus !== 'delivered');
+      }
+    }
+    
+    setFilteredProcurements(filtered);
+  }, [procurements, searchTerm, statusFilter]);
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Handle status filter change
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+
+  // Handle action clicks
+  const handleViewProcurement = (procurement) => {
+    console.log('View procurement:', procurement.id);
+    alert(`View details for procurement ${procurement.reference || procurement.id}`);
+    // TODO: Implement view modal/details
+  };
+
+  const handleEditProcurement = (procurement) => {
+    console.log('Edit procurement:', procurement.id);
+    // NEW: Use global state to edit procurement and switch to procurement form
+    editProcurement(procurement);
+  };
+
+  const handleDeleteProcurement = (procurement) => {
+    console.log('Delete procurement:', procurement.id);
+    if (window.confirm(`Are you sure you want to delete procurement ${procurement.reference || procurement.id}?`)) {
+      alert('Delete functionality will be implemented here');
+      // TODO: Implement delete confirmation and deletion
+    }
+  };
+{/* Part 3 End - Event Handlers and Filter Logic */}
+
+{/* Part 4 Start - Loading and Error States */}
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <Package className="h-6 w-6 mr-2" />
+              Procurement Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
+              <p className="mt-2 text-gray-600">Loading procurement data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <Package className="h-6 w-6 mr-2" />
+              Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={fetchProcurements}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+{/* Part 4 End - Loading and Error States */}
+
+{/* Part 5 Start - Main Component Render */}
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <CardHeader className="bg-[rgb(52,69,157)] py-3">
+          <CardTitle className="text-2xl text-white flex items-center">
+            <Package className="h-6 w-6 mr-2" />
+            Procurement Management
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="bg-white p-4 space-y-6">
+{/* Part 5 End - Main Component Render */}
+
+{/* Part 6 Start - Search and Filter Section */}
+          {/* Search and Filter Section */}
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search Input */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search by supplier name, reference, or date..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div className="w-full md:w-48">
+                <select
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  className="w-full p-2 border rounded-lg text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="paid">Paid Only</option>
+                  <option value="unpaid">Unpaid Only</option>
+                  <option value="delivered">Delivered Only</option>
+                  <option value="pending">Pending Delivery</option>
+                </select>
+              </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={fetchProcurements}
+                className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-lg hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </button>
+            </div>
+          </div>
+{/* Part 6 End - Search and Filter Section */}
+
+{/* Part 7 Start - Procurement Entries Table */}
+          {/* Procurement List */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
+                Procurement Entries ({filteredProcurements.length} items)
+              </h3>
+            </div>
+
+            {filteredProcurements.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-gray-700 mb-2">
+                  {procurements.length === 0 ? 'No procurement entries found' : 'No entries match your filters'}
+                </h4>
+                <p className="text-gray-500">
+                  {procurements.length === 0 
+                    ? 'Create procurement entries from the Phone Procurement form'
+                    : 'Try adjusting your search criteria or filters'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border px-3 py-3 text-left font-semibold">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Date
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-left font-semibold">
+                        <div className="flex items-center">
+                          <Building2 className="h-4 w-4 mr-2" />
+                          Supplier
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold">
+                        <div className="flex items-center justify-center">
+                          <Hash className="h-4 w-4 mr-2" />
+                          Total Items
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-right font-semibold">
+                        <div className="flex items-center justify-end">
+                          <DollarSign className="h-4 w-4 mr-2" />
+                          Amount
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold">
+                        <div className="flex items-center justify-center">
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Payment Status
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold">
+                        <div className="flex items-center justify-center">
+                          <Truck className="h-4 w-4 mr-2" />
+                          Delivery Status
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold w-32">
+                        <div className="flex items-center justify-center">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Actions
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProcurements.map((procurement) => {
+                      const paymentStatus = getPaymentStatus(procurement);
+                      const deliveryStatus = getDeliveryStatus(procurement);
+                      
+                      return (
+                        <tr key={procurement.id} className="hover:bg-gray-50">
+                          <td className="border px-3 py-3">
+                            <div className="font-medium">
+                              {formatDate(procurement.purchaseDate)}
+                            </div>
+                            {procurement.reference && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {procurement.reference}
+                              </div>
+                            )}
+                          </td>
+                          <td className="border px-3 py-3">
+                            <div className="font-medium text-gray-900">
+                              {procurement.supplierName || 'Unknown Supplier'}
+                            </div>
+                          </td>
+                          <td className="border px-3 py-3 text-center">
+                            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                              {procurement.totalQuantity}
+                            </span>
+                          </td>
+                          <td className="border px-3 py-3 text-right font-mono">
+                            <span className="font-semibold text-lg">
+                              ₱{formatPrice(procurement.grandTotal)}
+                            </span>
+                          </td>
+                          <td className="border px-3 py-3 text-center">
+                            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${paymentStatus.className}`}>
+                              {paymentStatus.label}
+                            </span>
+                          </td>
+                          <td className="border px-3 py-3 text-center">
+                            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${deliveryStatus.className}`}>
+                              {deliveryStatus.label}
+                            </span>
+                          </td>
+                          <td className="border px-3 py-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleViewProcurement(procurement)}
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleEditProcurement(procurement)}
+                                className="p-1 text-green-600 hover:bg-green-100 rounded"
+                                title="Edit Procurement"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProcurement(procurement)}
+                                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                title="Delete Procurement"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+{/* Part 7 End - Procurement Entries Table */}
+
+{/* Part 8 Start - Summary Statistics */}
+          {/* Summary Stats - MOVED TO BOTTOM */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <Package className="h-8 w-8 text-blue-600 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Total Procurements</p>
+                  <p className="text-xl font-bold text-blue-600">{procurements.length}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <CreditCard className="h-8 w-8 text-green-600 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Paid</p>
+                  <p className="text-xl font-bold text-green-600">
+                    {procurements.filter(p => p.isPaid === true || p.paymentStatus === 'paid').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <DollarSign className="h-8 w-8 text-red-600 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Unpaid</p>
+                  <p className="text-xl font-bold text-red-600">
+                    {procurements.filter(p => p.isPaid !== true && p.paymentStatus !== 'paid').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <Truck className="h-8 w-8 text-yellow-600 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Pending Delivery</p>
+                  <p className="text-xl font-bold text-yellow-600">
+                    {procurements.filter(p => p.isReceived !== true && p.deliveryStatus !== 'delivered').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+{/* Part 8 End - Summary Statistics */}
+
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ProcurementManagementForm;
+</file>
 
 <file path=".gitignore">
 # Logs
@@ -2400,1281 +2912,6 @@ const PhoneListForm = () => {
 export default PhoneListForm;
 </file>
 
-<file path="src/components/PhoneProcurementForm.jsx">
-{/* Part 1 Start - Imports, State, and Helper Functions */}
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs, query, where, addDoc, Timestamp } from 'firebase/firestore'; // ADDED: addDoc, Timestamp
-import { db } from '../firebase/config';
-import { 
-  RefreshCw, 
-  Plus,
-  Minus,
-  ShoppingCart,
-  Trash2
-} from 'lucide-react';
-// Import supplier service
-import supplierService from '../services/supplierService';
-
-const PhoneProcurementForm = () => {
-  // ====== STATE DEFINITIONS ======
-  // Table data for multiple phone models
-  const [procurementItems, setProcurementItems] = useState([]);
-  const [nextId, setNextId] = useState(1);
-  
-  // Current item being added
-  const [currentItem, setCurrentItem] = useState({
-    id: null,
-    manufacturer: '',
-    model: '',
-    ram: '',
-    storage: '',
-    color: '',
-    quantity: 1,
-    dealersPrice: '',
-    retailPrice: '',
-    totalPrice: 0
-  });
-  
-  // Options from database
-  const [manufacturers, setManufacturers] = useState([]);
-  const [models, setModels] = useState([]);
-  const [rams, setRams] = useState([]);
-  const [storages, setStorages] = useState([]);
-  const [colors, setColors] = useState([]);
-  
-  // Supplier management
-  const [suppliers, setSuppliers] = useState([]); // Suppliers from Firebase
-  const [selectedSupplier, setSelectedSupplier] = useState(''); // Selected supplier ID
-  const [selectedSupplierData, setSelectedSupplierData] = useState(null); // Full supplier data
-  
-  // General procurement details
-  const [purchaseDate, setPurchaseDate] = useState('');
-  
-  // Payment and delivery status - Read-only values for new entries
-  const [datePaid] = useState(''); // Read-only, empty for new entries
-  const [dateDelivered] = useState(''); // Read-only, empty for new entries
-  const [paymentReference, setPaymentReference] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
-  const [accountPayable, setAccountPayable] = useState('');
-  
-  // UI state
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCurrentItemValid, setIsCurrentItemValid] = useState(false);
-  
-  // State for tracking available colors for each item in the table
-  const [itemColorOptions, setItemColorOptions] = useState({});
-
-  // ====== HELPER FUNCTIONS ======
-  // Get current date in YYYY-MM-DD format for date input
-  const getCurrentDate = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = (today.getMonth() + 1).toString().padStart(2, '0');
-    const day = today.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Format number with commas
-  const formatNumberWithCommas = (value) => {
-    if (!value && value !== 0) return '';
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
-
-  // Validation function for price
-  const validatePrice = (value) => {
-    return value.replace(/[^\d.]/g, '');
-  };
-
-  // Format RAM/Storage with GB suffix
-  const formatWithGB = (value) => {
-    return value ? `${value}GB` : value;
-  };
-
-  // Calculate margin percentage
-  const calculateMargin = (dealersPrice, retailPrice) => {
-    const dealers = parseFloat(dealersPrice.replace(/,/g, '')) || 0;
-    const retail = parseFloat(retailPrice.replace(/,/g, '')) || 0;
-    
-    if (dealers === 0) return '0.00';
-    const margin = ((retail - dealers) / dealers) * 100;
-    return margin.toFixed(2);
-  };
-
-  // Calculate grand total
-  const calculateGrandTotal = () => {
-    return procurementItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  };
-
-  // Reset current item to initial state
-  const resetCurrentItem = () => {
-    setCurrentItem({
-      id: null,
-      manufacturer: '',
-      model: '',
-      ram: '',
-      storage: '',
-      color: '',
-      quantity: 1,
-      dealersPrice: '',
-      retailPrice: '',
-      totalPrice: 0
-    });
-  };
-{/* Part 1 End - Imports, State, and Helper Functions */}
-
-{/* Part 2 Start - Data Fetching and useEffect Hooks with Suppliers */}
-  // Initialize purchase date to current date
-  useEffect(() => {
-    setPurchaseDate(getCurrentDate());
-  }, []);
-
-  // Fetch suppliers on component mount
-  useEffect(() => {
-    const fetchSuppliers = async () => {
-      try {
-        const supplierResult = await supplierService.getAllSuppliers();
-        if (supplierResult.success) {
-          setSuppliers(supplierResult.suppliers);
-        }
-      } catch (error) {
-        console.error("Error fetching suppliers:", error);
-      }
-    };
-
-    fetchSuppliers();
-  }, []);
-
-  // Fetch manufacturers
-  useEffect(() => {
-    const fetchManufacturers = async () => {
-      setLoading(true);
-      try {
-        const q = query(collection(db, 'phones'));
-        const querySnapshot = await getDocs(q);
-        const manufacturerSet = new Set();
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.manufacturer) {
-            manufacturerSet.add(data.manufacturer);
-          }
-        });
-        
-        setManufacturers(Array.from(manufacturerSet).sort());
-      } catch (error) {
-        console.error("Error fetching manufacturers:", error);
-        setError(`Error fetching manufacturers: ${error.message}`);
-      }
-      setLoading(false);
-    };
-
-    fetchManufacturers();
-  }, []);
-
-  // Fetch models
-  useEffect(() => {
-    const fetchModels = async () => {
-      if (!currentItem.manufacturer) {
-        setModels([]);
-        return;
-      }
-      
-      try {
-        const q = query(
-          collection(db, 'phones'),
-          where('manufacturer', '==', currentItem.manufacturer)
-        );
-        const querySnapshot = await getDocs(q);
-        const modelSet = new Set();
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.model) {
-            modelSet.add(data.model);
-          }
-        });
-        
-        setModels(Array.from(modelSet).sort());
-      } catch (error) {
-        console.error("Error fetching models:", error);
-      }
-    };
-
-    fetchModels();
-  }, [currentItem.manufacturer]);
-
-  // Fetch RAM, Storage, Colors from arrays in the document
-  useEffect(() => {
-    const fetchOptions = async () => {
-      if (!currentItem.manufacturer || !currentItem.model) {
-        setRams([]);
-        setStorages([]);
-        setColors([]);
-        return;
-      }
-      
-      try {
-        const q = query(
-          collection(db, 'phones'),
-          where('manufacturer', '==', currentItem.manufacturer),
-          where('model', '==', currentItem.model)
-        );
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          const data = querySnapshot.docs[0].data();
-          
-          const ramArray = Array.isArray(data.storage_extra) ? data.storage_extra : [];
-          setRams(ramArray.sort());
-          
-          const storageArray = Array.isArray(data.storage) ? data.storage : [];
-          setStorages(storageArray.sort());
-          
-          const colorArray = Array.isArray(data.colors) ? data.colors : [];
-          setColors(colorArray.sort());
-        } else {
-          setRams([]);
-          setStorages([]);
-          setColors([]);
-        }
-      } catch (error) {
-        console.error("Error fetching options:", error);
-        setRams([]);
-        setStorages([]);
-        setColors([]);
-      }
-    };
-
-    fetchOptions();
-  }, [currentItem.manufacturer, currentItem.model]);
-
-  // NEW: Fetch pricing when complete configuration is selected
-  useEffect(() => {
-    const fetchPricing = async () => {
-      if (!currentItem.manufacturer || !currentItem.model || !currentItem.ram || !currentItem.storage || !currentItem.color) {
-        // Clear pricing if configuration is incomplete
-        setCurrentItem(prev => ({
-          ...prev,
-          dealersPrice: '',
-          retailPrice: ''
-        }));
-        return;
-      }
-      
-      try {
-        const q = query(
-          collection(db, 'price_configurations'),
-          where('manufacturer', '==', currentItem.manufacturer),
-          where('model', '==', currentItem.model),
-          where('ram', '==', currentItem.ram),
-          where('storage', '==', currentItem.storage),
-          where('color', '==', currentItem.color)
-        );
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          const priceData = querySnapshot.docs[0].data();
-          console.log("Found pricing data:", priceData);
-          
-          setCurrentItem(prev => ({
-            ...prev,
-            dealersPrice: priceData.dealersPrice ? priceData.dealersPrice.toString() : '',
-            retailPrice: priceData.retailPrice ? priceData.retailPrice.toString() : ''
-          }));
-        } else {
-          console.log("No pricing found for configuration");
-          // Clear pricing if no configuration found
-          setCurrentItem(prev => ({
-            ...prev,
-            dealersPrice: '',
-            retailPrice: ''
-          }));
-        }
-      } catch (error) {
-        console.error("Error fetching pricing:", error);
-        setCurrentItem(prev => ({
-          ...prev,
-          dealersPrice: '',
-          retailPrice: ''
-        }));
-      }
-    };
-
-    fetchPricing();
-  }, [currentItem.manufacturer, currentItem.model, currentItem.ram, currentItem.storage, currentItem.color]);
-
-  // Validate current item and calculate totals
-  useEffect(() => {
-    const isValid = 
-      currentItem.manufacturer &&
-      currentItem.model &&
-      currentItem.ram &&
-      currentItem.storage &&
-      currentItem.color &&
-      currentItem.quantity > 0 &&
-      currentItem.dealersPrice &&
-      parseFloat(currentItem.dealersPrice.replace(/,/g, '')) > 0;
-    
-    setIsCurrentItemValid(isValid);
-    
-    if (currentItem.dealersPrice && currentItem.quantity) {
-      const price = parseFloat(currentItem.dealersPrice.replace(/,/g, '')) || 0;
-      const total = price * currentItem.quantity;
-      
-      setCurrentItem(prev => ({
-        ...prev,
-        totalPrice: total
-      }));
-    }
-  }, [
-    currentItem.manufacturer,
-    currentItem.model,
-    currentItem.ram,
-    currentItem.storage,
-    currentItem.color,
-    currentItem.quantity,
-    currentItem.dealersPrice
-  ]);
-{/* Part 2 End - Data Fetching and useEffect Hooks with Suppliers */}
-
-{/* Part 3 Start - Event Handlers */}
-  // Handle purchase date change
-  const handlePurchaseDateChange = (e) => {
-    setPurchaseDate(e.target.value);
-  };
-
-  // Handle supplier selection
-  const handleSupplierChange = (e) => {
-    const supplierId = e.target.value;
-    setSelectedSupplier(supplierId);
-    
-    if (supplierId) {
-      const supplierData = suppliers.find(s => s.id === supplierId);
-      setSelectedSupplierData(supplierData);
-      
-      // Auto-populate bank fields when supplier is selected
-      if (supplierData) {
-        setBankName(supplierData.bankName || '');
-        setBankAccount(supplierData.bankAccount || '');
-      }
-    } else {
-      setSelectedSupplierData(null);
-      setBankName('');
-      setBankAccount('');
-    }
-  };
-
-  // Handle current item field changes
-  const handleCurrentManufacturerChange = (e) => {
-    setCurrentItem(prev => ({
-      ...prev,
-      manufacturer: e.target.value,
-      model: '',
-      ram: '',
-      storage: '',
-      color: ''
-    }));
-  };
-
-  const handleCurrentModelChange = (e) => {
-    setCurrentItem(prev => ({
-      ...prev,
-      model: e.target.value,
-      ram: '',
-      storage: '',
-      color: ''
-    }));
-  };
-
-  const handleCurrentRamChange = (e) => {
-    setCurrentItem(prev => ({
-      ...prev,
-      ram: e.target.value,
-      storage: '',
-      color: ''
-    }));
-  };
-
-  const handleCurrentStorageChange = (e) => {
-    setCurrentItem(prev => ({
-      ...prev,
-      storage: e.target.value,
-      color: ''
-    }));
-  };
-
-  const handleCurrentColorChange = (e) => {
-    setCurrentItem(prev => ({
-      ...prev,
-      color: e.target.value
-    }));
-  };
-
-  const handleCurrentQuantityChange = (e) => {
-    const quantity = parseInt(e.target.value) || 1;
-    setCurrentItem(prev => ({
-      ...prev,
-      quantity: Math.max(1, quantity)
-    }));
-  };
-
-  const handleCurrentDealersPriceChange = (e) => {
-    const cleanValue = validatePrice(e.target.value);
-    setCurrentItem(prev => ({
-      ...prev,
-      dealersPrice: cleanValue
-    }));
-  };
-
-  const handleCurrentRetailPriceChange = (e) => {
-    const cleanValue = validatePrice(e.target.value);
-    setCurrentItem(prev => ({
-      ...prev,
-      retailPrice: cleanValue
-    }));
-  };
-
-  const handlePaymentReferenceChange = (e) => {
-    setPaymentReference(e.target.value);
-  };
-
-  const handleBankNameChange = (e) => {
-    setBankName(e.target.value);
-  };
-
-  const handleBankAccountChange = (e) => {
-    setBankAccount(e.target.value);
-  };
-
-  const handleAccountPayableChange = (e) => {
-    setAccountPayable(e.target.value);
-  };
-{/* Part 3 End - Event Handlers */}
-
-{/* Part 4 Start - Essential Functions */}
-  // Clear all items from procurement list
-  const clearAllItems = () => {
-    if (window.confirm('Are you sure you want to clear all items from the procurement list?')) {
-      setProcurementItems([]);
-      resetCurrentItem();
-    }
-  };
-
-  // Increment current item quantity
-  const incrementCurrentQuantity = () => {
-    setCurrentItem(prev => ({
-      ...prev,
-      quantity: prev.quantity + 1
-    }));
-  };
-
-  // Decrement current item quantity
-  const decrementCurrentQuantity = () => {
-    setCurrentItem(prev => ({
-      ...prev,
-      quantity: Math.max(1, prev.quantity - 1)
-    }));
-  };
-
-  // Increment table item quantity
-  const incrementTableQuantity = (itemId) => {
-    setProcurementItems(prevItems => 
-      prevItems.map(item => 
-        item.id === itemId 
-          ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
-          : item
-      )
-    );
-  };
-
-  // Decrement table item quantity (remove if quantity becomes 0)
-  const decrementTableQuantity = (itemId) => {
-    setProcurementItems(prevItems => 
-      prevItems.map(item => 
-        item.id === itemId 
-          ? item.quantity === 1 
-            ? null // Will be filtered out
-            : { ...item, quantity: item.quantity - 1, totalPrice: (item.quantity - 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
-          : item
-      ).filter(Boolean) // Remove null items
-    );
-  };
-
-  // Handle color change in table
-  const handleTableColorChange = (itemId, newColor) => {
-    setProcurementItems(prevItems => 
-      prevItems.map(item => 
-        item.id === itemId 
-          ? { ...item, color: newColor }
-          : item
-      )
-    );
-  };
-
-  // Handle form key events
-  const handleKeyDown = (e) => {
-    // Allow form submission on Ctrl+Enter
-    if (e.ctrlKey && e.key === 'Enter') {
-      e.preventDefault();
-      if (procurementItems.length > 0 && purchaseDate && selectedSupplier) {
-        handleSubmit(e);
-      }
-    }
-  };
-
-  // Add item to procurement table
-  const addItemToTable = () => {
-    if (!isCurrentItemValid) return;
-    
-    const dealersPrice = parseFloat(currentItem.dealersPrice.replace(/,/g, '')) || 0;
-    const totalPrice = currentItem.quantity * dealersPrice;
-    
-    const newItem = {
-      id: nextId,
-      manufacturer: currentItem.manufacturer,
-      model: currentItem.model,
-      ram: currentItem.ram,
-      storage: currentItem.storage,
-      color: currentItem.color,
-      quantity: currentItem.quantity,
-      dealersPrice: formatNumberWithCommas(dealersPrice.toString()),
-      retailPrice: currentItem.retailPrice,
-      totalPrice: totalPrice
-    };
-    
-    // Store available colors for this item
-    setItemColorOptions(prev => ({
-      ...prev,
-      [nextId]: colors
-    }));
-    
-    setProcurementItems(prev => [...prev, newItem]);
-    setNextId(prev => prev + 1);
-    resetCurrentItem();
-  };
-{/* Part 4 End - Essential Functions */}
-
-{/* Part 5 Start - Form Submission with Real Firebase Implementation */}
-  // Handle form submission with supplier validation and real Firebase submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validation
-    if (procurementItems.length === 0) {
-      alert('Please add at least one phone model to the procurement list');
-      return;
-    }
-    
-    if (!purchaseDate) {
-      alert('Please enter the purchase date');
-      return;
-    }
-    
-    // Supplier validation - Required for saving
-    if (!selectedSupplier) {
-      alert('Please select a supplier before saving the procurement record');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      const grandTotal = calculateGrandTotal();
-      
-      // Prepare procurement data for Firebase
-      const procurementData = {
-        // Supplier information
-        supplierId: selectedSupplier,
-        supplierName: selectedSupplierData?.supplierName || '',
-        
-        // Items array
-        items: procurementItems.map(item => ({
-          manufacturer: item.manufacturer,
-          model: item.model,
-          ram: item.ram,
-          storage: item.storage,
-          color: item.color,
-          quantity: item.quantity,
-          dealersPrice: parseFloat(item.dealersPrice.replace(/,/g, '')) || 0,
-          retailPrice: parseFloat(item.retailPrice.replace(/,/g, '')) || 0,
-          totalPrice: item.totalPrice
-        })),
-        
-        // Summary data
-        totalQuantity: procurementItems.reduce((sum, item) => sum + item.quantity, 0),
-        grandTotal: grandTotal,
-        
-        // Procurement details
-        purchaseDate: purchaseDate,
-        paymentStatus: 'pending',
-        deliveryStatus: 'pending',
-        paymentReference: paymentReference || '',
-        bankName: bankName || '',
-        bankAccount: bankAccount || '',
-        accountPayable: accountPayable || '',
-        
-        // Timestamps
-        dateCreated: Timestamp.now(),
-        lastUpdated: Timestamp.now()
-      };
-      
-      console.log("Submitting procurement data to Firebase:", procurementData);
-      
-      // ACTUAL FIREBASE SUBMISSION
-      const docRef = await addDoc(collection(db, 'procurement_entries'), procurementData);
-      console.log("Procurement entry saved with ID:", docRef.id);
-      
-      // Reset form after successful submission
-      setProcurementItems([]);
-      resetCurrentItem();
-      setPurchaseDate(getCurrentDate());
-      setSelectedSupplier('');
-      setSelectedSupplierData(null);
-      setBankName('');
-      setBankAccount('');
-      setAccountPayable('');
-      setPaymentReference('');
-      
-      setIsSubmitting(false);
-      
-      // Success message with document ID
-      alert(`Procurement record saved successfully!\n\nDocument ID: ${docRef.id}\nSupplier: ${procurementData.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatNumberWithCommas(grandTotal.toString())}`);
-      
-    } catch (error) {
-      console.error("Error saving procurement to Firebase:", error);
-      setError(`Error saving procurement: ${error.message}`);
-      setIsSubmitting(false);
-      
-      // Show user-friendly error message
-      alert(`Error saving procurement record: ${error.message}\n\nPlease check your internet connection and try again.`);
-    }
-  };
-{/* Part 5 End - Form Submission with Real Firebase Implementation */}
-
-{/* Part 6 Start - Loading States and Form Start */}
-  // Show loading state ONLY when actually loading
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white flex items-center">
-              <ShoppingCart className="h-6 w-6 mr-2" />
-              Phone Procurement
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
-              <p className="mt-2 text-gray-600">Loading form data...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-red-600 py-3">
-            <CardTitle className="text-2xl text-white flex items-center">
-              <ShoppingCart className="h-6 w-6 mr-2" />
-              Error
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-            <button 
-              onClick={() => {
-                setError(null);
-                window.location.reload();
-              }}
-              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Main component render
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <form 
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDown}
-      >
-        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white flex items-center">
-              <ShoppingCart className="h-6 w-6 mr-2" />
-              Phone Procurement
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="bg-white p-4 space-y-6">
-{/* Part 6 End - Loading States and Form Start */}
-
-{/* Part 7 Start - Procurement Details Section */}
-            {/* Procurement Details Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Procurement Details</h3>
-              
-              {/* First Row: Purchase Date, Supplier, Bank Name, Bank Account, Account Payable */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Purchase Date */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Purchase Date:</label>
-                  <input 
-                    type="date" 
-                    className="w-full p-2 border rounded text-sm h-10"
-                    value={purchaseDate}
-                    onChange={handlePurchaseDateChange}
-                    required
-                  />
-                </div>
-
-                {/* Supplier - Dropdown */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Supplier:</label>
-                  <select 
-                    className="w-full p-2 border rounded text-sm h-10"
-                    value={selectedSupplier}
-                    onChange={handleSupplierChange}
-                    required
-                  >
-                    <option value="">-- Select Supplier --</option>
-                    {suppliers.map(supplier => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.supplierName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Bank Name - DISABLED */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Name:</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
-                    value={bankName}
-                    onChange={handleBankNameChange}
-                    placeholder="Bank name"
-                    disabled={true}
-                  />
-                </div>
-
-                {/* Bank Account - DISABLED */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Account:</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
-                    value={bankAccount}
-                    onChange={handleBankAccountChange}
-                    placeholder="Account number"
-                    disabled={true}
-                  />
-                </div>
-
-                {/* Account Payable - DISABLED */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Account Payable:</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
-                    value={accountPayable}
-                    onChange={handleAccountPayableChange}
-                    placeholder="Payable amount"
-                    disabled={true}
-                  />
-                </div>
-              </div>
-
-              {/* Second Row: Payment Status, Date Paid, Payment Reference, Delivery Status, Date Delivered */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Payment Status - Read-only */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Status:</label>
-                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
-                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
-                      Unpaid
-                    </span>
-                  </div>
-                </div>
-
-                {/* Date Paid */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Paid:</label>
-                  <input 
-                    type="date" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
-                    value={datePaid}
-                    disabled
-                  />
-                </div>
-
-                {/* Payment Reference - DISABLED */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
-                    value={paymentReference}
-                    onChange={handlePaymentReferenceChange}
-                    placeholder="Receipt #"
-                    disabled={true}
-                  />
-                </div>
-
-                {/* Delivery Status - Read-only */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Delivery Status:</label>
-                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
-                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
-                      Pending
-                    </span>
-                  </div>
-                </div>
-
-                {/* Date Delivered */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Delivered:</label>
-                  <input 
-                    type="date" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
-                    value={dateDelivered}
-                    disabled
-                  />
-                </div>
-              </div>
-            </div>
-{/* Part 7 End - Procurement Details Section */}
-
-{/* Part 8 Start - Phone Selection Section */}
-            {/* Add Phone Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Add Phone Model</h3>
-              
-              {/* Phone Selection Row */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Manufacturer - REMOVED required */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Manufacturer:</label>
-                  <select 
-                    className="w-full p-2 border rounded text-sm"
-                    value={currentItem.manufacturer}
-                    onChange={handleCurrentManufacturerChange}
-                  >
-                    <option value="">-- Select --</option>
-                    {manufacturers.map(manufacturer => (
-                      <option key={manufacturer} value={manufacturer}>
-                        {manufacturer}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Model - REMOVED required */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Model:</label>
-                  <select 
-                    className="w-full p-2 border rounded text-sm"
-                    value={currentItem.model}
-                    onChange={handleCurrentModelChange}
-                    disabled={!currentItem.manufacturer}
-                  >
-                    <option value="">-- Select --</option>
-                    {models.map(model => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* RAM - REMOVED required */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">RAM:</label>
-                  <select 
-                    className="w-full p-2 border rounded text-sm"
-                    value={currentItem.ram}
-                    onChange={handleCurrentRamChange}
-                    disabled={!currentItem.model}
-                  >
-                    <option value="">-- Select --</option>
-                    {rams.map(ram => (
-                      <option key={ram} value={ram}>
-                        {formatWithGB(ram)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Storage - REMOVED required */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Storage:</label>
-                  <select 
-                    className="w-full p-2 border rounded text-sm"
-                    value={currentItem.storage}
-                    onChange={handleCurrentStorageChange}
-                    disabled={!currentItem.model}
-                  >
-                    <option value="">-- Select --</option>
-                    {storages.map(storage => (
-                      <option key={storage} value={storage}>
-                        {formatWithGB(storage)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Color - REMOVED required */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Color:</label>
-                  <select 
-                    className="w-full p-2 border rounded text-sm"
-                    value={currentItem.color}
-                    onChange={handleCurrentColorChange}
-                    disabled={!currentItem.ram || !currentItem.storage}
-                  >
-                    <option value="">-- Select --</option>
-                    {colors.map(color => (
-                      <option key={color} value={color}>
-                        {color}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Second Row: Quantity, Dealers Price, Retail Price, Total Price, Margin % + Action */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Quantity - REMOVED required */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Quantity:</label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={decrementCurrentQuantity}
-                      disabled={currentItem.quantity <= 1}
-                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <input 
-                      type="number" 
-                      className="w-32 p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      value={currentItem.quantity}
-                      onChange={handleCurrentQuantityChange}
-                      min="1"
-                    />
-                    <button
-                      type="button"
-                      onClick={incrementCurrentQuantity}
-                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Dealers Price - REMOVED required */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Dealer&apos;s Price:</label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
-                    <input 
-                      type="text" 
-                      className="w-full p-2 pl-6 border rounded text-sm"
-                      value={currentItem.dealersPrice}
-                      onChange={handleCurrentDealersPriceChange}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                {/* Retail Price - Disabled */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Retail Price:</label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
-                    <input 
-                      type="text" 
-                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                      value={currentItem.retailPrice}
-                      onChange={handleCurrentRetailPriceChange}
-                      placeholder="0.00"
-                      disabled={true}
-                    />
-                  </div>
-                </div>
-
-                {/* Total Price Display */}
-                <div className="space-y-2">
-                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Total Price:</label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
-                    <input 
-                      type="text" 
-                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                      value={currentItem.totalPrice ? formatNumberWithCommas(currentItem.totalPrice.toString()) : '0.00'}
-                      disabled={true}
-                      readOnly
-                    />
-                  </div>
-                </div>
-
-                {/* Margin + Add Button */}
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <div className="w-20 space-y-2">
-                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Margin:</label>
-                      <input 
-                        type="text" 
-                        className="w-full p-2 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 text-center"
-                        value={currentItem.dealersPrice && currentItem.retailPrice ? `${calculateMargin(currentItem.dealersPrice, currentItem.retailPrice)}%` : '0.00%'}
-                        disabled={true}
-                        readOnly
-                      />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Action:</label>
-                      <button
-                        type="button"
-                        onClick={addItemToTable}
-                        disabled={!isCurrentItemValid}
-                        className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-{/* Part 8 End - Phone Selection Section */}
-
-{/* Part 9 Start - Procurement Table */}
-            {/* Section Divider */}
-            <div className="border-t border-gray-300 my-6"></div>
-
-            {/* Procurement Table Section */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
-                  Procurement List ({procurementItems.length} items)
-                </h3>
-                {procurementItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearAllItems}
-                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Clear All
-                  </button>
-                )}
-              </div>
-
-              {procurementItems.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                  <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h4 className="text-lg font-medium text-gray-700 mb-2">No items in procurement list</h4>
-                  <p className="text-gray-500">Add phone models above to build your procurement list</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto border rounded-lg">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Manufacturer</th>
-                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Model</th>
-                        <th className="border px-3 py-2 text-left font-semibold w-[22%]">Configuration</th>
-                        <th className="border px-3 py-2 text-left font-semibold w-[10%]">Color</th>
-                        <th className="border px-3 py-2 text-center font-semibold w-[12%]">Qty</th>
-                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Unit Price</th>
-                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {procurementItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="border px-3 py-2">
-                            <div className="font-medium">{item.manufacturer}</div>
-                          </td>
-                          <td className="border px-3 py-2">
-                            <div className="text-gray-700">{item.model}</div>
-                          </td>
-                          <td className="border px-3 py-2">
-                            <div className="whitespace-nowrap">{formatWithGB(item.ram)} RAM / {formatWithGB(item.storage)} Storage</div>
-                          </td>
-                          <td className="border px-3 py-2">
-                            <select
-                              value={item.color}
-                              onChange={(e) => handleTableColorChange(item.id, e.target.value)}
-                              className="w-full p-1 border rounded text-xs bg-white"
-                              title="Change color"
-                            >
-                              {(itemColorOptions[item.id] || [item.color]).map(color => (
-                                <option key={color} value={color}>
-                                  {color}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="border px-3 py-2 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => decrementTableQuantity(item.id)}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
-                                title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
-                              <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
-                                {item.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => incrementTableQuantity(item.id)}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
-                                title="Increase quantity"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="border px-3 py-2 text-right font-mono">
-                            ₱{item.dealersPrice}
-                          </td>
-                          <td className="border px-3 py-2 text-right font-mono font-medium">
-                            ₱{formatNumberWithCommas(item.totalPrice.toString())}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-blue-50 font-semibold">
-                        <td colSpan="4" className="border px-3 py-2 text-right">Total Items:</td>
-                        <td className="border px-3 py-2 text-center">
-                          {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
-                        </td>
-                        <td className="border px-3 py-2 text-right">Grand Total:</td>
-                        <td className="border px-3 py-2 text-right font-mono text-lg">
-                          ₱{formatNumberWithCommas(calculateGrandTotal().toString())}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </div>
-{/* Part 9 End - Procurement Table */}
-
-{/* Part 10 Start - Summary and Submit Button */}
-            {/* Procurement Summary Section */}
-            {procurementItems.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Procurement Summary</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">Unique Models</p>
-                        <p className="text-xs text-gray-500">Different phone configurations</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-blue-600">
-                          {procurementItems.length}
-                        </p>
-                        <p className="text-xs text-gray-500">models</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">Total Units</p>
-                        <p className="text-xs text-gray-500">Combined quantity ordered</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-green-600">
-                          {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
-                        </p>
-                        <p className="text-xs text-gray-500">units</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">Grand Total</p>
-                        <p className="text-xs text-gray-500">Total procurement cost</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-purple-600">
-                          ₱{formatNumberWithCommas(calculateGrandTotal().toString())}
-                        </p>
-                        <p className="text-xs text-gray-500">total cost</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Submit Button - UPDATED: Simplified validation */}
-            <div className="pt-4">
-              <button
-                type="submit"
-                className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={
-                  procurementItems.length === 0 || 
-                  isSubmitting || 
-                  !purchaseDate || 
-                  !selectedSupplier
-                }
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="animate-spin h-5 w-5 mr-2" />
-                    Saving Procurement...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="h-5 w-5 mr-2" />
-                    Save Procurement Record ({procurementItems.length} items)
-                  </>
-                )}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      </form>
-    </div>
-  );
-};
-
-export default PhoneProcurementForm;
-{/* Part 10 End - Summary and Submit Button */}
-</file>
-
 <file path="src/components/PhoneSpecCard.jsx">
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -3930,6 +3167,7 @@ export { Card, CardHeader, CardTitle, CardContent }
 </file>
 
 <file path="src/context/GlobalStateContext.jsx">
+{/* Part 1 Start - Imports and Context Creation */}
 // src/context/GlobalStateContext.jsx
 import PropTypes from 'prop-types';
 import { createContext, useState, useContext } from 'react';
@@ -3939,15 +3177,19 @@ export const GlobalStateContext = createContext();
 
 // Custom hook for easier context usage
 export const useGlobalState = () => useContext(GlobalStateContext);
+{/* Part 1 End - Imports and Context Creation */}
 
+{/* Part 2 Start - GlobalStateProvider Component */}
 // Create provider
 export const GlobalStateProvider = ({ children }) => {
+  // ====== STATE DEFINITIONS ======
   const [phoneToEdit, setPhoneToEdit] = useState(null);
-  const [activeComponent, setActiveComponent] = useState('summary'); // Changed back to 'summary'
+  const [procurementToEdit, setProcurementToEdit] = useState(null);
+  const [activeComponent, setActiveComponent] = useState('summary');
   
+  // ====== PHONE EDITING FUNCTIONS ======
   // Function to set a phone for editing and switch to form
   const editPhone = (phone) => {
-    console.log("GlobalStateContext: Setting phone to edit", phone?.id);
     setPhoneToEdit(phone);
     setActiveComponent('form');
   };
@@ -3957,11 +3199,27 @@ export const GlobalStateProvider = ({ children }) => {
     setPhoneToEdit(null);
   };
   
+  // ====== PROCUREMENT EDITING FUNCTIONS ======
+  // Function to set a procurement for editing and switch to procurement form
+  const editProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setActiveComponent('procurement');
+  };
+  
+  // Function to clear the selected procurement
+  const clearProcurementToEdit = () => {
+    setProcurementToEdit(null);
+  };
+  
+  // ====== CONTEXT VALUE OBJECT ======
   // Create a value object with all the state and functions
   const contextValue = {
     phoneToEdit,
     editPhone,
     clearPhoneToEdit,
+    procurementToEdit,
+    editProcurement,
+    clearProcurementToEdit,
     activeComponent,
     setActiveComponent
   };
@@ -3977,9 +3235,12 @@ export const GlobalStateProvider = ({ children }) => {
 GlobalStateProvider.propTypes = {
   children: PropTypes.node.isRequired
 };
+{/* Part 2 End - GlobalStateProvider Component */}
 
+{/* Part 3 Start - Export Default Hook */}
 // Also provide a default export for the hook for backward compatibility
 export default useGlobalState;
+{/* Part 3 End - Export Default Hook */}
 </file>
 
 <file path="src/firebase/config.js">
@@ -4364,6 +3625,229 @@ export const createProcurement = async (procurementData, supplierId) => {
 };
 
 /**
+ * Update an existing procurement and maintain data consistency
+ * FINAL FIX: Pre-reads ledger entries before transaction to avoid query issues
+ * This function handles:
+ * - Updating the procurement document
+ * - Adjusting supplier outstanding balances
+ * - Updating corresponding ledger entries
+ * - Handling supplier changes
+ */
+export const updateProcurement = async (procurementId, updatedProcurementData, newSupplierId) => {
+  try {
+    // Validate inputs
+    if (!procurementId) {
+      throw new Error('Procurement ID is required');
+    }
+    
+    console.log('Starting updateProcurement:', { procurementId, newSupplierId });
+    
+    // =============================
+    // 🚨 PRE-READ LEDGER ENTRIES OUTSIDE TRANSACTION
+    // =============================
+    
+    // Get existing ledger entries BEFORE starting transaction
+    const ledgerQuery = query(
+      collection(db, 'supplier_ledger'),
+      where('procurementId', '==', procurementId),
+      where('entryType', '==', 'purchase')
+    );
+    const ledgerQuerySnap = await getDocs(ledgerQuery);
+    
+    console.log('Pre-read ledger entries:', ledgerQuerySnap.size);
+    
+    // Use transaction to ensure data consistency
+    const result = await runTransaction(db, async (transaction) => {
+      // =============================
+      // 🚨 TRANSACTION READS ONLY
+      // =============================
+      
+      console.log('Starting transaction - Reading documents...');
+      
+      // READ 1: Get the original procurement document
+      const procurementRef = doc(db, 'procurements', procurementId);
+      const procurementSnap = await transaction.get(procurementRef);
+      
+      if (!procurementSnap.exists()) {
+        throw new Error('Procurement not found');
+      }
+      
+      const originalProcurement = procurementSnap.data();
+      const originalSupplierId = originalProcurement.supplierId;
+      const originalGrandTotal = originalProcurement.grandTotal || 0;
+      const newGrandTotal = updatedProcurementData.grandTotal || 0;
+      const grandTotalDifference = newGrandTotal - originalGrandTotal;
+      
+      console.log('Procurement found:', { procurementId, originalSupplierId, originalGrandTotal, newGrandTotal });
+      
+      // READ 2: Get original supplier document
+      const originalSupplierRef = doc(db, 'suppliers', originalSupplierId);
+      const originalSupplierSnap = await transaction.get(originalSupplierRef);
+      
+      if (!originalSupplierSnap.exists()) {
+        throw new Error('Original supplier not found');
+      }
+      
+      const originalSupplierData = originalSupplierSnap.data();
+      console.log('Original supplier found:', originalSupplierData.supplierName);
+      
+      // READ 3: Get new supplier document (if supplier changed)
+      let newSupplierRef = null;
+      let newSupplierSnap = null;
+      let newSupplierData = null;
+      
+      if (newSupplierId && newSupplierId !== originalSupplierId) {
+        console.log('Supplier changed, reading new supplier...');
+        newSupplierRef = doc(db, 'suppliers', newSupplierId);
+        newSupplierSnap = await transaction.get(newSupplierRef);
+        
+        if (!newSupplierSnap.exists()) {
+          throw new Error('New supplier not found');
+        }
+        
+        newSupplierData = newSupplierSnap.data();
+        console.log('New supplier found:', newSupplierData.supplierName);
+      }
+      
+      // =============================
+      // 🚨 NOW ALL WRITES CAN HAPPEN
+      // =============================
+      
+      console.log('All reads completed. Starting writes...');
+      
+      // Handle supplier change scenario
+      if (newSupplierId && newSupplierId !== originalSupplierId) {
+        console.log('Supplier changed - handling supplier transfer');
+        
+        // Remove amount from original supplier's outstanding balance
+        const originalNewOutstanding = (originalSupplierData.totalOutstanding || 0) - originalGrandTotal;
+        transaction.update(originalSupplierRef, {
+          totalOutstanding: Math.max(0, originalNewOutstanding),
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Add amount to new supplier's outstanding balance
+        const newSupplierNewOutstanding = (newSupplierData.totalOutstanding || 0) + newGrandTotal;
+        transaction.update(newSupplierRef, {
+          totalOutstanding: newSupplierNewOutstanding,
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update the procurement with new supplier info
+        transaction.update(procurementRef, {
+          ...updatedProcurementData,
+          supplierId: newSupplierId,
+          supplierName: newSupplierData.supplierName,
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update original ledger entry to mark it as transferred (using pre-read data)
+        if (!ledgerQuerySnap.empty) {
+          const originalLedgerDoc = ledgerQuerySnap.docs.find(doc => 
+            doc.data().supplierId === originalSupplierId
+          );
+          
+          if (originalLedgerDoc) {
+            transaction.update(originalLedgerDoc.ref, {
+              description: `${originalLedgerDoc.data().description} - TRANSFERRED TO ${newSupplierData.supplierName}`,
+              amountDue: 0, // Zero out the amount since it's transferred
+              runningBalance: Math.max(0, originalNewOutstanding),
+              lastUpdated: Timestamp.now()
+            });
+          }
+        }
+        
+        // Create new ledger entry for new supplier
+        const newLedgerEntry = {
+          supplierId: newSupplierId,
+          supplierName: newSupplierData.supplierName,
+          procurementId: procurementId,
+          entryType: 'purchase',
+          purchaseDate: updatedProcurementData.purchaseDate,
+          entryDate: updatedProcurementData.purchaseDate,
+          reference: originalProcurement.reference || `EDIT-${procurementId.substring(0, 8)}`,
+          amountDue: newGrandTotal,
+          amountPaid: 0,
+          runningBalance: newSupplierNewOutstanding,
+          description: `Purchase order - ${updatedProcurementData.items.length} items (TRANSFERRED FROM ${originalSupplierData.supplierName})`,
+          sortOrder: 1,
+          dateCreated: Timestamp.now()
+        };
+        
+        const newLedgerDocRef = doc(collection(db, 'supplier_ledger'));
+        transaction.set(newLedgerDocRef, newLedgerEntry);
+        
+      } else {
+        // Same supplier - just update amounts
+        console.log('Same supplier - updating amounts');
+        
+        // Update supplier outstanding balance with the difference
+        const newOutstanding = (originalSupplierData.totalOutstanding || 0) + grandTotalDifference;
+        transaction.update(originalSupplierRef, {
+          totalOutstanding: Math.max(0, newOutstanding),
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update the procurement document
+        transaction.update(procurementRef, {
+          ...updatedProcurementData,
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update the corresponding ledger entry (using pre-read data)
+        if (!ledgerQuerySnap.empty) {
+          const ledgerDoc = ledgerQuerySnap.docs.find(doc => 
+            doc.data().supplierId === originalSupplierId
+          );
+          
+          if (ledgerDoc) {
+            const updatedDescription = `Purchase order - ${updatedProcurementData.items.length} items${grandTotalDifference !== 0 ? ' (EDITED)' : ''}`;
+            
+            transaction.update(ledgerDoc.ref, {
+              amountDue: newGrandTotal,
+              runningBalance: Math.max(0, newOutstanding),
+              description: updatedDescription,
+              purchaseDate: updatedProcurementData.purchaseDate,
+              entryDate: updatedProcurementData.purchaseDate,
+              lastUpdated: Timestamp.now()
+            });
+          }
+        }
+      }
+      
+      console.log('All writes completed successfully');
+      
+      return {
+        procurementId: procurementId,
+        originalGrandTotal,
+        newGrandTotal,
+        grandTotalDifference,
+        supplierChanged: newSupplierId && newSupplierId !== originalSupplierId
+      };
+    });
+    
+    console.log('Transaction completed successfully:', result);
+    
+    return {
+      success: true,
+      procurementId: result.procurementId,
+      originalGrandTotal: result.originalGrandTotal,
+      newGrandTotal: result.newGrandTotal,
+      grandTotalDifference: result.grandTotalDifference,
+      supplierChanged: result.supplierChanged,
+      message: 'Procurement updated successfully with proper balance adjustments'
+    };
+    
+  } catch (error) {
+    console.error('Error updating procurement:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
  * Update procurement payment status
  */
 export const updateProcurementPaymentStatus = async (procurementId, paymentData) => {
@@ -4663,6 +4147,7 @@ export default {
   
   // Procurement operations
   createProcurement,
+  updateProcurement, // NEW: Add the update function
   updateProcurementPaymentStatus,
   getProcurementsBySupplier,
   
@@ -4950,6 +4435,1422 @@ PhoneAdditionalInfo.propTypes = {
 };
 
 export default PhoneAdditionalInfo;
+</file>
+
+<file path="src/components/PhoneProcurementForm.jsx">
+{/* Part 1 Start - Imports, State, and Helper Functions */}
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { 
+  RefreshCw, 
+  Plus,
+  Minus,
+  ShoppingCart,
+  Trash2
+} from 'lucide-react';
+// Import supplier service
+import supplierService from '../services/supplierService';
+// Import global state for editing functionality
+import { useGlobalState } from '../context/GlobalStateContext';
+
+const PhoneProcurementForm = () => {
+  // ====== GLOBAL STATE FOR EDITING ======
+  const { procurementToEdit, clearProcurementToEdit } = useGlobalState();
+  
+  // ====== EDITING STATE ======
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  
+  // ====== STATE DEFINITIONS ======
+  // Table data for multiple phone models
+  const [procurementItems, setProcurementItems] = useState([]);
+  const [nextId, setNextId] = useState(1);
+  
+  // Current item being added
+  const [currentItem, setCurrentItem] = useState({
+    id: null,
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: '',
+    color: '',
+    quantity: 1,
+    dealersPrice: '',
+    retailPrice: '',
+    totalPrice: 0
+  });
+  
+  // Options from database
+  const [manufacturers, setManufacturers] = useState([]);
+  const [models, setModels] = useState([]);
+  const [rams, setRams] = useState([]);
+  const [storages, setStorages] = useState([]);
+  const [colors, setColors] = useState([]);
+  
+  // Supplier management
+  const [suppliers, setSuppliers] = useState([]); // Suppliers from Firebase
+  const [selectedSupplier, setSelectedSupplier] = useState(''); // Selected supplier ID
+  const [selectedSupplierData, setSelectedSupplierData] = useState(null); // Full supplier data
+  
+  // General procurement details
+  const [purchaseDate, setPurchaseDate] = useState('');
+  
+  // Payment and delivery status - Read-only values for new entries
+  const [datePaid] = useState(''); // Read-only, empty for new entries
+  const [dateDelivered] = useState(''); // Read-only, empty for new entries
+  const [paymentReference, setPaymentReference] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [accountPayable, setAccountPayable] = useState('');
+  
+  // UI state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCurrentItemValid, setIsCurrentItemValid] = useState(false);
+  
+  // State for tracking available colors for each item in the table
+  const [itemColorOptions, setItemColorOptions] = useState({});
+
+  // ====== HELPER FUNCTIONS ======
+  // Get current date in YYYY-MM-DD format for date input
+  const getCurrentDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = (today.getMonth() + 1).toString().padStart(2, '0');
+    const day = today.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Format number with commas
+  const formatNumberWithCommas = (value) => {
+    if (!value && value !== 0) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  // NEW: Format price with commas and two decimal places
+  const formatPrice = (value) => {
+    if (!value && value !== 0) return '';
+    const numValue = parseFloat(value.toString().replace(/,/g, ''));
+    if (isNaN(numValue)) return '';
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // NEW: Clean price value by removing commas and formatting characters
+  const cleanPriceValue = (value) => {
+    return value.replace(/[^\d.]/g, '');
+  };
+
+  // Validation function for price - UPDATED to work with formatted prices
+  const validatePrice = (value) => {
+    return cleanPriceValue(value);
+  };
+
+  // Format RAM/Storage with GB suffix
+  const formatWithGB = (value) => {
+    return value ? `${value}GB` : value;
+  };
+
+  // Calculate margin percentage
+  const calculateMargin = (dealersPrice, retailPrice) => {
+    const dealers = parseFloat(dealersPrice.replace(/,/g, '')) || 0;
+    const retail = parseFloat(retailPrice.replace(/,/g, '')) || 0;
+    
+    if (dealers === 0) return '0.00';
+    const margin = ((retail - dealers) / dealers) * 100;
+    return margin.toFixed(2);
+  };
+
+  // Calculate grand total
+  const calculateGrandTotal = () => {
+    return procurementItems.reduce((sum, item) => sum + item.totalPrice, 0);
+  };
+
+  // Reset current item to initial state
+  const resetCurrentItem = () => {
+    setCurrentItem({
+      id: null,
+      manufacturer: '',
+      model: '',
+      ram: '',
+      storage: '',
+      color: '',
+      quantity: 1,
+      dealersPrice: '',
+      retailPrice: '',
+      totalPrice: 0
+    });
+  };
+
+  // Reset to create mode function
+  const resetToCreateMode = () => {
+    clearProcurementToEdit();
+    resetForm();
+  };
+
+  // Reset form function - UPDATED to properly clear global state
+  const resetForm = () => {
+    setProcurementItems([]);
+    setNextId(1);
+    resetCurrentItem();
+    setPurchaseDate(getCurrentDate());
+    setSelectedSupplier('');
+    setSelectedSupplierData(null);
+    setBankName('');
+    setBankAccount('');
+    setAccountPayable('');
+    setPaymentReference('');
+    setIsSubmitting(false);
+    setIsEditing(false);
+    setEditingId(null);
+    // Clear global state to prevent persistence
+    clearProcurementToEdit();
+  };
+{/* Part 1 End - Imports, State, and Helper Functions */}
+
+{/* Part 2 Start - Data Fetching and useEffect Hooks with Suppliers */}
+  // Initialize purchase date to current date
+  useEffect(() => {
+    setPurchaseDate(getCurrentDate());
+  }, []);
+
+  // Handle editing mode when procurementToEdit changes
+  useEffect(() => {
+    if (procurementToEdit) {
+      setIsEditing(true);
+      setEditingId(procurementToEdit.id);
+      
+      // Populate form fields with existing procurement data
+      setPurchaseDate(procurementToEdit.purchaseDate || getCurrentDate());
+      setSelectedSupplier(procurementToEdit.supplierId || '');
+      setBankName(procurementToEdit.bankName || '');
+      setBankAccount(procurementToEdit.bankAccount || '');
+      setAccountPayable(procurementToEdit.accountPayable || '');
+      setPaymentReference(procurementToEdit.paymentReference || '');
+      
+      // Find and set supplier data
+      if (procurementToEdit.supplierId && suppliers.length > 0) {
+        const supplierData = suppliers.find(s => s.id === procurementToEdit.supplierId);
+        setSelectedSupplierData(supplierData || null);
+      }
+      
+      // Populate procurement items
+      if (procurementToEdit.items && Array.isArray(procurementToEdit.items)) {
+        const formattedItems = procurementToEdit.items.map((item, index) => ({
+          id: index + 1,
+          manufacturer: item.manufacturer || '',
+          model: item.model || '',
+          ram: item.ram || '',
+          storage: item.storage || '',
+          color: item.color || '',
+          quantity: item.quantity || 1,
+          dealersPrice: formatNumberWithCommas((item.dealersPrice || 0).toString()),
+          retailPrice: (item.retailPrice || 0).toString(),
+          totalPrice: item.totalPrice || (item.quantity * item.dealersPrice) || 0
+        }));
+        setProcurementItems(formattedItems);
+        setNextId(formattedItems.length + 1);
+      }
+    } else {
+      setIsEditing(false);
+      setEditingId(null);
+    }
+  }, [procurementToEdit, suppliers]);
+
+  // Fetch suppliers on component mount
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const supplierResult = await supplierService.getAllSuppliers();
+        if (supplierResult.success) {
+          setSuppliers(supplierResult.suppliers);
+        }
+      } catch (error) {
+        console.error("Error fetching suppliers:", error);
+      }
+    };
+
+    fetchSuppliers();
+  }, []);
+
+  // Fetch manufacturers
+  useEffect(() => {
+    const fetchManufacturers = async () => {
+      setLoading(true);
+      try {
+        const q = query(collection(db, 'phones'));
+        const querySnapshot = await getDocs(q);
+        const manufacturerSet = new Set();
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.manufacturer) {
+            manufacturerSet.add(data.manufacturer);
+          }
+        });
+        
+        setManufacturers(Array.from(manufacturerSet).sort());
+      } catch (error) {
+        console.error("Error fetching manufacturers:", error);
+        setError(`Error fetching manufacturers: ${error.message}`);
+      }
+      setLoading(false);
+    };
+
+    fetchManufacturers();
+  }, []);
+
+  // Fetch models
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (!currentItem.manufacturer) {
+        setModels([]);
+        return;
+      }
+      
+      try {
+        const q = query(
+          collection(db, 'phones'),
+          where('manufacturer', '==', currentItem.manufacturer)
+        );
+        const querySnapshot = await getDocs(q);
+        const modelSet = new Set();
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.model) {
+            modelSet.add(data.model);
+          }
+        });
+        
+        setModels(Array.from(modelSet).sort());
+      } catch (error) {
+        console.error("Error fetching models:", error);
+      }
+    };
+
+    fetchModels();
+  }, [currentItem.manufacturer]);
+
+  // Fetch RAM, Storage, Colors from arrays in the document
+  useEffect(() => {
+    const fetchOptions = async () => {
+      if (!currentItem.manufacturer || !currentItem.model) {
+        setRams([]);
+        setStorages([]);
+        setColors([]);
+        return;
+      }
+      
+      try {
+        const q = query(
+          collection(db, 'phones'),
+          where('manufacturer', '==', currentItem.manufacturer),
+          where('model', '==', currentItem.model)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const data = querySnapshot.docs[0].data();
+          
+          const ramArray = Array.isArray(data.storage_extra) ? data.storage_extra : [];
+          setRams(ramArray.sort());
+          
+          const storageArray = Array.isArray(data.storage) ? data.storage : [];
+          setStorages(storageArray.sort());
+          
+          const colorArray = Array.isArray(data.colors) ? data.colors : [];
+          setColors(colorArray.sort());
+        } else {
+          setRams([]);
+          setStorages([]);
+          setColors([]);
+        }
+      } catch (error) {
+        console.error("Error fetching options:", error);
+        setRams([]);
+        setStorages([]);
+        setColors([]);
+      }
+    };
+
+    fetchOptions();
+  }, [currentItem.manufacturer, currentItem.model]);
+
+  // Fetch pricing when complete configuration is selected
+  useEffect(() => {
+    const fetchPricing = async () => {
+      if (!currentItem.manufacturer || !currentItem.model || !currentItem.ram || !currentItem.storage || !currentItem.color) {
+        setCurrentItem(prev => ({
+          ...prev,
+          dealersPrice: '',
+          retailPrice: ''
+        }));
+        return;
+      }
+      
+      try {
+        const q = query(
+          collection(db, 'price_configurations'),
+          where('manufacturer', '==', currentItem.manufacturer),
+          where('model', '==', currentItem.model),
+          where('ram', '==', currentItem.ram),
+          where('storage', '==', currentItem.storage),
+          where('color', '==', currentItem.color)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const priceData = querySnapshot.docs[0].data();
+          setCurrentItem(prev => ({
+            ...prev,
+            dealersPrice: priceData.dealersPrice ? priceData.dealersPrice.toString() : '',
+            retailPrice: priceData.retailPrice ? priceData.retailPrice.toString() : ''
+          }));
+        } else {
+          setCurrentItem(prev => ({
+            ...prev,
+            dealersPrice: '',
+            retailPrice: ''
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching pricing:", error);
+        setCurrentItem(prev => ({
+          ...prev,
+          dealersPrice: '',
+          retailPrice: ''
+        }));
+      }
+    };
+
+    fetchPricing();
+  }, [currentItem.manufacturer, currentItem.model, currentItem.ram, currentItem.storage, currentItem.color]);
+
+  // Validate current item and calculate totals
+  useEffect(() => {
+    const isValid = 
+      currentItem.manufacturer &&
+      currentItem.model &&
+      currentItem.ram &&
+      currentItem.storage &&
+      currentItem.color &&
+      currentItem.quantity > 0 &&
+      currentItem.dealersPrice &&
+      parseFloat(currentItem.dealersPrice.replace(/,/g, '')) > 0;
+    
+    setIsCurrentItemValid(isValid);
+    
+    if (currentItem.dealersPrice && currentItem.quantity) {
+      const price = parseFloat(currentItem.dealersPrice.replace(/,/g, '')) || 0;
+      const total = price * currentItem.quantity;
+      
+      setCurrentItem(prev => ({
+        ...prev,
+        totalPrice: total
+      }));
+    }
+  }, [
+    currentItem.manufacturer,
+    currentItem.model,
+    currentItem.ram,
+    currentItem.storage,
+    currentItem.color,
+    currentItem.quantity,
+    currentItem.dealersPrice
+  ]);
+{/* Part 2 End - Data Fetching and useEffect Hooks with Suppliers */}
+
+{/* Part 3 Start - Event Handlers */}
+  // Handle purchase date change
+  const handlePurchaseDateChange = (e) => {
+    setPurchaseDate(e.target.value);
+  };
+
+  // Handle supplier selection - UPDATED: Auto-populate account payable from supplier's outstanding balance
+  const handleSupplierChange = (e) => {
+    const supplierId = e.target.value;
+    setSelectedSupplier(supplierId);
+    
+    if (supplierId) {
+      const supplierData = suppliers.find(s => s.id === supplierId);
+      setSelectedSupplierData(supplierData);
+      
+      // Auto-populate bank fields and account payable when supplier is selected
+      if (supplierData) {
+        setBankName(supplierData.bankName || '');
+        setBankAccount(supplierData.bankAccount || '');
+        
+        // NEW: Auto-populate account payable from supplier's outstanding balance
+        const outstandingBalance = supplierData.totalOutstanding || 0;
+        setAccountPayable(formatNumberWithCommas(outstandingBalance.toString()));
+      }
+    } else {
+      setSelectedSupplierData(null);
+      setBankName('');
+      setBankAccount('');
+      setAccountPayable(''); // Clear account payable when no supplier selected
+    }
+  };
+
+  // Handle current item field changes
+  const handleCurrentManufacturerChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      manufacturer: e.target.value,
+      model: '',
+      ram: '',
+      storage: '',
+      color: ''
+    }));
+  };
+
+  const handleCurrentModelChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      model: e.target.value,
+      ram: '',
+      storage: '',
+      color: ''
+    }));
+  };
+
+  const handleCurrentRamChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      ram: e.target.value,
+      storage: '',
+      color: ''
+    }));
+  };
+
+  const handleCurrentStorageChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      storage: e.target.value,
+      color: ''
+    }));
+  };
+
+  const handleCurrentColorChange = (e) => {
+    setCurrentItem(prev => ({
+      ...prev,
+      color: e.target.value
+    }));
+  };
+
+  const handleCurrentQuantityChange = (e) => {
+    const quantity = parseInt(e.target.value) || 1;
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: Math.max(1, quantity)
+    }));
+  };
+
+  const handleCurrentDealersPriceChange = (e) => {
+    const cleanValue = validatePrice(e.target.value);
+    setCurrentItem(prev => ({
+      ...prev,
+      dealersPrice: cleanValue
+    }));
+  };
+
+  const handleCurrentRetailPriceChange = (e) => {
+    const cleanValue = validatePrice(e.target.value);
+    setCurrentItem(prev => ({
+      ...prev,
+      retailPrice: cleanValue
+    }));
+  };
+
+  const handlePaymentReferenceChange = (e) => {
+    setPaymentReference(e.target.value);
+  };
+
+  const handleBankNameChange = (e) => {
+    setBankName(e.target.value);
+  };
+
+  const handleBankAccountChange = (e) => {
+    setBankAccount(e.target.value);
+  };
+
+  const handleAccountPayableChange = (e) => {
+    setAccountPayable(e.target.value);
+  };
+{/* Part 3 End - Event Handlers */}
+
+{/* Part 4 Start - Essential Functions */}
+  // Clear all items from procurement list
+  const clearAllItems = () => {
+    if (window.confirm('Are you sure you want to clear all items from the procurement list?')) {
+      setProcurementItems([]);
+      resetCurrentItem();
+    }
+  };
+
+  // Increment current item quantity
+  const incrementCurrentQuantity = () => {
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: prev.quantity + 1
+    }));
+  };
+
+  // Decrement current item quantity
+  const decrementCurrentQuantity = () => {
+    setCurrentItem(prev => ({
+      ...prev,
+      quantity: Math.max(1, prev.quantity - 1)
+    }));
+  };
+
+  // Increment table item quantity
+  const incrementTableQuantity = (itemId) => {
+    setProcurementItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId 
+          ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
+          : item
+      )
+    );
+  };
+
+  // Decrement table item quantity (remove if quantity becomes 0)
+  const decrementTableQuantity = (itemId) => {
+    setProcurementItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId 
+          ? item.quantity === 1 
+            ? null // Will be filtered out
+            : { ...item, quantity: item.quantity - 1, totalPrice: (item.quantity - 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
+          : item
+      ).filter(Boolean) // Remove null items
+    );
+  };
+
+  // Handle color change in table
+  const handleTableColorChange = (itemId, newColor) => {
+    setProcurementItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId 
+          ? { ...item, color: newColor }
+          : item
+      )
+    );
+  };
+
+  // Handle form key events
+  const handleKeyDown = (e) => {
+    // Allow form submission on Ctrl+Enter
+    if (e.ctrlKey && e.key === 'Enter') {
+      e.preventDefault();
+      if (procurementItems.length > 0 && purchaseDate && selectedSupplier) {
+        handleSubmit(e);
+      }
+    }
+  };
+
+  // Add item to procurement table
+  const addItemToTable = () => {
+    if (!isCurrentItemValid) return;
+    
+    const dealersPrice = parseFloat(currentItem.dealersPrice.replace(/,/g, '')) || 0;
+    const totalPrice = currentItem.quantity * dealersPrice;
+    
+    const newItem = {
+      id: nextId,
+      manufacturer: currentItem.manufacturer,
+      model: currentItem.model,
+      ram: currentItem.ram,
+      storage: currentItem.storage,
+      color: currentItem.color,
+      quantity: currentItem.quantity,
+      dealersPrice: formatNumberWithCommas(dealersPrice.toString()),
+      retailPrice: currentItem.retailPrice,
+      totalPrice: totalPrice
+    };
+    
+    // Store available colors for this item
+    setItemColorOptions(prev => ({
+      ...prev,
+      [nextId]: colors
+    }));
+    
+    setProcurementItems(prev => [...prev, newItem]);
+    setNextId(prev => prev + 1);
+    resetCurrentItem();
+  };
+{/* Part 4 End - Essential Functions */}
+
+{/* Part 5 Start - Form Submission with Edit and Create Support */}
+  // Handle form submission with supplier service for proper balance updates
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (procurementItems.length === 0) {
+      alert('Please add at least one phone model to the procurement list');
+      return;
+    }
+    
+    if (!purchaseDate) {
+      alert('Please enter the purchase date');
+      return;
+    }
+    
+    // Supplier validation - Required for saving
+    if (!selectedSupplier) {
+      alert('Please select a supplier before saving the procurement record');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const grandTotal = calculateGrandTotal();
+      
+      // Prepare procurement data
+      const procurementData = {
+        // Items array
+        items: procurementItems.map(item => ({
+          manufacturer: item.manufacturer,
+          model: item.model,
+          ram: item.ram,
+          storage: item.storage,
+          color: item.color,
+          quantity: item.quantity,
+          dealersPrice: parseFloat(item.dealersPrice.replace(/,/g, '')) || 0,
+          retailPrice: parseFloat(item.retailPrice.replace(/,/g, '')) || 0,
+          totalPrice: item.totalPrice
+        })),
+        
+        // Summary data
+        totalQuantity: procurementItems.reduce((sum, item) => sum + item.quantity, 0),
+        grandTotal: grandTotal,
+        
+        // Procurement details
+        purchaseDate: purchaseDate,
+        paymentStatus: 'pending',
+        deliveryStatus: 'pending',
+        paymentReference: paymentReference || '',
+        bankName: bankName || '',
+        bankAccount: bankAccount || '',
+        accountPayable: accountPayable || ''
+      };
+      
+      if (isEditing) {
+        // UPDATE EXISTING PROCUREMENT WITH PROPER BALANCE MANAGEMENT
+        console.log("Updating procurement with supplier service:", editingId, procurementData);
+        
+        const result = await supplierService.updateProcurement(
+          editingId, 
+          procurementData, 
+          selectedSupplier
+        );
+        
+        if (result.success) {
+          console.log("Procurement updated successfully:", result);
+          
+          // Clear editing state
+          clearProcurementToEdit();
+          
+          // Detailed success message
+          let message = `Procurement record updated successfully!\n\n`;
+          message += `Procurement ID: ${editingId}\n`;
+          message += `Supplier: ${selectedSupplierData?.supplierName}\n`;
+          message += `Total Items: ${procurementData.items.length}\n`;
+          message += `Total Quantity: ${procurementData.totalQuantity}\n`;
+          message += `Grand Total: ₱${formatPrice(grandTotal.toString())}\n`;
+          
+          if (result.supplierChanged) {
+            message += `\n🔄 Supplier was changed - balances updated accordingly`;
+          }
+          
+          if (result.grandTotalDifference !== 0) {
+            const diffType = result.grandTotalDifference > 0 ? 'increased' : 'decreased';
+            const diffAmount = Math.abs(result.grandTotalDifference);
+            message += `\n💰 Grand total ${diffType} by ₱${formatPrice(diffAmount.toString())}`;
+            message += `\n📊 Supplier balance updated automatically`;
+          }
+          
+          alert(message);
+          
+          // Reset form
+          resetForm();
+          
+        } else {
+          console.error("Error updating procurement:", result.error);
+          alert(`Error updating procurement: ${result.error}`);
+        }
+        
+      } else {
+        // CREATE NEW PROCUREMENT (existing logic)
+        console.log("Creating new procurement with supplier service:", procurementData);
+        
+        const result = await supplierService.createProcurement(procurementData, selectedSupplier);
+        
+        if (result.success) {
+          console.log("Procurement created successfully:", result);
+          
+          // Success message
+          alert(`Procurement record saved successfully!\n\nProcurement ID: ${result.procurementId}\nReference: ${result.reference}\nSupplier: ${selectedSupplierData?.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatPrice(grandTotal.toString())}`);
+          
+          // Reset form
+          resetForm();
+          
+        } else {
+          console.error("Error creating procurement:", result.error);
+          alert(`Error creating procurement: ${result.error}`);
+        }
+      }
+      
+    } catch (error) {
+      console.error("Error in handleSubmit:", error);
+      alert(`Error submitting form: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+{/* Part 5 End - Form Submission with Edit and Create Support */}
+
+{/* Part 6 Start - Loading States and Form Start */}
+  // Show loading state ONLY when actually loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <ShoppingCart className="h-6 w-6 mr-2" />
+              Phone Procurement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
+              <p className="mt-2 text-gray-600">Loading form data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <ShoppingCart className="h-6 w-6 mr-2" />
+              Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={() => {
+                setError(null);
+                window.location.reload();
+              }}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Main component render
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <form 
+        onSubmit={handleSubmit}
+        onKeyDown={handleKeyDown}
+      >
+        <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-2xl text-white flex items-center">
+                <ShoppingCart className="h-6 w-6 mr-2" />
+                {isEditing ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` : 'Phone Procurement'}
+              </CardTitle>
+              
+              {/* Cancel Edit Button */}
+              {(isEditing || procurementToEdit) && (
+                <button
+                  type="button"
+                  onClick={resetToCreateMode}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center text-sm"
+                  title="Cancel editing and return to create mode"
+                >
+                  ✕ Cancel Edit
+                </button>
+              )}
+            </div>
+          </CardHeader>
+
+          <CardContent className="bg-white p-4 space-y-6">
+{/* Part 6 End - Loading States and Form Start */}
+
+{/* Part 7 Start - Procurement Details Section */}
+            {/* Procurement Details Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Procurement Details</h3>
+              
+              {/* First Row: Purchase Date, Supplier, Bank Name, Bank Account, Account Payable */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Purchase Date */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Purchase Date:</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded text-sm h-10"
+                    value={purchaseDate}
+                    onChange={handlePurchaseDateChange}
+                    required
+                  />
+                </div>
+
+                {/* Supplier - Dropdown */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Supplier:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm h-10"
+                    value={selectedSupplier}
+                    onChange={handleSupplierChange}
+                    required
+                  >
+                    <option value="">-- Select Supplier --</option>
+                    {suppliers.map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.supplierName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Bank Name - DISABLED */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Name:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={bankName}
+                    onChange={handleBankNameChange}
+                    placeholder="Bank name"
+                    disabled={true}
+                  />
+                </div>
+
+                {/* Bank Account - DISABLED */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Bank Account:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={bankAccount}
+                    onChange={handleBankAccountChange}
+                    placeholder="Account number"
+                    disabled={true}
+                  />
+                </div>
+
+                {/* Account Payable - DISABLED */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Account Payable:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={accountPayable}
+                    onChange={handleAccountPayableChange}
+                    placeholder="Payable amount"
+                    disabled={true}
+                  />
+                </div>
+              </div>
+
+              {/* Second Row: Payment Status, Date Paid, Payment Reference, Delivery Status, Date Delivered */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Payment Status - Read-only */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Status:</label>
+                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
+                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
+                      Unpaid
+                    </span>
+                  </div>
+                </div>
+
+                {/* Date Paid */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Paid:</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    value={datePaid}
+                    disabled
+                  />
+                </div>
+
+                {/* Payment Reference - DISABLED */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    value={paymentReference}
+                    onChange={handlePaymentReferenceChange}
+                    placeholder="Receipt #"
+                    disabled={true}
+                  />
+                </div>
+
+                {/* Delivery Status - Read-only */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Delivery Status:</label>
+                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
+                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
+                      Pending
+                    </span>
+                  </div>
+                </div>
+
+                {/* Date Delivered */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Delivered:</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    value={dateDelivered}
+                    disabled
+                  />
+                </div>
+              </div>
+            </div>
+{/* Part 7 End - Procurement Details Section */}
+
+{/* Part 8 Start - Phone Selection Section */}
+            {/* Add Phone Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Add Phone Model</h3>
+              
+              {/* Phone Selection Row */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Manufacturer - REMOVED required */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Manufacturer:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.manufacturer}
+                    onChange={handleCurrentManufacturerChange}
+                  >
+                    <option value="">-- Select --</option>
+                    {manufacturers.map(manufacturer => (
+                      <option key={manufacturer} value={manufacturer}>
+                        {manufacturer}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Model - REMOVED required */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Model:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.model}
+                    onChange={handleCurrentModelChange}
+                    disabled={!currentItem.manufacturer}
+                  >
+                    <option value="">-- Select --</option>
+                    {models.map(model => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* RAM - REMOVED required */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">RAM:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.ram}
+                    onChange={handleCurrentRamChange}
+                    disabled={!currentItem.model}
+                  >
+                    <option value="">-- Select --</option>
+                    {rams.map(ram => (
+                      <option key={ram} value={ram}>
+                        {formatWithGB(ram)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Storage - REMOVED required */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Storage:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.storage}
+                    onChange={handleCurrentStorageChange}
+                    disabled={!currentItem.model}
+                  >
+                    <option value="">-- Select --</option>
+                    {storages.map(storage => (
+                      <option key={storage} value={storage}>
+                        {formatWithGB(storage)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Color - REMOVED required */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Color:</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm"
+                    value={currentItem.color}
+                    onChange={handleCurrentColorChange}
+                    disabled={!currentItem.ram || !currentItem.storage}
+                  >
+                    <option value="">-- Select --</option>
+                    {colors.map(color => (
+                      <option key={color} value={color}>
+                        {color}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Second Row: Quantity, Dealers Price, Retail Price, Total Price, Margin % + Action */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Quantity - REMOVED required */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Quantity:</label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={decrementCurrentQuantity}
+                      disabled={currentItem.quantity <= 1}
+                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <input 
+                      type="number" 
+                      className="w-32 p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={currentItem.quantity}
+                      onChange={handleCurrentQuantityChange}
+                      min="1"
+                    />
+                    <button
+                      type="button"
+                      onClick={incrementCurrentQuantity}
+                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dealers Price - UPDATED with formatted display */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Dealer&apos;s Price:</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
+                    <input 
+                      type="text" 
+                      className="w-full p-2 pl-6 border rounded text-sm"
+                      value={currentItem.dealersPrice ? formatPrice(currentItem.dealersPrice) : ''}
+                      onChange={handleCurrentDealersPriceChange}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                {/* Retail Price - UPDATED with formatted display */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Retail Price:</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
+                    <input 
+                      type="text" 
+                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                      value={currentItem.retailPrice ? formatPrice(currentItem.retailPrice) : ''}
+                      onChange={handleCurrentRetailPriceChange}
+                      placeholder="0.00"
+                      disabled={true}
+                    />
+                  </div>
+                </div>
+
+                {/* Total Price Display */}
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Total Price:</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
+                    <input 
+                      type="text" 
+                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                      value={currentItem.totalPrice ? formatPrice(currentItem.totalPrice.toString()) : '0.00'}
+                      disabled={true}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                {/* Margin + Add Button */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="w-20 space-y-2">
+                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Margin:</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 text-center"
+                        value={currentItem.dealersPrice && currentItem.retailPrice ? `${calculateMargin(currentItem.dealersPrice, currentItem.retailPrice)}%` : '0.00%'}
+                        disabled={true}
+                        readOnly
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Action:</label>
+                      <button
+                        type="button"
+                        onClick={addItemToTable}
+                        disabled={!isCurrentItemValid}
+                        className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+{/* Part 8 End - Phone Selection Section */}
+
+{/* Part 9 Start - Procurement Table */}
+            {/* Section Divider */}
+            <div className="border-t border-gray-300 my-6"></div>
+
+            {/* Procurement Table Section */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
+                  Procurement List ({procurementItems.length} items)
+                </h3>
+                {procurementItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllItems}
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              {procurementItems.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h4 className="text-lg font-medium text-gray-700 mb-2">No items in procurement list</h4>
+                  <p className="text-gray-500">Add phone models above to build your procurement list</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Manufacturer</th>
+                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Model</th>
+                        <th className="border px-3 py-2 text-left font-semibold w-[22%]">Configuration</th>
+                        <th className="border px-3 py-2 text-left font-semibold w-[10%]">Color</th>
+                        <th className="border px-3 py-2 text-center font-semibold w-[12%]">Qty</th>
+                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Unit Price</th>
+                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {procurementItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="border px-3 py-2">
+                            <div className="font-medium">{item.manufacturer}</div>
+                          </td>
+                          <td className="border px-3 py-2">
+                            <div className="text-gray-700">{item.model}</div>
+                          </td>
+                          <td className="border px-3 py-2">
+                            <div className="whitespace-nowrap">{formatWithGB(item.ram)} RAM / {formatWithGB(item.storage)} Storage</div>
+                          </td>
+                          <td className="border px-3 py-2">
+                            <select
+                              value={item.color}
+                              onChange={(e) => handleTableColorChange(item.id, e.target.value)}
+                              className="w-full p-1 border rounded text-xs bg-white"
+                              title="Change color"
+                            >
+                              {(itemColorOptions[item.id] || [item.color]).map(color => (
+                                <option key={color} value={color}>
+                                  {color}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="border px-3 py-2 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => decrementTableQuantity(item.id)}
+                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => incrementTableQuantity(item.id)}
+                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                title="Increase quantity"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="border px-3 py-2 text-right font-mono">
+                            ₱{formatPrice(item.dealersPrice)}
+                          </td>
+                          <td className="border px-3 py-2 text-right font-mono font-medium">
+                            ₱{formatPrice(item.totalPrice.toString())}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-blue-50 font-semibold">
+                        <td colSpan="4" className="border px-3 py-2 text-right">Total Items:</td>
+                        <td className="border px-3 py-2 text-center">
+                          {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
+                        </td>
+                        <td className="border px-3 py-2 text-right">Grand Total:</td>
+                        <td className="border px-3 py-2 text-right font-mono text-lg">
+                          ₱{formatPrice(calculateGrandTotal().toString())}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+{/* Part 9 End - Procurement Table */}
+
+{/* Part 10 Start - Summary and Submit Button */}
+            {/* Procurement Summary Section */}
+            {procurementItems.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Procurement Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Unique Models</p>
+                        <p className="text-xs text-gray-500">Different phone configurations</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-blue-600">
+                          {procurementItems.length}
+                        </p>
+                        <p className="text-xs text-gray-500">models</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Total Units</p>
+                        <p className="text-xs text-gray-500">Combined quantity ordered</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-green-600">
+                          {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
+                        </p>
+                        <p className="text-xs text-gray-500">units</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Grand Total</p>
+                        <p className="text-xs text-gray-500">Total procurement cost</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-purple-600">
+                          ₱{formatPrice(calculateGrandTotal().toString())}
+                        </p>
+                        <p className="text-xs text-gray-500">total cost</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button - UPDATED: Shows edit vs create mode */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={
+                  procurementItems.length === 0 || 
+                  isSubmitting || 
+                  !purchaseDate || 
+                  !selectedSupplier
+                }
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                    {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
+                  </>
+                )}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </div>
+  );
+};
+
+export default PhoneProcurementForm;
+{/* Part 10 End - Summary and Submit Button */}
 </file>
 
 <file path="src/components/PhoneSpecForm.jsx">
@@ -9354,6 +10255,7 @@ import InventorySummaryForm from './components/InventorySummaryForm';
 import PriceManagementForm from './components/PriceManagementForm';
 import PhoneProcurementForm from './components/PhoneProcurementForm';
 import SupplierManagementForm from './components/SupplierManagementForm'; // NEW: Added supplier management import
+import ProcurementManagementForm from './components/ProcurementManagementForm'; // NEW: Added procurement management import
 // Import the hook from our consolidated file
 import { useGlobalState } from './context/GlobalStateContext';
 
@@ -9395,6 +10297,12 @@ function App() {
             Phone Procurement
           </button>
           <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'procurementmgmt' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('procurementmgmt')}
+          >
+            Procurement Management
+          </button>
+          <button 
             className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
             onClick={() => setActiveComponent('suppliers')}
           >
@@ -9424,6 +10332,7 @@ function App() {
       {activeComponent === 'summary' && <InventorySummaryForm />}
       {activeComponent === 'selection' && <PhoneSelectionForm />}
       {activeComponent === 'procurement' && <PhoneProcurementForm />}
+      {activeComponent === 'procurementmgmt' && <ProcurementManagementForm />}
       {activeComponent === 'suppliers' && <SupplierManagementForm />}
       {activeComponent === 'form' && <PhoneSpecForm />}
       {activeComponent === 'inventory' && <InventoryListForm />}

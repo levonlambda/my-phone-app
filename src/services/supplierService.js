@@ -325,6 +325,229 @@ export const createProcurement = async (procurementData, supplierId) => {
 };
 
 /**
+ * Update an existing procurement and maintain data consistency
+ * FINAL FIX: Pre-reads ledger entries before transaction to avoid query issues
+ * This function handles:
+ * - Updating the procurement document
+ * - Adjusting supplier outstanding balances
+ * - Updating corresponding ledger entries
+ * - Handling supplier changes
+ */
+export const updateProcurement = async (procurementId, updatedProcurementData, newSupplierId) => {
+  try {
+    // Validate inputs
+    if (!procurementId) {
+      throw new Error('Procurement ID is required');
+    }
+    
+    console.log('Starting updateProcurement:', { procurementId, newSupplierId });
+    
+    // =============================
+    // 🚨 PRE-READ LEDGER ENTRIES OUTSIDE TRANSACTION
+    // =============================
+    
+    // Get existing ledger entries BEFORE starting transaction
+    const ledgerQuery = query(
+      collection(db, 'supplier_ledger'),
+      where('procurementId', '==', procurementId),
+      where('entryType', '==', 'purchase')
+    );
+    const ledgerQuerySnap = await getDocs(ledgerQuery);
+    
+    console.log('Pre-read ledger entries:', ledgerQuerySnap.size);
+    
+    // Use transaction to ensure data consistency
+    const result = await runTransaction(db, async (transaction) => {
+      // =============================
+      // 🚨 TRANSACTION READS ONLY
+      // =============================
+      
+      console.log('Starting transaction - Reading documents...');
+      
+      // READ 1: Get the original procurement document
+      const procurementRef = doc(db, 'procurements', procurementId);
+      const procurementSnap = await transaction.get(procurementRef);
+      
+      if (!procurementSnap.exists()) {
+        throw new Error('Procurement not found');
+      }
+      
+      const originalProcurement = procurementSnap.data();
+      const originalSupplierId = originalProcurement.supplierId;
+      const originalGrandTotal = originalProcurement.grandTotal || 0;
+      const newGrandTotal = updatedProcurementData.grandTotal || 0;
+      const grandTotalDifference = newGrandTotal - originalGrandTotal;
+      
+      console.log('Procurement found:', { procurementId, originalSupplierId, originalGrandTotal, newGrandTotal });
+      
+      // READ 2: Get original supplier document
+      const originalSupplierRef = doc(db, 'suppliers', originalSupplierId);
+      const originalSupplierSnap = await transaction.get(originalSupplierRef);
+      
+      if (!originalSupplierSnap.exists()) {
+        throw new Error('Original supplier not found');
+      }
+      
+      const originalSupplierData = originalSupplierSnap.data();
+      console.log('Original supplier found:', originalSupplierData.supplierName);
+      
+      // READ 3: Get new supplier document (if supplier changed)
+      let newSupplierRef = null;
+      let newSupplierSnap = null;
+      let newSupplierData = null;
+      
+      if (newSupplierId && newSupplierId !== originalSupplierId) {
+        console.log('Supplier changed, reading new supplier...');
+        newSupplierRef = doc(db, 'suppliers', newSupplierId);
+        newSupplierSnap = await transaction.get(newSupplierRef);
+        
+        if (!newSupplierSnap.exists()) {
+          throw new Error('New supplier not found');
+        }
+        
+        newSupplierData = newSupplierSnap.data();
+        console.log('New supplier found:', newSupplierData.supplierName);
+      }
+      
+      // =============================
+      // 🚨 NOW ALL WRITES CAN HAPPEN
+      // =============================
+      
+      console.log('All reads completed. Starting writes...');
+      
+      // Handle supplier change scenario
+      if (newSupplierId && newSupplierId !== originalSupplierId) {
+        console.log('Supplier changed - handling supplier transfer');
+        
+        // Remove amount from original supplier's outstanding balance
+        const originalNewOutstanding = (originalSupplierData.totalOutstanding || 0) - originalGrandTotal;
+        transaction.update(originalSupplierRef, {
+          totalOutstanding: Math.max(0, originalNewOutstanding),
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Add amount to new supplier's outstanding balance
+        const newSupplierNewOutstanding = (newSupplierData.totalOutstanding || 0) + newGrandTotal;
+        transaction.update(newSupplierRef, {
+          totalOutstanding: newSupplierNewOutstanding,
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update the procurement with new supplier info
+        transaction.update(procurementRef, {
+          ...updatedProcurementData,
+          supplierId: newSupplierId,
+          supplierName: newSupplierData.supplierName,
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update original ledger entry to mark it as transferred (using pre-read data)
+        if (!ledgerQuerySnap.empty) {
+          const originalLedgerDoc = ledgerQuerySnap.docs.find(doc => 
+            doc.data().supplierId === originalSupplierId
+          );
+          
+          if (originalLedgerDoc) {
+            transaction.update(originalLedgerDoc.ref, {
+              description: `${originalLedgerDoc.data().description} - TRANSFERRED TO ${newSupplierData.supplierName}`,
+              amountDue: 0, // Zero out the amount since it's transferred
+              runningBalance: Math.max(0, originalNewOutstanding),
+              lastUpdated: Timestamp.now()
+            });
+          }
+        }
+        
+        // Create new ledger entry for new supplier
+        const newLedgerEntry = {
+          supplierId: newSupplierId,
+          supplierName: newSupplierData.supplierName,
+          procurementId: procurementId,
+          entryType: 'purchase',
+          purchaseDate: updatedProcurementData.purchaseDate,
+          entryDate: updatedProcurementData.purchaseDate,
+          reference: originalProcurement.reference || `EDIT-${procurementId.substring(0, 8)}`,
+          amountDue: newGrandTotal,
+          amountPaid: 0,
+          runningBalance: newSupplierNewOutstanding,
+          description: `Purchase order - ${updatedProcurementData.items.length} items (TRANSFERRED FROM ${originalSupplierData.supplierName})`,
+          sortOrder: 1,
+          dateCreated: Timestamp.now()
+        };
+        
+        const newLedgerDocRef = doc(collection(db, 'supplier_ledger'));
+        transaction.set(newLedgerDocRef, newLedgerEntry);
+        
+      } else {
+        // Same supplier - just update amounts
+        console.log('Same supplier - updating amounts');
+        
+        // Update supplier outstanding balance with the difference
+        const newOutstanding = (originalSupplierData.totalOutstanding || 0) + grandTotalDifference;
+        transaction.update(originalSupplierRef, {
+          totalOutstanding: Math.max(0, newOutstanding),
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update the procurement document
+        transaction.update(procurementRef, {
+          ...updatedProcurementData,
+          lastUpdated: Timestamp.now()
+        });
+        
+        // Update the corresponding ledger entry (using pre-read data)
+        if (!ledgerQuerySnap.empty) {
+          const ledgerDoc = ledgerQuerySnap.docs.find(doc => 
+            doc.data().supplierId === originalSupplierId
+          );
+          
+          if (ledgerDoc) {
+            const updatedDescription = `Purchase order - ${updatedProcurementData.items.length} items${grandTotalDifference !== 0 ? ' (EDITED)' : ''}`;
+            
+            transaction.update(ledgerDoc.ref, {
+              amountDue: newGrandTotal,
+              runningBalance: Math.max(0, newOutstanding),
+              description: updatedDescription,
+              purchaseDate: updatedProcurementData.purchaseDate,
+              entryDate: updatedProcurementData.purchaseDate,
+              lastUpdated: Timestamp.now()
+            });
+          }
+        }
+      }
+      
+      console.log('All writes completed successfully');
+      
+      return {
+        procurementId: procurementId,
+        originalGrandTotal,
+        newGrandTotal,
+        grandTotalDifference,
+        supplierChanged: newSupplierId && newSupplierId !== originalSupplierId
+      };
+    });
+    
+    console.log('Transaction completed successfully:', result);
+    
+    return {
+      success: true,
+      procurementId: result.procurementId,
+      originalGrandTotal: result.originalGrandTotal,
+      newGrandTotal: result.newGrandTotal,
+      grandTotalDifference: result.grandTotalDifference,
+      supplierChanged: result.supplierChanged,
+      message: 'Procurement updated successfully with proper balance adjustments'
+    };
+    
+  } catch (error) {
+    console.error('Error updating procurement:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
  * Update procurement payment status
  */
 export const updateProcurementPaymentStatus = async (procurementId, paymentData) => {
@@ -624,6 +847,7 @@ export default {
   
   // Procurement operations
   createProcurement,
+  updateProcurement, // NEW: Add the update function
   updateProcurementPaymentStatus,
   getProcurementsBySupplier,
   

@@ -12,8 +12,17 @@ import {
 } from 'lucide-react';
 // Import supplier service
 import supplierService from '../services/supplierService';
+// Import global state for editing functionality
+import { useGlobalState } from '../context/GlobalStateContext';
 
 const PhoneProcurementForm = () => {
+  // ====== GLOBAL STATE FOR EDITING ======
+  const { procurementToEdit, clearProcurementToEdit } = useGlobalState();
+  
+  // ====== EDITING STATE ======
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  
   // ====== STATE DEFINITIONS ======
   // Table data for multiple phone models
   const [procurementItems, setProcurementItems] = useState([]);
@@ -137,6 +146,31 @@ const PhoneProcurementForm = () => {
       totalPrice: 0
     });
   };
+
+  // Reset to create mode function
+  const resetToCreateMode = () => {
+    clearProcurementToEdit();
+    resetForm();
+  };
+
+  // Reset form function - UPDATED to properly clear global state
+  const resetForm = () => {
+    setProcurementItems([]);
+    setNextId(1);
+    resetCurrentItem();
+    setPurchaseDate(getCurrentDate());
+    setSelectedSupplier('');
+    setSelectedSupplierData(null);
+    setBankName('');
+    setBankAccount('');
+    setAccountPayable('');
+    setPaymentReference('');
+    setIsSubmitting(false);
+    setIsEditing(false);
+    setEditingId(null);
+    // Clear global state to prevent persistence
+    clearProcurementToEdit();
+  };
 {/* Part 1 End - Imports, State, and Helper Functions */}
 
 {/* Part 2 Start - Data Fetching and useEffect Hooks with Suppliers */}
@@ -144,6 +178,49 @@ const PhoneProcurementForm = () => {
   useEffect(() => {
     setPurchaseDate(getCurrentDate());
   }, []);
+
+  // Handle editing mode when procurementToEdit changes
+  useEffect(() => {
+    if (procurementToEdit) {
+      setIsEditing(true);
+      setEditingId(procurementToEdit.id);
+      
+      // Populate form fields with existing procurement data
+      setPurchaseDate(procurementToEdit.purchaseDate || getCurrentDate());
+      setSelectedSupplier(procurementToEdit.supplierId || '');
+      setBankName(procurementToEdit.bankName || '');
+      setBankAccount(procurementToEdit.bankAccount || '');
+      setAccountPayable(procurementToEdit.accountPayable || '');
+      setPaymentReference(procurementToEdit.paymentReference || '');
+      
+      // Find and set supplier data
+      if (procurementToEdit.supplierId && suppliers.length > 0) {
+        const supplierData = suppliers.find(s => s.id === procurementToEdit.supplierId);
+        setSelectedSupplierData(supplierData || null);
+      }
+      
+      // Populate procurement items
+      if (procurementToEdit.items && Array.isArray(procurementToEdit.items)) {
+        const formattedItems = procurementToEdit.items.map((item, index) => ({
+          id: index + 1,
+          manufacturer: item.manufacturer || '',
+          model: item.model || '',
+          ram: item.ram || '',
+          storage: item.storage || '',
+          color: item.color || '',
+          quantity: item.quantity || 1,
+          dealersPrice: formatNumberWithCommas((item.dealersPrice || 0).toString()),
+          retailPrice: (item.retailPrice || 0).toString(),
+          totalPrice: item.totalPrice || (item.quantity * item.dealersPrice) || 0
+        }));
+        setProcurementItems(formattedItems);
+        setNextId(formattedItems.length + 1);
+      }
+    } else {
+      setIsEditing(false);
+      setEditingId(null);
+    }
+  }, [procurementToEdit, suppliers]);
 
   // Fetch suppliers on component mount
   useEffect(() => {
@@ -265,11 +342,10 @@ const PhoneProcurementForm = () => {
     fetchOptions();
   }, [currentItem.manufacturer, currentItem.model]);
 
-  // NEW: Fetch pricing when complete configuration is selected
+  // Fetch pricing when complete configuration is selected
   useEffect(() => {
     const fetchPricing = async () => {
       if (!currentItem.manufacturer || !currentItem.model || !currentItem.ram || !currentItem.storage || !currentItem.color) {
-        // Clear pricing if configuration is incomplete
         setCurrentItem(prev => ({
           ...prev,
           dealersPrice: '',
@@ -291,16 +367,12 @@ const PhoneProcurementForm = () => {
         
         if (!querySnapshot.empty) {
           const priceData = querySnapshot.docs[0].data();
-          console.log("Found pricing data:", priceData);
-          
           setCurrentItem(prev => ({
             ...prev,
             dealersPrice: priceData.dealersPrice ? priceData.dealersPrice.toString() : '',
             retailPrice: priceData.retailPrice ? priceData.retailPrice.toString() : ''
           }));
         } else {
-          console.log("No pricing found for configuration");
-          // Clear pricing if no configuration found
           setCurrentItem(prev => ({
             ...prev,
             dealersPrice: '',
@@ -576,8 +648,8 @@ const PhoneProcurementForm = () => {
   };
 {/* Part 4 End - Essential Functions */}
 
-{/* Part 5 Start - Form Submission with Supplier Service Integration */}
-  // Handle form submission using supplier service for proper balance updates
+{/* Part 5 Start - Form Submission with Edit and Create Support */}
+  // Handle form submission with supplier service for proper balance updates
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -603,7 +675,7 @@ const PhoneProcurementForm = () => {
     try {
       const grandTotal = calculateGrandTotal();
       
-      // Prepare procurement data for supplier service
+      // Prepare procurement data
       const procurementData = {
         // Items array
         items: procurementItems.map(item => ({
@@ -632,43 +704,80 @@ const PhoneProcurementForm = () => {
         accountPayable: accountPayable || ''
       };
       
-      console.log("Submitting procurement data to supplier service:", procurementData);
-      
-      // USE SUPPLIER SERVICE - This will update supplier balance and create ledger entries
-      const result = await supplierService.createProcurement(procurementData, selectedSupplier);
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create procurement');
+      if (isEditing) {
+        // UPDATE EXISTING PROCUREMENT WITH PROPER BALANCE MANAGEMENT
+        console.log("Updating procurement with supplier service:", editingId, procurementData);
+        
+        const result = await supplierService.updateProcurement(
+          editingId, 
+          procurementData, 
+          selectedSupplier
+        );
+        
+        if (result.success) {
+          console.log("Procurement updated successfully:", result);
+          
+          // Clear editing state
+          clearProcurementToEdit();
+          
+          // Detailed success message
+          let message = `Procurement record updated successfully!\n\n`;
+          message += `Procurement ID: ${editingId}\n`;
+          message += `Supplier: ${selectedSupplierData?.supplierName}\n`;
+          message += `Total Items: ${procurementData.items.length}\n`;
+          message += `Total Quantity: ${procurementData.totalQuantity}\n`;
+          message += `Grand Total: ₱${formatPrice(grandTotal.toString())}\n`;
+          
+          if (result.supplierChanged) {
+            message += `\n🔄 Supplier was changed - balances updated accordingly`;
+          }
+          
+          if (result.grandTotalDifference !== 0) {
+            const diffType = result.grandTotalDifference > 0 ? 'increased' : 'decreased';
+            const diffAmount = Math.abs(result.grandTotalDifference);
+            message += `\n💰 Grand total ${diffType} by ₱${formatPrice(diffAmount.toString())}`;
+            message += `\n📊 Supplier balance updated automatically`;
+          }
+          
+          alert(message);
+          
+          // Reset form
+          resetForm();
+          
+        } else {
+          console.error("Error updating procurement:", result.error);
+          alert(`Error updating procurement: ${result.error}`);
+        }
+        
+      } else {
+        // CREATE NEW PROCUREMENT (existing logic)
+        console.log("Creating new procurement with supplier service:", procurementData);
+        
+        const result = await supplierService.createProcurement(procurementData, selectedSupplier);
+        
+        if (result.success) {
+          console.log("Procurement created successfully:", result);
+          
+          // Success message
+          alert(`Procurement record saved successfully!\n\nProcurement ID: ${result.procurementId}\nReference: ${result.reference}\nSupplier: ${selectedSupplierData?.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatPrice(grandTotal.toString())}`);
+          
+          // Reset form
+          resetForm();
+          
+        } else {
+          console.error("Error creating procurement:", result.error);
+          alert(`Error creating procurement: ${result.error}`);
+        }
       }
       
-      console.log("Procurement created successfully:", result);
-      
-      // Reset form after successful submission
-      setProcurementItems([]);
-      resetCurrentItem();
-      setPurchaseDate(getCurrentDate());
-      setSelectedSupplier('');
-      setSelectedSupplierData(null);
-      setBankName('');
-      setBankAccount('');
-      setAccountPayable('');
-      setPaymentReference('');
-      
-      setIsSubmitting(false);
-      
-      // Success message with procurement details
-      alert(`Procurement record saved successfully!\n\nProcurement ID: ${result.procurementId}\nReference: ${result.reference}\nSupplier: ${selectedSupplierData?.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatPrice(grandTotal.toString())}\n\nSupplier outstanding balance has been updated.`);
-      
     } catch (error) {
-      console.error("Error saving procurement:", error);
-      setError(`Error saving procurement: ${error.message}`);
+      console.error("Error in handleSubmit:", error);
+      alert(`Error submitting form: ${error.message}`);
+    } finally {
       setIsSubmitting(false);
-      
-      // Show user-friendly error message
-      alert(`Error saving procurement record: ${error.message}\n\nPlease check your internet connection and try again.`);
     }
   };
-{/* Part 5 End - Form Submission with Supplier Service Integration */}
+{/* Part 5 End - Form Submission with Edit and Create Support */}
 
 {/* Part 6 Start - Loading States and Form Start */}
   // Show loading state ONLY when actually loading
@@ -731,10 +840,24 @@ const PhoneProcurementForm = () => {
       >
         <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
           <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white flex items-center">
-              <ShoppingCart className="h-6 w-6 mr-2" />
-              Phone Procurement
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-2xl text-white flex items-center">
+                <ShoppingCart className="h-6 w-6 mr-2" />
+                {isEditing ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` : 'Phone Procurement'}
+              </CardTitle>
+              
+              {/* Cancel Edit Button */}
+              {(isEditing || procurementToEdit) && (
+                <button
+                  type="button"
+                  onClick={resetToCreateMode}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center text-sm"
+                  title="Cancel editing and return to create mode"
+                >
+                  ✕ Cancel Edit
+                </button>
+              )}
+            </div>
           </CardHeader>
 
           <CardContent className="bg-white p-4 space-y-6">
@@ -1254,7 +1377,7 @@ const PhoneProcurementForm = () => {
               </div>
             )}
 
-            {/* Submit Button - UPDATED: Simplified validation */}
+            {/* Submit Button - UPDATED: Shows edit vs create mode */}
             <div className="pt-4">
               <button
                 type="submit"
@@ -1269,12 +1392,12 @@ const PhoneProcurementForm = () => {
                 {isSubmitting ? (
                   <>
                     <RefreshCw className="animate-spin h-5 w-5 mr-2" />
-                    Saving Procurement...
+                    {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
                   </>
                 ) : (
                   <>
                     <ShoppingCart className="h-5 w-5 mr-2" />
-                    Save Procurement Record ({procurementItems.length} items)
+                    {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
                   </>
                 )}
               </button>
