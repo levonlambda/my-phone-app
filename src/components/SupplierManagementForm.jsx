@@ -11,7 +11,13 @@ import {
   XCircle,
   Search,
   FileText,
-  Calculator
+  Calculator,
+  Eye,
+  Building2,
+  CreditCard,
+  DollarSign,
+  StickyNote,
+  Settings
 } from 'lucide-react';
 // Import the supplier service
 import supplierService from '../services/supplierService';
@@ -328,6 +334,20 @@ const SupplierManagementForm = () => {
     }
   };
 
+  // Handle direct ledger view from supplier actions - NEW
+  const handleViewLedger = (supplier) => {
+    // Switch to ledger tab
+    setActiveTab('ledger');
+    // Select the supplier and load their ledger
+    setSelectedSupplierId(supplier.id);
+    setSelectedSupplierForLedger(supplier);
+    // Clear any existing messages
+    setError('');
+    setSuccessMessage('');
+    // Fetch the ledger data
+    fetchSupplierLedger(supplier.id);
+  };
+
   // Handle tab changes
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -349,7 +369,7 @@ const SupplierManagementForm = () => {
 {/* Part 4 Start - Main Component Structure and Header */}
   return (
     <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
         <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <Building className="h-6 w-6 text-white" />
@@ -459,11 +479,11 @@ const SupplierManagementForm = () => {
                           placeholder="Auto-calculated from procurements"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          {isEditing ? 'Updated automatically from procurement entries' : 'Will be calculated from future procurements'}
+                          {isEditing ? 'This balance is calculated from active procurements and payments' : 'Balance will be calculated from procurements'}
                         </p>
                       </div>
-                      
-                      {/* Bank Name - Position 3 (MOVED DOWN) */}
+
+                      {/* Bank Name - Position 3 */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Bank Name *
@@ -478,8 +498,8 @@ const SupplierManagementForm = () => {
                           disabled={submitLoading}
                         />
                       </div>
-                      
-                      {/* Bank Account - Position 4 (MOVED DOWN) */}
+
+                      {/* Bank Account - Position 4 */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Bank Account *
@@ -495,7 +515,8 @@ const SupplierManagementForm = () => {
                         />
                       </div>
                     </div>
-                    
+
+                    {/* Notes - Full Width */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Notes
@@ -504,18 +525,17 @@ const SupplierManagementForm = () => {
                         name="notes"
                         value={currentSupplier.notes}
                         onChange={handleInputChange}
-                        className="w-full p-2 border rounded"
-                        rows={3}
-                        placeholder="Optional notes about this supplier..."
+                        className="w-full p-2 border rounded h-20"
                         disabled={submitLoading}
+                        placeholder="Additional notes about this supplier..."
                       />
                     </div>
-                    
-                    <div className="flex gap-3">
+
+                    <div className="flex gap-2">
                       <button
                         type="submit"
                         disabled={submitLoading}
-                        className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center disabled:opacity-50"
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center disabled:opacity-50"
                       >
                         <Save className="h-4 w-4 mr-2" />
                         {submitLoading ? 'Saving...' : (isEditing ? 'Update Supplier' : 'Add Supplier')}
@@ -549,115 +569,211 @@ const SupplierManagementForm = () => {
                     <p>No suppliers found. Add your first supplier to get started.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Supplier</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Bank Details</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Outstanding Balance</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Notes</th>
-                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {suppliers.map((supplier) => (
-                          <tr key={supplier.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900">{supplier.supplierName}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="text-sm text-gray-900">{supplier.bankName}</div>
-                              <div className="text-sm text-gray-500">{supplier.bankAccount}</div>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="font-mono text-sm">
-                                ₱{formatNumberWithCommas((supplier.totalOutstanding || 0).toString())}
+                  <>
+                    <div className="overflow-x-auto border rounded-lg">
+                      <table className="w-full border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border px-3 py-3 text-left font-semibold">
+                              <div className="flex items-center">
+                                <Building2 className="h-4 w-4 mr-2" />
+                                Supplier
                               </div>
-                              {supplier.totalOutstanding > 0 && (
-                                <div className="text-xs text-red-600">Outstanding</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="text-sm text-gray-500 max-w-xs truncate">
-                                {supplier.notes || 'No notes'}
+                            </th>
+                            <th className="border px-3 py-3 text-left font-semibold">
+                              <div className="flex items-center">
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Bank Details
                               </div>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <div className="flex justify-center gap-2">
-                                <button 
-                                  onClick={() => handleEdit(supplier)}
-                                  disabled={loading}
-                                  className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                  title="Edit supplier"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </button>
-                                <button 
-                                  onClick={() => handleDelete(supplier.id)}
-                                  disabled={loading}
-                                  className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50"
-                                  title="Delete supplier"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                            </th>
+                            <th className="border px-3 py-3 text-right font-semibold w-48">
+                              <div className="flex items-center justify-end">
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                Balance
                               </div>
-                            </td>
+                            </th>
+                            <th className="border px-3 py-3 text-left font-semibold">
+                              <div className="flex items-center">
+                                <StickyNote className="h-4 w-4 mr-2" />
+                                Notes
+                              </div>
+                            </th>
+                            <th className="border px-3 py-3 text-center font-semibold w-32">
+                              <div className="flex items-center justify-center">
+                                <Settings className="h-4 w-4 mr-2" />
+                                Actions
+                              </div>
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {suppliers.map((supplier) => (
+                            <tr key={supplier.id} className="hover:bg-gray-50">
+                              <td className="border px-3 py-3">
+                                <div className="font-medium text-gray-900">{supplier.supplierName}</div>
+                              </td>
+                              <td className="border px-3 py-3">
+                                <div className="font-medium text-gray-900">{supplier.bankName}</div>
+                                <div className="text-xs text-gray-500 mt-1">{supplier.bankAccount}</div>
+                              </td>
+                              <td className="border px-3 py-3 text-right font-mono w-48">
+                                <span className="font-semibold text-lg">
+                                  ₱{((supplier.totalOutstanding || 0).toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                  }))}
+                                </span>
+                              </td>
+                              <td className="border px-3 py-3">
+                                <div className="text-sm text-gray-500 max-w-xs truncate">
+                                  {supplier.notes || 'No notes'}
+                                </div>
+                              </td>
+                              <td className="border px-3 py-3 w-32">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button 
+                                    onClick={() => handleViewLedger(supplier)}
+                                    disabled={loading}
+                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded disabled:opacity-50"
+                                    title="View ledger"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleEdit(supplier)}
+                                    disabled={loading}
+                                    className="p-1 text-green-600 hover:bg-green-100 rounded disabled:opacity-50"
+                                    title="Edit supplier"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDelete(supplier.id)}
+                                    disabled={loading}
+                                    className="p-1 text-red-600 hover:bg-red-100 rounded disabled:opacity-50"
+                                    title="Delete supplier"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
+
+              {/* Summary Statistics - Matching ProcurementManagementForm Style */}
+              {suppliers.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <Building2 className="h-8 w-8 text-blue-600 mr-3" />
+                      <div>
+                        <p className="text-sm text-gray-600">Total Suppliers</p>
+                        <p className="text-xl font-bold text-blue-600">{suppliers.length}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <DollarSign className="h-8 w-8 text-green-600 mr-3" />
+                      <div>
+                        <p className="text-sm text-gray-600">Suppliers with Balance</p>
+                        <p className="text-xl font-bold text-green-600">
+                          {suppliers.filter(s => (s.totalOutstanding || 0) > 0).length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <CreditCard className="h-8 w-8 text-red-600 mr-3" />
+                      <div>
+                        <p className="text-sm text-gray-600">Total Balance</p>
+                        <p className="text-xl font-bold text-red-600 font-mono">
+                          ₱{(suppliers.reduce((total, supplier) => total + (supplier.totalOutstanding || 0), 0).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          }))}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 {/* Part 5 End - Suppliers Tab Content with Outstanding Balance Display */}
 
-{/* Part 6 Start - Ledger Tab and Component Export */}
+{/* Part 6 Start - Ledger Tab and Component Export - FIXED */}
           {/* Ledger Tab */}
           {activeTab === 'ledger' && (
             <div className="space-y-6">
-              {/* Supplier Selection */}
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <h3 className="font-semibold text-lg text-[rgb(52,69,157)] mb-4">Supplier Ledger</h3>
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex-1 min-w-[300px]">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Select Supplier
+              {/* Supplier Selection for Ledger */}
+              <div className="bg-white border rounded-lg p-4">
+                <div className="flex items-end gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Supplier for Ledger View
                     </label>
                     <select
                       value={selectedSupplierId || ''}
                       onChange={(e) => handleSupplierLedgerSelection(e.target.value)}
-                      className="w-full p-2 border rounded"
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       disabled={loading}
                     >
                       <option value="">Choose a supplier...</option>
                       {suppliers.map((supplier) => (
                         <option key={supplier.id} value={supplier.id}>
-                          {supplier.supplierName} (₱{formatNumberWithCommas((supplier.totalOutstanding || 0).toString())} outstanding)
+                          {supplier.supplierName}
                         </option>
                       ))}
                     </select>
                   </div>
                   
                   {selectedSupplierId && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => recalculateBalance(selectedSupplierId)}
-                        disabled={loading}
-                        className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 flex items-center gap-2 disabled:opacity-50"
-                        title="Recalculate running balances"
-                      >
-                        <Calculator className="h-4 w-4" />
-                        Recalculate Balance
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => recalculateBalance(selectedSupplierId)}
+                      disabled={loading}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 h-[42px]"
+                      title="Recalculate balance from all transactions"
+                    >
+                      <Calculator className="h-4 w-4" />
+                      Recalculate
+                    </button>
                   )}
                 </div>
               </div>
 
-              {/* Ledger Summary */}
+              {/* Loading indicator */}
+              {loading && (
+                <div className="flex justify-center items-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600">Loading ledger...</span>
+                </div>
+              )}
+
+              {/* Error message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-800">{error}</p>
+                </div>
+              )}
+
+              {/* Success message */}
+              {successMessage && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-green-800">{successMessage}</p>
+                </div>
+              )}
+
+              {/* Ledger Summary - FIXED PROPERTY NAMES */}
               {selectedSupplierForLedger && ledgerSummary && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -668,7 +784,7 @@ const SupplierManagementForm = () => {
                       <div className="text-center">
                         <p className="text-sm text-gray-600 font-medium">Total Purchases</p>
                         <p className="text-xl font-bold text-blue-600">
-                          ₱{formatNumberWithCommas(ledgerSummary.totalPurchases.toString())}
+                          ₱{formatNumberWithCommas(ledgerSummary.totalDue.toString())}
                         </p>
                       </div>
                     </div>
@@ -695,11 +811,23 @@ const SupplierManagementForm = () => {
                       <div className="text-center">
                         <p className="text-sm text-gray-600 font-medium">Last Activity</p>
                         <p className="text-sm font-bold text-gray-600">
-                          {ledgerSummary.lastPurchaseDate || ledgerSummary.lastPaymentDate ? 
-                            (ledgerSummary.lastPurchaseDate > ledgerSummary.lastPaymentDate ? 
-                              `Purchase: ${ledgerSummary.lastPurchaseDate}` : 
-                              `Payment: ${ledgerSummary.lastPaymentDate}`) 
-                            : 'No activity'}
+                          {(() => {
+                            const hasLastPurchase = ledgerSummary.lastPurchaseDate && ledgerSummary.lastPurchaseDate !== 'null';
+                            const hasLastPayment = ledgerSummary.lastPaymentDate && ledgerSummary.lastPaymentDate !== 'null';
+                            
+                            if (!hasLastPurchase && !hasLastPayment) {
+                              return 'No activity';
+                            } else if (hasLastPurchase && !hasLastPayment) {
+                              return `Purchase: ${ledgerSummary.lastPurchaseDate}`;
+                            } else if (!hasLastPurchase && hasLastPayment) {
+                              return `Payment: ${ledgerSummary.lastPaymentDate}`;
+                            } else {
+                              // Both exist, show the most recent one
+                              return ledgerSummary.lastPurchaseDate > ledgerSummary.lastPaymentDate ? 
+                                `Purchase: ${ledgerSummary.lastPurchaseDate}` : 
+                                `Payment: ${ledgerSummary.lastPaymentDate}`;
+                            }
+                          })()}
                         </p>
                       </div>
                     </div>
@@ -741,38 +869,31 @@ const SupplierManagementForm = () => {
                           {ledgerEntries.map((entry) => (
                             <tr key={entry.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-sm text-gray-900">
-                                {entry.displayDate}
+                                {entry.entryDate}
                               </td>
-                              <td className="px-4 py-3 text-sm">
-                                <span className="font-mono text-blue-600">{entry.reference}</span>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                {entry.reference}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-700">
-                                <div className="flex items-center gap-2">
-                                  {entry.entryType === 'purchase' && (
-                                    <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
-                                  )}
-                                  {entry.entryType === 'payment' && (
-                                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
-                                  )}
-                                  {entry.description}
-                                </div>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                {entry.description}
                               </td>
-                              <td className="px-4 py-3 text-right text-sm font-mono">
-                                {entry.entryType === 'purchase' && entry.amountDue > 0 && (
-                                  <span className="text-red-600">
+                              <td className="px-4 py-3 text-sm text-right">
+                                {entry.amountDue > 0 && (
+                                  <span className="text-red-600 font-medium">
                                     ₱{formatNumberWithCommas(entry.amountDue.toString())}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-right text-sm font-mono">
-                                {entry.entryType === 'payment' && entry.amountPaid > 0 && (
-                                  <span className="text-green-600">
+                              <td className="px-4 py-3 text-sm text-right">
+                                {entry.amountPaid > 0 && (
+                                  <span className="text-green-600 font-medium">
                                     ₱{formatNumberWithCommas(entry.amountPaid.toString())}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-right text-sm font-mono font-medium">
-                                <span className={entry.runningBalance > 0 ? 'text-red-600' : 'text-green-600'}>
+                              <td className="px-4 py-3 text-sm text-right font-medium">
+                                <span className={entry.runningBalance > 0 ? 
+                                  'text-red-600' : 'text-green-600'}>
                                   ₱{formatNumberWithCommas(entry.runningBalance.toString())}
                                 </span>
                               </td>
@@ -798,4 +919,4 @@ const SupplierManagementForm = () => {
 };
 
 export default SupplierManagementForm;
-{/* Part 6 End - Ledger Tab and Component Export */}
+{/* Part 6 End - Ledger Tab and Component Export - FIXED */}

@@ -17,7 +17,7 @@ import { useGlobalState } from '../context/GlobalStateContext';
 
 const PhoneProcurementForm = () => {
   // ====== GLOBAL STATE FOR EDITING ======
-  const { procurementToEdit, clearProcurementToEdit } = useGlobalState();
+  const { procurementToEdit, clearProcurementToEdit, isViewingProcurement } = useGlobalState(); // NEW: Add isViewingProcurement
   
   // ====== EDITING STATE ======
   const [isEditing, setIsEditing] = useState(false);
@@ -816,10 +816,7 @@ const PhoneProcurementForm = () => {
           <CardContent className="p-4">
             <p className="text-red-600">{error}</p>
             <button 
-              onClick={() => {
-                setError(null);
-                window.location.reload();
-              }}
+              onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -831,19 +828,19 @@ const PhoneProcurementForm = () => {
     );
   }
 
-  // Main component render
   return (
     <div className="min-h-screen bg-white p-4">
-      <form 
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDown}
-      >
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
         <Card className="w-full max-w-6xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
           <CardHeader className="bg-[rgb(52,69,157)] py-3">
             <div className="flex justify-between items-center">
               <CardTitle className="text-2xl text-white flex items-center">
                 <ShoppingCart className="h-6 w-6 mr-2" />
-                {isEditing ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` : 'Phone Procurement'}
+                {isViewingProcurement 
+                  ? `View Phone Procurement - ${procurementToEdit?.reference || procurementToEdit?.id}`
+                  : (isEditing || procurementToEdit) 
+                    ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` 
+                    : 'Phone Procurement'}
               </CardTitle>
               
               {/* Cancel Edit Button */}
@@ -852,9 +849,9 @@ const PhoneProcurementForm = () => {
                   type="button"
                   onClick={resetToCreateMode}
                   className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center text-sm"
-                  title="Cancel editing and return to create mode"
+                  title={isViewingProcurement ? "Close view and return to create mode" : "Cancel editing and return to create mode"}
                 >
-                  ✕ Cancel Edit
+                  ✕ {isViewingProcurement ? 'Close' : 'Cancel Edit'}
                 </button>
               )}
             </div>
@@ -875,9 +872,10 @@ const PhoneProcurementForm = () => {
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Purchase Date:</label>
                   <input 
                     type="date" 
-                    className="w-full p-2 border rounded text-sm h-10"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={purchaseDate}
                     onChange={handlePurchaseDateChange}
+                    disabled={isViewingProcurement}
                     required
                   />
                 </div>
@@ -886,9 +884,10 @@ const PhoneProcurementForm = () => {
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Supplier:</label>
                   <select 
-                    className="w-full p-2 border rounded text-sm h-10"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={selectedSupplier}
                     onChange={handleSupplierChange}
+                    disabled={isViewingProcurement}
                     required
                   >
                     <option value="">-- Select Supplier --</option>
@@ -945,55 +944,57 @@ const PhoneProcurementForm = () => {
                 {/* Payment Status - Read-only */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Status:</label>
-                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
-                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
-                      Unpaid
-                    </span>
-                  </div>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    value="Pending"
+                    disabled={true}
+                  />
                 </div>
 
-                {/* Date Paid */}
+                {/* Date Paid - Read-only */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Paid:</label>
                   <input 
                     type="date" 
                     className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
                     value={datePaid}
-                    disabled
+                    disabled={true}
                   />
                 </div>
 
-                {/* Payment Reference - DISABLED */}
+                {/* Payment Reference */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
                   <input 
                     type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={paymentReference}
                     onChange={handlePaymentReferenceChange}
-                    placeholder="Receipt #"
-                    disabled={true}
+                    placeholder="Payment reference"
+                    disabled={isViewingProcurement}
                   />
                 </div>
 
                 {/* Delivery Status - Read-only */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Delivery Status:</label>
-                  <div className="w-full p-2 border rounded text-sm h-10 bg-gray-50 flex items-center">
-                    <span className="inline-block px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
-                      Pending
-                    </span>
-                  </div>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    value="Pending"
+                    disabled={true}
+                  />
                 </div>
 
-                {/* Date Delivered */}
+                {/* Date Delivered - Read-only */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Delivered:</label>
                   <input 
                     type="date" 
                     className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
                     value={dateDelivered}
-                    disabled
+                    disabled={true}
                   />
                 </div>
               </div>
@@ -1001,21 +1002,22 @@ const PhoneProcurementForm = () => {
 {/* Part 7 End - Procurement Details Section */}
 
 {/* Part 8 Start - Phone Selection Section */}
-            {/* Add Phone Section */}
+            {/* Phone Selection Section */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Add Phone Model</h3>
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Add Phone to Procurement</h3>
               
-              {/* Phone Selection Row */}
+              {/* First Row: Manufacturer, Model, RAM, Storage, Color */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Manufacturer - REMOVED required */}
+                {/* Manufacturer */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Manufacturer:</label>
                   <select 
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.manufacturer}
                     onChange={handleCurrentManufacturerChange}
+                    disabled={isViewingProcurement}
                   >
-                    <option value="">-- Select --</option>
+                    <option value="">-- Select Manufacturer --</option>
                     {manufacturers.map(manufacturer => (
                       <option key={manufacturer} value={manufacturer}>
                         {manufacturer}
@@ -1024,16 +1026,16 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* Model - REMOVED required */}
+                {/* Model */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Model:</label>
                   <select 
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.model}
                     onChange={handleCurrentModelChange}
-                    disabled={!currentItem.manufacturer}
+                    disabled={isViewingProcurement || !currentItem.manufacturer}
                   >
-                    <option value="">-- Select --</option>
+                    <option value="">-- Select Model --</option>
                     {models.map(model => (
                       <option key={model} value={model}>
                         {model}
@@ -1042,16 +1044,16 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* RAM - REMOVED required */}
+                {/* RAM */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">RAM:</label>
                   <select 
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.ram}
                     onChange={handleCurrentRamChange}
-                    disabled={!currentItem.model}
+                    disabled={isViewingProcurement || !currentItem.model}
                   >
-                    <option value="">-- Select --</option>
+                    <option value="">-- Select RAM --</option>
                     {rams.map(ram => (
                       <option key={ram} value={ram}>
                         {formatWithGB(ram)}
@@ -1060,16 +1062,16 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* Storage - REMOVED required */}
+                {/* Storage */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Storage:</label>
                   <select 
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.storage}
                     onChange={handleCurrentStorageChange}
-                    disabled={!currentItem.model}
+                    disabled={isViewingProcurement || !currentItem.ram}
                   >
-                    <option value="">-- Select --</option>
+                    <option value="">-- Select Storage --</option>
                     {storages.map(storage => (
                       <option key={storage} value={storage}>
                         {formatWithGB(storage)}
@@ -1078,16 +1080,16 @@ const PhoneProcurementForm = () => {
                   </select>
                 </div>
 
-                {/* Color - REMOVED required */}
+                {/* Color */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Color:</label>
                   <select 
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.color}
                     onChange={handleCurrentColorChange}
-                    disabled={!currentItem.ram || !currentItem.storage}
+                    disabled={isViewingProcurement || !currentItem.storage}
                   >
-                    <option value="">-- Select --</option>
+                    <option value="">-- Select Color --</option>
                     {colors.map(color => (
                       <option key={color} value={color}>
                         {color}
@@ -1106,22 +1108,24 @@ const PhoneProcurementForm = () => {
                     <button
                       type="button"
                       onClick={decrementCurrentQuantity}
-                      disabled={currentItem.quantity <= 1}
+                      disabled={currentItem.quantity <= 1 || isViewingProcurement}
                       className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
                     <input 
                       type="number" 
-                      className="w-32 p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-32 p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:bg-gray-100 disabled:text-gray-500"
                       value={currentItem.quantity}
                       onChange={handleCurrentQuantityChange}
+                      disabled={isViewingProcurement}
                       min="1"
                     />
                     <button
                       type="button"
                       onClick={incrementCurrentQuantity}
-                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                      disabled={isViewingProcurement}
+                      className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       <Plus className="h-3 w-3" />
                     </button>
@@ -1135,9 +1139,10 @@ const PhoneProcurementForm = () => {
                     <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
                     <input 
                       type="text" 
-                      className="w-full p-2 pl-6 border rounded text-sm"
-                      value={currentItem.dealersPrice ? formatPrice(currentItem.dealersPrice) : ''}
+                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                      value={currentItem.dealersPrice ? formatNumberWithCommas(currentItem.dealersPrice) : ''}
                       onChange={handleCurrentDealersPriceChange}
+                      disabled={isViewingProcurement}
                       placeholder="0.00"
                     />
                   </div>
@@ -1147,58 +1152,59 @@ const PhoneProcurementForm = () => {
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Retail Price:</label>
                   <div className="relative">
-                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
+                    <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
                     <input 
                       type="text" 
-                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                      value={currentItem.retailPrice ? formatPrice(currentItem.retailPrice) : ''}
+                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                      value={currentItem.retailPrice ? formatNumberWithCommas(currentItem.retailPrice) : ''}
                       onChange={handleCurrentRetailPriceChange}
+                      disabled={isViewingProcurement}
                       placeholder="0.00"
-                      disabled={true}
                     />
                   </div>
                 </div>
 
-                {/* Total Price Display */}
+                {/* Total Price - Auto-calculated, disabled */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Total Price:</label>
                   <div className="relative">
-                    <span className="absolute left-2 top-2 text-gray-400 text-sm">₱</span>
+                    <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
                     <input 
                       type="text" 
-                      className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                      value={currentItem.totalPrice ? formatPrice(currentItem.totalPrice.toString()) : '0.00'}
+                      className="w-full p-2 pl-6 border rounded text-sm bg-gray-100 text-gray-400"
+                      value={currentItem.dealersPrice && currentItem.quantity 
+                        ? formatPrice((parseFloat(currentItem.dealersPrice.replace(/,/g, '')) * currentItem.quantity).toString())
+                        : '0.00'}
                       disabled={true}
                       readOnly
                     />
                   </div>
                 </div>
 
-                {/* Margin + Add Button */}
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <div className="w-20 space-y-2">
-                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Margin:</label>
-                      <input 
-                        type="text" 
-                        className="w-full p-2 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 text-center"
-                        value={currentItem.dealersPrice && currentItem.retailPrice ? `${calculateMargin(currentItem.dealersPrice, currentItem.retailPrice)}%` : '0.00%'}
-                        disabled={true}
-                        readOnly
-                      />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Action:</label>
-                      <button
-                        type="button"
-                        onClick={addItemToTable}
-                        disabled={!isCurrentItemValid}
-                        className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add
-                      </button>
-                    </div>
+                {/* Right Column: Margin and Action */}
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Margin:</label>
+                    <input 
+                      type="text" 
+                      className="w-full p-2 border rounded text-sm bg-gray-100 text-gray-400 text-center"
+                      value={currentItem.dealersPrice && currentItem.retailPrice 
+                        ? `${calculateMargin(currentItem.dealersPrice, currentItem.retailPrice)}%` : '0.00%'}
+                      disabled={true}
+                      readOnly
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Action:</label>
+                    <button
+                      type="button"
+                      onClick={addItemToTable}
+                      disabled={!isCurrentItemValid || isViewingProcurement}
+                      className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1215,7 +1221,7 @@ const PhoneProcurementForm = () => {
                 <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
                   Procurement List ({procurementItems.length} items)
                 </h3>
-                {procurementItems.length > 0 && (
+                {procurementItems.length > 0 && !isViewingProcurement && (
                   <button
                     type="button"
                     onClick={clearAllItems}
@@ -1228,57 +1234,56 @@ const PhoneProcurementForm = () => {
               </div>
 
               {procurementItems.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                  <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h4 className="text-lg font-medium text-gray-700 mb-2">No items in procurement list</h4>
-                  <p className="text-gray-500">Add phone models above to build your procurement list</p>
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <p className="text-lg font-medium">No items in procurement list</p>
+                  <p className="text-sm">Add phones using the form above</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Manufacturer</th>
-                        <th className="border px-3 py-2 text-left font-semibold w-[13%]">Model</th>
-                        <th className="border px-3 py-2 text-left font-semibold w-[22%]">Configuration</th>
-                        <th className="border px-3 py-2 text-left font-semibold w-[10%]">Color</th>
-                        <th className="border px-3 py-2 text-center font-semibold w-[12%]">Qty</th>
-                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Unit Price</th>
-                        <th className="border px-3 py-2 text-right font-semibold w-[15%]">Total</th>
+                        <th className="border px-3 py-3 text-left font-semibold">Manufacturer</th>
+                        <th className="border px-3 py-3 text-left font-semibold">Model</th>
+                        <th className="border px-3 py-3 text-center font-semibold">RAM</th>
+                        <th className="border px-3 py-3 text-center font-semibold">Storage</th>
+                        <th className="border px-3 py-3 text-center font-semibold">Color</th>
+                        <th className="border px-3 py-3 text-center font-semibold">Qty</th>
+                        <th className="border px-3 py-3 text-right font-semibold">Dealer&apos;s Price</th>
+                        <th className="border px-3 py-3 text-right font-semibold">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
                       {procurementItems.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="border px-3 py-2">
-                            <div className="font-medium">{item.manufacturer}</div>
-                          </td>
-                          <td className="border px-3 py-2">
-                            <div className="text-gray-700">{item.model}</div>
-                          </td>
-                          <td className="border px-3 py-2">
-                            <div className="whitespace-nowrap">{formatWithGB(item.ram)} RAM / {formatWithGB(item.storage)} Storage</div>
-                          </td>
-                          <td className="border px-3 py-2">
-                            <select
-                              value={item.color}
-                              onChange={(e) => handleTableColorChange(item.id, e.target.value)}
-                              className="w-full p-1 border rounded text-xs bg-white"
-                              title="Change color"
-                            >
-                              {(itemColorOptions[item.id] || [item.color]).map(color => (
-                                <option key={color} value={color}>
-                                  {color}
-                                </option>
-                              ))}
-                            </select>
+                          <td className="border px-3 py-2 text-left">{item.manufacturer}</td>
+                          <td className="border px-3 py-2 text-left">{item.model}</td>
+                          <td className="border px-3 py-2 text-center">{formatWithGB(item.ram)}</td>
+                          <td className="border px-3 py-2 text-center">{formatWithGB(item.storage)}</td>
+                          <td className="border px-3 py-2 text-center">
+                            {isViewingProcurement ? (
+                              <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
+                                {item.color}
+                              </span>
+                            ) : (
+                              <select 
+                                value={item.color}
+                                onChange={(e) => handleTableColorChange(item.id, e.target.value)}
+                                className="w-full p-1 border rounded text-xs text-center"
+                              >
+                                {(itemColorOptions[item.id] || []).map(color => (
+                                  <option key={color} value={color}>{color}</option>
+                                ))}
+                              </select>
+                            )}
                           </td>
                           <td className="border px-3 py-2 text-center">
                             <div className="flex items-center justify-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => decrementTableQuantity(item.id)}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                disabled={isViewingProcurement}
+                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
                                 title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
                               >
                                 <Minus className="h-3 w-3" />
@@ -1289,7 +1294,8 @@ const PhoneProcurementForm = () => {
                               <button
                                 type="button"
                                 onClick={() => incrementTableQuantity(item.id)}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                disabled={isViewingProcurement}
+                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
                                 title="Increase quantity"
                               >
                                 <Plus className="h-3 w-3" />
@@ -1377,31 +1383,33 @@ const PhoneProcurementForm = () => {
               </div>
             )}
 
-            {/* Submit Button - UPDATED: Shows edit vs create mode */}
-            <div className="pt-4">
-              <button
-                type="submit"
-                className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={
-                  procurementItems.length === 0 || 
-                  isSubmitting || 
-                  !purchaseDate || 
-                  !selectedSupplier
-                }
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="animate-spin h-5 w-5 mr-2" />
-                    {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="h-5 w-5 mr-2" />
-                    {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Submit Button - Hide when viewing */}
+            {!isViewingProcurement && (
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={
+                    procurementItems.length === 0 || 
+                    isSubmitting || 
+                    !purchaseDate || 
+                    !selectedSupplier
+                  }
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                      {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </form>

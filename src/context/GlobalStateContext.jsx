@@ -17,6 +17,7 @@ export const GlobalStateProvider = ({ children }) => {
   const [phoneToEdit, setPhoneToEdit] = useState(null);
   const [procurementToEdit, setProcurementToEdit] = useState(null);
   const [activeComponent, setActiveComponent] = useState('summary');
+  const [isViewingProcurement, setIsViewingProcurement] = useState(false); // NEW: Track view vs edit mode
   
   // ====== PHONE EDITING FUNCTIONS ======
   // Function to set a phone for editing and switch to form
@@ -34,12 +35,21 @@ export const GlobalStateProvider = ({ children }) => {
   // Function to set a procurement for editing and switch to procurement form
   const editProcurement = (procurement) => {
     setProcurementToEdit(procurement);
+    setIsViewingProcurement(false); // Set to edit mode
+    setActiveComponent('procurement');
+  };
+  
+  // NEW: Function to set a procurement for viewing (read-only)
+  const viewProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(true); // Set to view mode
     setActiveComponent('procurement');
   };
   
   // Function to clear the selected procurement
   const clearProcurementToEdit = () => {
     setProcurementToEdit(null);
+    setIsViewingProcurement(false); // Reset view mode
   };
   
   // ====== CONTEXT VALUE OBJECT ======
@@ -50,7 +60,9 @@ export const GlobalStateProvider = ({ children }) => {
     clearPhoneToEdit,
     procurementToEdit,
     editProcurement,
+    viewProcurement, // NEW: Add view function
     clearProcurementToEdit,
+    isViewingProcurement, // NEW: Add view mode state
     activeComponent,
     setActiveComponent
   };
