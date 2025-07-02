@@ -9,6 +9,12 @@ const InventoryEditForm = ({
   itemId, 
   savingItemId 
 }) => {
+  // NEW: Function to format price with currency - read-only display
+  const formatPrice = (price) => {
+    if (!price && price !== 0) return '-';
+    return `₱${price.toLocaleString()}`;
+  };
+
   return (
     <tr className="hover:bg-gray-50">
       <td className="border px-2 py-3 whitespace-nowrap">
@@ -73,6 +79,12 @@ const InventoryEditForm = ({
           onChange={handleEditInputChange}
           className="w-full p-1 border rounded font-mono"
         />
+      </td>
+      {/* NEW: Added retail price column - read-only display */}
+      <td className="border px-2 py-3 whitespace-nowrap text-right">
+        <span className="text-gray-600 font-medium">
+          {formatPrice(editFormData.retailPrice)}
+        </span>
       </td>
       <td className="border px-2 py-3 whitespace-nowrap text-xs text-gray-500">
         {new Date().toLocaleDateString('en-US')}

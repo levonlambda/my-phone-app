@@ -27,7 +27,8 @@ const InventoryTable = ({
     color: '',
     imei1: '',
     barcode: '',
-    status: ''
+    status: '',
+    retailPrice: 0 // NEW: Added retailPrice to initial state
   });
   const [savingItemId, setSavingItemId] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -53,7 +54,8 @@ const InventoryTable = ({
       color: item.color,
       imei1: item.imei1,
       barcode: item.barcode || '',
-      status: item.status
+      status: item.status,
+      retailPrice: item.retailPrice // NEW: Added retailPrice to edit form data
     });
   };
 
@@ -66,7 +68,7 @@ const InventoryTable = ({
     }
   };
 
-  // Handle delete confirmation
+  // Handle delete confirmation - PRESERVED: Original working delete logic
   const handleDeleteConfirm = async () => {
     if (!itemToDelete) return;
     
@@ -144,7 +146,8 @@ const InventoryTable = ({
       color: '',
       imei1: '',
       barcode: '',
-      status: ''
+      status: '',
+      retailPrice: 0 // NEW: Added retailPrice to reset state
     });
   };
 
@@ -263,7 +266,7 @@ const InventoryTable = ({
     }
   };
   
-  // Sort the inventory items based on sortField and sortDirection
+  // UPDATED: Enhanced sorting logic for new sortable columns
   const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
     // Handle numeric fields
     if (sortField === 'retailPrice') {
@@ -271,6 +274,18 @@ const InventoryTable = ({
         return a.retailPrice - b.retailPrice;
       } else {
         return b.retailPrice - a.retailPrice;
+      }
+    }
+    
+    // Handle date field (lastUpdated)
+    if (sortField === 'lastUpdated') {
+      const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
+      const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
+      
+      if (sortDirection === 'asc') {
+        return dateA - dateB;
+      } else {
+        return dateB - dateA;
       }
     }
     
@@ -290,7 +305,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('manufacturer')}
-              style={{ width: '14%' }}
+              style={{ width: '12%' }}
             >
               Manufacturer
               {sortField === 'manufacturer' && (
@@ -300,30 +315,95 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('model')}
-              style={{ width: '14%' }}
+              style={{ width: '12%' }}
             >
               Model
               {sortField === 'model' && (
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>RAM</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '8%' }}>Storage</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '14%' }}>Color</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>IMEI1</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '17%' }}>Barcode</th>
-            <th className="border px-2 py-3 text-left font-semibold" style={{ width: '10%' }}>Date</th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('ram')}
+              style={{ width: '7%' }}
+            >
+              RAM
+              {sortField === 'ram' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('storage')}
+              style={{ width: '7%' }}
+            >
+              Storage
+              {sortField === 'storage' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('color')}
+              style={{ width: '12%' }}
+            >
+              Color
+              {sortField === 'color' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('imei1')}
+              style={{ width: '15%' }}
+            >
+              IMEI1
+              {sortField === 'imei1' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('barcode')}
+              style={{ width: '15%' }}
+            >
+              Barcode
+              {sortField === 'barcode' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            {/* NEW: Added Retail Price column */}
+            <th 
+              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('retailPrice')}
+              style={{ width: '10%' }}
+            >
+              Price
+              {sortField === 'retailPrice' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('lastUpdated')}
+              style={{ width: '8%' }}
+            >
+              Date
+              {sortField === 'lastUpdated' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
             <th 
               className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('status')}
-              style={{ width: '10%' }}
+              style={{ width: '8%' }}
             >
               Status
               {sortField === 'status' && (
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </th>
-            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '8%' }}>Action</th>
+            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '6%' }}>Action</th>
           </tr>
         </thead>
         <tbody>

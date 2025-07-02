@@ -30,6 +30,12 @@ const InventoryRow = ({
   const getStatusDisplay = (status) => {
     return status === 'On-Hand' ? 'Stock' : status;
   };
+
+  // NEW: Function to format price with currency
+  const formatPrice = (price) => {
+    if (!price && price !== 0) return '-';
+    return `₱${price.toLocaleString()}`;
+  };
   
   return (
     <tr className="hover:bg-gray-50">
@@ -40,6 +46,8 @@ const InventoryRow = ({
       <td className="border px-2 py-3 whitespace-nowrap">{item.color}</td>
       <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.imei1}</td>
       <td className="border px-2 py-3 font-mono whitespace-nowrap">{item.barcode || '-'}</td>
+      {/* NEW: Added retail price column */}
+      <td className="border px-2 py-3 whitespace-nowrap text-right font-medium">{formatPrice(item.retailPrice)}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-xs">{formatDate(item.lastUpdated)}</td>
       <td className="border px-2 py-3 text-center whitespace-nowrap">
         <span className={`inline-block px-3 py-1 rounded-full text-sm ${
@@ -84,6 +92,7 @@ InventoryRow.propTypes = {
     color: PropTypes.string.isRequired,
     imei1: PropTypes.string.isRequired,
     barcode: PropTypes.string,
+    retailPrice: PropTypes.number, // NEW: Added retailPrice prop
     status: PropTypes.string.isRequired,
     lastUpdated: PropTypes.string
   }).isRequired,

@@ -491,6 +491,49 @@ const InventoryFilters = ({
           className="w-full p-2 border rounded"
         />
       </div>
+
+      {/* NEW: Serial Number filter - Display only, no functionality */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Serial Number
+        </label>
+        <input
+          type="text"
+          name="serialNumber"
+          value=""
+          placeholder="Search serial number"
+          className="w-full p-2 border rounded"
+          disabled
+        />
+      </div>
+
+      {/* Start Date filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Start Date
+        </label>
+        <input
+          type="date"
+          name="startDate"
+          value={pendingFilters.startDate}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      
+      {/* End Date filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          End Date
+        </label>
+        <input
+          type="date"
+          name="endDate"
+          value={pendingFilters.endDate}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+        />
+      </div>
       
       {/* Price range */}
       <div className="flex gap-2">
