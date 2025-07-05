@@ -263,7 +263,7 @@ const InventorySummaryForm = () => {
     });
   };
 
-  // UPDATED: Fetch and process inventory data with exclusion logic
+  // UPDATED: Fetch and process inventory data with exclusion logic and improved sorting
   const fetchInventoryData = async () => {
     setLoading(true);
     setError(null);
@@ -392,17 +392,44 @@ const InventorySummaryForm = () => {
         }).sort((a, b) => a.color.localeCompare(b.color));
       });
       
+      // UPDATED: Helper function to extract numeric value from RAM/storage strings
+      const extractNumericValue = (value) => {
+        if (!value) return 0;
+        // Extract the number from strings like "3GB", "128GB", "1TB", etc.
+        const match = value.match(/(\d+(?:\.\d+)?)/);
+        if (!match) return 0;
+        
+        const num = parseFloat(match[1]);
+        // Convert TB to GB for consistent comparison
+        if (value.toLowerCase().includes('tb')) {
+          return num * 1024;
+        }
+        return num;
+      };
+      
+      // UPDATED: Improved sorting logic with numeric comparison for RAM and storage
       const inventoryArray = Object.values(groupedData).sort((a, b) => {
+        // 1. Sort by manufacturer (string comparison)
         if (a.manufacturer !== b.manufacturer) {
           return a.manufacturer.localeCompare(b.manufacturer);
         }
+        
+        // 2. Sort by model (string comparison)
         if (a.model !== b.model) {
           return a.model.localeCompare(b.model);
         }
-        if (a.ram !== b.ram) {
-          return a.ram.localeCompare(b.ram);
+        
+        // 3. Sort by RAM (numeric comparison - smallest to largest)
+        const ramA = extractNumericValue(a.ram);
+        const ramB = extractNumericValue(b.ram);
+        if (ramA !== ramB) {
+          return ramA - ramB; // Ascending order (smallest to largest)
         }
-        return a.storage.localeCompare(b.storage);
+        
+        // 4. Sort by storage (numeric comparison - smallest to largest)
+        const storageA = extractNumericValue(a.storage);
+        const storageB = extractNumericValue(b.storage);
+        return storageA - storageB; // Ascending order (smallest to largest)
       });
       
       const filterOpts = {
@@ -725,7 +752,7 @@ const InventorySummaryForm = () => {
                               {item.totalAvailable}
                             </span>
                           </td>
-                        </tr>{/* Part 5 Start - Expanded Color Breakdown Section */}
+                        </tr> {/* Part 5 Start - Expanded Color Breakdown Section */}
                         
                         {/* Expanded color breakdown */}
                         {expandedRows.has(index) && (
@@ -743,7 +770,7 @@ const InventorySummaryForm = () => {
                                       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                                         <div className="flex justify-between items-center">
                                           <div className="flex items-center gap-4">
-                                            <h5 className="font-medium text-gray-800">{colorData.color}</h5>
+                                            <h5 className="font-bold text-lg text-gray-800">{colorData.color}</h5>
                                             <div className="flex gap-4 text-sm">
                                               <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
                                                 Sold: {colorData.sold}
