@@ -1398,8 +1398,8 @@ const PhoneProcurementForm = () => {
                     </tbody>
                     <tfoot>
                       <tr className="bg-blue-50 font-semibold">
-                        <td colSpan="4" className="border px-3 py-2 text-right">Total Items:</td>
-                        <td className="border px-3 py-2 text-center">
+                        <td colSpan="5" className="border px-3 py-2 text-right">Total Items:</td>
+                        <td className="border px-3 py-2 text-center font-mono">
                           {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
                         </td>
                         <td className="border px-3 py-2 text-right">Grand Total:</td>

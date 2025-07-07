@@ -166,18 +166,82 @@ const ProcurementManagementForm = () => {
   }, [procurements, searchTerm, statusFilter]);
 {/* Part 2 End - Data Fetching Functions */}
 
-{/* Part 3 Start - Event Handlers and Filter Logic */}
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
+{/* Part 3 Start - Form Action Handlers with Payment Update */}
+  // ====== FORM ACTION HANDLERS ======
+  
+  // NEW: Handle payment status update
+  const handlePaymentUpdate = async (procurement) => {
+    console.log('Update payment status:', procurement.id);
+    
+    // Check current payment status
+    const isPaid = procurement.isPaid === true || procurement.paymentStatus === 'paid';
+    const newStatus = !isPaid; // Toggle the status
+    
+    // Enhanced confirmation dialog
+    const statusText = newStatus ? 'PAID' : 'UNPAID';
+    const actionText = newStatus ? 'mark as paid' : 'mark as unpaid';
+    
+    const confirmMessage = `Are you sure you want to ${actionText}?\n\n` +
+      `Reference: ${procurement.reference || procurement.id}\n` +
+      `Supplier: ${procurement.supplierName}\n` +
+      `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n\n` +
+      `This will:\n` +
+      `• Update payment status to: ${statusText}\n` +
+      `${newStatus ? '• Reduce supplier outstanding balance\n• Create payment ledger entry' : '• Increase supplier outstanding balance\n• Remove payment ledger entry'}\n\n` +
+      `Continue with payment update?`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        setLoading(true);
+        setError('');
+        
+        console.log("Updating payment status with supplier service:", procurement.id, newStatus);
+        
+        // Prepare payment data
+        const paymentData = {
+          isPaid: newStatus,
+          paymentStatus: newStatus ? 'paid' : 'unpaid',
+          paymentDate: newStatus ? new Date().toISOString().split('T')[0] : null,
+          paymentReference: newStatus ? `PAY-${Date.now()}` : null
+        };
+        
+        const result = await supplierService.updateProcurementPaymentStatus(procurement.id, paymentData);
+        
+        if (result.success) {
+          console.log("Payment status updated successfully:", result);
+          
+          // Show success message
+          let message = `Payment status updated successfully!\n\n`;
+          message += `Procurement: ${procurement.reference || procurement.id}\n`;
+          message += `Status: ${statusText}\n`;
+          message += `Supplier: ${procurement.supplierName}\n`;
+          message += `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n`;
+          
+          if (newStatus) {
+            message += `\n✅ Payment recorded and supplier balance updated`;
+          } else {
+            message += `\n❌ Payment removed and supplier balance restored`;
+          }
+          
+          alert(message);
+          
+          // Refresh the procurement list to show updated status
+          await fetchAllProcurements();
+          
+        } else {
+          console.error("Error updating payment status:", result.error);
+          setError(`Error updating payment status: ${result.error}`);
+        }
+        
+      } catch (error) {
+        console.error('Error updating payment status:', error);
+        setError(`Error updating payment status: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
-  // Handle status filter change
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
-  };
-
-  // Handle action clicks
   const handleViewProcurement = (procurement) => {
     console.log('View procurement:', procurement.id);
     // Use the view function to open the form in read-only mode
@@ -222,10 +286,10 @@ const ProcurementManagementForm = () => {
           message += `Deleted Procurement:\n`;
           message += `• Reference: ${result.reference || procurement.id}\n`;
           message += `• Supplier: ${result.supplierName}\n`;
-          message += `• Amount: ₱${formatPrice(result.deletedGrandTotal?.toString() || '0')}\n\n`;
-          message += `✅ Supplier balance updated\n`;
-          message += `✅ Ledger entry marked as deleted\n`;
-          message += `✅ Procurement record removed`;
+          message += `• Amount: ₱${formatPrice(result.grandTotal?.toString() || '0')}\n\n`;
+          message += `Supplier Balance Effects:\n`;
+          message += `• Outstanding balance reduced by ₱${formatPrice(result.grandTotal?.toString() || '0')}\n`;
+          message += `• Ledger entries marked as deleted\n`;
           
           alert(message);
           
@@ -234,7 +298,7 @@ const ProcurementManagementForm = () => {
           
         } else {
           console.error("Error deleting procurement:", result.error);
-          setError(`Failed to delete procurement: ${result.error}`);
+          setError(`Error deleting procurement: ${result.error}`);
         }
         
       } catch (error) {
@@ -245,7 +309,19 @@ const ProcurementManagementForm = () => {
       }
     }
   };
-{/* Part 3 End - Event Handlers and Filter Logic */}
+
+  // ====== SEARCH AND FILTER HANDLERS ======
+  
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Handle status filter change
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+{/* Part 3 End - Form Action Handlers with Payment Update */}
 
 {/* Part 4 Start - Loading and Error States */}
   // Show loading state
@@ -545,9 +621,14 @@ const ProcurementManagementForm = () => {
                             </span>
                           </td>
                           <td className="border px-3 py-3 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${paymentStatus.className}`}>
+                            {/* CHANGED: Convert Payment column to clickable status button */}
+                            <button
+                              onClick={() => handlePaymentUpdate(procurement)}
+                              className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${paymentStatus.className} hover:opacity-80 cursor-pointer`}
+                              title={`${paymentStatus.label === 'Paid' ? 'Click to mark as Unpaid' : 'Click to mark as Paid'}`}
+                            >
                               {paymentStatus.label}
-                            </span>
+                            </button>
                           </td>
                           <td className="border px-3 py-3 text-center">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${deliveryStatus.className}`}>
