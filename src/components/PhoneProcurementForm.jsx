@@ -185,21 +185,45 @@ const PhoneProcurementForm = () => {
       setIsEditing(true);
       setEditingId(procurementToEdit.id);
       
+      // Calculate account payable: use saved value, or calculate from grand total if zero/empty
+      let accountPayableValue = procurementToEdit.accountPayable || '';
+      
+      // If account payable is zero or empty, calculate it from the procurement's grand total
+      // This makes business sense: account payable should be the amount owed for THIS procurement
+      if (!accountPayableValue || accountPayableValue === '0' || accountPayableValue === 0) {
+        const grandTotal = procurementToEdit.grandTotal || 0;
+        accountPayableValue = formatNumberWithCommas(grandTotal.toString());
+      }
+      
       // Populate form fields with existing procurement data
       setPurchaseDate(procurementToEdit.purchaseDate || getCurrentDate());
       setSelectedSupplier(procurementToEdit.supplierId || '');
       setBankName(procurementToEdit.bankName || '');
       setBankAccount(procurementToEdit.bankAccount || '');
-      setAccountPayable(procurementToEdit.accountPayable || '');
+      setAccountPayable(accountPayableValue);
       setPaymentReference(procurementToEdit.paymentReference || '');
       
-      // Find and set supplier data
+      // Find and set supplier data WITHOUT triggering auto-populate behavior
       if (procurementToEdit.supplierId && suppliers.length > 0) {
         const supplierData = suppliers.find(s => s.id === procurementToEdit.supplierId);
         setSelectedSupplierData(supplierData || null);
+        
+        // For existing procurement: preserve bank fields from procurement data, NOT supplier data
+        // This prevents overwriting with current supplier info when we want historical data
+        if (supplierData) {
+          // Only set bank fields if they're empty in procurement data
+          if (!procurementToEdit.bankName) {
+            setBankName(supplierData.bankName || '');
+          }
+          if (!procurementToEdit.bankAccount) {
+            setBankAccount(supplierData.bankAccount || '');
+          }
+          // IMPORTANT: Account payable is already set above based on procurement data or calculated from grand total
+          // Do NOT auto-populate from supplier's current outstanding balance for existing procurements
+        }
       }
       
-      // Populate procurement items
+      // Populate procurement items and fetch colors for each item
       if (procurementToEdit.items && Array.isArray(procurementToEdit.items)) {
         const formattedItems = procurementToEdit.items.map((item, index) => ({
           id: index + 1,
@@ -209,16 +233,56 @@ const PhoneProcurementForm = () => {
           storage: item.storage || '',
           color: item.color || '',
           quantity: item.quantity || 1,
-          dealersPrice: formatNumberWithCommas((item.dealersPrice || 0).toString()),
-          retailPrice: (item.retailPrice || 0).toString(),
-          totalPrice: item.totalPrice || (item.quantity * item.dealersPrice) || 0
+          dealersPrice: item.dealersPrice || '',
+          retailPrice: item.retailPrice || '',
+          totalPrice: item.totalPrice || 0
         }));
+        
         setProcurementItems(formattedItems);
         setNextId(formattedItems.length + 1);
+        
+        // Fetch colors for each existing item
+        const fetchColorsForExistingItems = async () => {
+          const colorOptionsMap = {};
+          
+          for (const item of formattedItems) {
+            if (item.manufacturer && item.model) {
+              try {
+                const q = query(
+                  collection(db, 'phones'),
+                  where('manufacturer', '==', item.manufacturer),
+                  where('model', '==', item.model)
+                );
+                const querySnapshot = await getDocs(q);
+                
+                if (!querySnapshot.empty) {
+                  const data = querySnapshot.docs[0].data();
+                  const colorArray = Array.isArray(data.colors) ? data.colors : [];
+                  colorOptionsMap[item.id] = colorArray.sort();
+                }
+              } catch (error) {
+                console.error(`Error fetching colors for ${item.manufacturer} ${item.model}:`, error);
+                colorOptionsMap[item.id] = [];
+              }
+            } else {
+              colorOptionsMap[item.id] = [];
+            }
+          }
+          
+          // Update itemColorOptions state with all fetched colors
+          setItemColorOptions(colorOptionsMap);
+        };
+        
+        // Call the function to fetch colors
+        fetchColorsForExistingItems();
       }
     } else {
+      // Reset form when not editing
       setIsEditing(false);
       setEditingId(null);
+      setProcurementItems([]);
+      setNextId(1);
+      setItemColorOptions({}); // Clear color options
     }
   }, [procurementToEdit, suppliers]);
 
@@ -229,9 +293,13 @@ const PhoneProcurementForm = () => {
         const supplierResult = await supplierService.getAllSuppliers();
         if (supplierResult.success) {
           setSuppliers(supplierResult.suppliers);
+          console.log("Suppliers loaded:", supplierResult.suppliers.length);
+        } else {
+          setError("Failed to load suppliers");
         }
       } catch (error) {
         console.error("Error fetching suppliers:", error);
+        setError("Failed to load suppliers");
       }
     };
 
@@ -243,8 +311,7 @@ const PhoneProcurementForm = () => {
     const fetchManufacturers = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'phones'));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(collection(db, 'phones'));
         const manufacturerSet = new Set();
         
         querySnapshot.forEach((doc) => {
@@ -257,9 +324,9 @@ const PhoneProcurementForm = () => {
         setManufacturers(Array.from(manufacturerSet).sort());
       } catch (error) {
         console.error("Error fetching manufacturers:", error);
-        setError(`Error fetching manufacturers: ${error.message}`);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchManufacturers();
@@ -432,7 +499,7 @@ const PhoneProcurementForm = () => {
     setPurchaseDate(e.target.value);
   };
 
-  // Handle supplier selection - UPDATED: Auto-populate account payable from supplier's outstanding balance
+  // Handle supplier selection - UPDATED: Auto-populate account payable from supplier's outstanding balance (only for new procurement)
   const handleSupplierChange = (e) => {
     const supplierId = e.target.value;
     setSelectedSupplier(supplierId);
@@ -446,15 +513,22 @@ const PhoneProcurementForm = () => {
         setBankName(supplierData.bankName || '');
         setBankAccount(supplierData.bankAccount || '');
         
-        // NEW: Auto-populate account payable from supplier's outstanding balance
-        const outstandingBalance = supplierData.totalOutstanding || 0;
-        setAccountPayable(formatNumberWithCommas(outstandingBalance.toString()));
+        // FIXED: Only auto-populate account payable for NEW procurement, not when editing existing ones
+        // This preserves the historical account payable value for existing procurements
+        if (!isEditing && !procurementToEdit) {
+          const outstandingBalance = supplierData.totalOutstanding || 0;
+          setAccountPayable(formatNumberWithCommas(outstandingBalance.toString()));
+        }
+        // For existing procurement: keep the account payable that was already set from procurement data
       }
     } else {
       setSelectedSupplierData(null);
       setBankName('');
       setBankAccount('');
-      setAccountPayable(''); // Clear account payable when no supplier selected
+      // Only clear account payable for new procurement, not when editing
+      if (!isEditing && !procurementToEdit) {
+        setAccountPayable('');
+      }
     }
   };
 
@@ -546,6 +620,17 @@ const PhoneProcurementForm = () => {
 {/* Part 3 End - Event Handlers */}
 
 {/* Part 4 Start - Essential Functions */}
+  // Helper function to safely parse any price (handles both string and number)
+  const safeParsePrice = (price) => {
+    if (typeof price === 'number') {
+      return price;
+    }
+    if (typeof price === 'string') {
+      return parseFloat(price.replace(/,/g, '')) || 0;
+    }
+    return 0;
+  };
+
   // Clear all items from procurement list
   const clearAllItems = () => {
     if (window.confirm('Are you sure you want to clear all items from the procurement list?')) {
@@ -575,7 +660,7 @@ const PhoneProcurementForm = () => {
     setProcurementItems(prevItems => 
       prevItems.map(item => 
         item.id === itemId 
-          ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
+          ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * safeParsePrice(item.dealersPrice) }
           : item
       )
     );
@@ -588,7 +673,7 @@ const PhoneProcurementForm = () => {
         item.id === itemId 
           ? item.quantity === 1 
             ? null // Will be filtered out
-            : { ...item, quantity: item.quantity - 1, totalPrice: (item.quantity - 1) * parseFloat(item.dealersPrice.replace(/,/g, '')) }
+            : { ...item, quantity: item.quantity - 1, totalPrice: (item.quantity - 1) * safeParsePrice(item.dealersPrice) }
           : item
       ).filter(Boolean) // Remove null items
     );
@@ -677,7 +762,7 @@ const PhoneProcurementForm = () => {
       
       // Prepare procurement data
       const procurementData = {
-        // Items array
+        // Items array - using safe parsing for both dealersPrice and retailPrice
         items: procurementItems.map(item => ({
           manufacturer: item.manufacturer,
           model: item.model,
@@ -685,8 +770,8 @@ const PhoneProcurementForm = () => {
           storage: item.storage,
           color: item.color,
           quantity: item.quantity,
-          dealersPrice: parseFloat(item.dealersPrice.replace(/,/g, '')) || 0,
-          retailPrice: parseFloat(item.retailPrice.replace(/,/g, '')) || 0,
+          dealersPrice: safeParsePrice(item.dealersPrice),
+          retailPrice: safeParsePrice(item.retailPrice),
           totalPrice: item.totalPrice
         })),
         
@@ -963,16 +1048,16 @@ const PhoneProcurementForm = () => {
                   />
                 </div>
 
-                {/* Payment Reference */}
+                {/* Payment Reference - DISABLED in both create and edit modes */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
                   <input 
                     type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
                     value={paymentReference}
                     onChange={handlePaymentReferenceChange}
                     placeholder="Payment reference"
-                    disabled={isViewingProcurement}
+                    disabled={true}
                   />
                 </div>
 

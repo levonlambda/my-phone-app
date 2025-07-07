@@ -1,5 +1,5 @@
 {/* Part 1 Start - Complete File: Imports, State, and Helper Functions */}
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -52,8 +52,8 @@ const InventorySummaryForm = () => {
     colors: []
   });
 
-  // NEW: Add this function to fetch excluded models info for display
-  const fetchExcludedModelsInfo = async () => {
+  // UPDATED: Add this function to fetch excluded models info for display with useCallback
+  const fetchExcludedModelsInfo = useCallback(async () => {
     try {
       const phonesRef = collection(db, 'phones');
       const phonesSnapshot = await getDocs(phonesRef);
@@ -78,7 +78,7 @@ const InventorySummaryForm = () => {
     } catch (error) {
       console.error("Error fetching excluded models info:", error);
     }
-  };
+  }, []);
 
   // Toggle row expansion (for base configurations)
   const toggleRowExpansion = (index) => {
@@ -263,8 +263,30 @@ const InventorySummaryForm = () => {
     });
   };
 
-  // UPDATED: Fetch and process inventory data with exclusion logic and improved sorting
-  const fetchInventoryData = async () => {
+  // NEW: Helper function to check if a date is within the current month
+  const isWithinCurrentMonth = (dateString) => {
+    if (!dateString) return false;
+    
+    try {
+      const itemDate = new Date(dateString);
+      const currentDate = new Date();
+      
+      // Check if dates are valid
+      if (isNaN(itemDate.getTime()) || isNaN(currentDate.getTime())) {
+        return false;
+      }
+      
+      // Compare year and month
+      return itemDate.getFullYear() === currentDate.getFullYear() && 
+             itemDate.getMonth() === currentDate.getMonth();
+    } catch (error) {
+      console.error("Error parsing date:", dateString, error);
+      return false;
+    }
+  };
+
+  // UPDATED: Fetch and process inventory data with exclusion logic, improved sorting, current month sold filter, and useCallback
+  const fetchInventoryData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -351,12 +373,15 @@ const InventorySummaryForm = () => {
         
         const colorData = groupedData[baseKey].colors[item.color];
         
-        // Count and store items based on status
+        // UPDATED: Count and store items based on status with current month filter for sold items
         switch (item.status) {
           case 'Sold':
-            colorData.sold++;
-            groupedData[baseKey].totalSold++;
-            colorData.soldItems.push(item);
+            // NEW: Only count and include sold items from the current month
+            if (isWithinCurrentMonth(item.lastUpdated)) {
+              colorData.sold++;
+              groupedData[baseKey].totalSold++;
+              colorData.soldItems.push(item);
+            }
             break;
           case 'On-Display':
             colorData.onDisplay++;
@@ -453,19 +478,20 @@ const InventorySummaryForm = () => {
       
       // NEW: Log summary of excluded models for debugging
       console.log(`Inventory Summary loaded: ${inventoryArray.length} configurations (${excludedModels.size} models excluded)`);
+      console.log(`Sold items filtered to current month only`);
       
     } catch (err) {
       console.error("Error fetching inventory data:", err);
       setError(`Error fetching inventory: ${err.message}`);
       setLoading(false);
     }
-  };
+  }, []); // Empty dependency array since this function doesn't depend on any state or props
 
-  // UPDATED: Effects to include fetchExcludedModelsInfo
+  // UPDATED: Effects with proper dependencies to fix React Hook warnings
   useEffect(() => {
     fetchInventoryData();
-    fetchExcludedModelsInfo(); // NEW: Add this line
-  }, []);
+    fetchExcludedModelsInfo();
+  }, [fetchInventoryData, fetchExcludedModelsInfo]); // Both functions are now memoized with useCallback
   
   useEffect(() => {
     updateFilteredOptions();
