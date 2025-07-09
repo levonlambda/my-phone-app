@@ -4983,18 +4983,82 @@ const ProcurementManagementForm = () => {
   }, [procurements, searchTerm, statusFilter]);
 {/* Part 2 End - Data Fetching Functions */}
 
-{/* Part 3 Start - Event Handlers and Filter Logic */}
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
+{/* Part 3 Start - Form Action Handlers with Payment Update */}
+  // ====== FORM ACTION HANDLERS ======
+  
+  // NEW: Handle payment status update
+  const handlePaymentUpdate = async (procurement) => {
+    console.log('Update payment status:', procurement.id);
+    
+    // Check current payment status
+    const isPaid = procurement.isPaid === true || procurement.paymentStatus === 'paid';
+    const newStatus = !isPaid; // Toggle the status
+    
+    // Enhanced confirmation dialog
+    const statusText = newStatus ? 'PAID' : 'UNPAID';
+    const actionText = newStatus ? 'mark as paid' : 'mark as unpaid';
+    
+    const confirmMessage = `Are you sure you want to ${actionText}?\n\n` +
+      `Reference: ${procurement.reference || procurement.id}\n` +
+      `Supplier: ${procurement.supplierName}\n` +
+      `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n\n` +
+      `This will:\n` +
+      `• Update payment status to: ${statusText}\n` +
+      `${newStatus ? '• Reduce supplier outstanding balance\n• Create payment ledger entry' : '• Increase supplier outstanding balance\n• Remove payment ledger entry'}\n\n` +
+      `Continue with payment update?`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        setLoading(true);
+        setError('');
+        
+        console.log("Updating payment status with supplier service:", procurement.id, newStatus);
+        
+        // Prepare payment data
+        const paymentData = {
+          isPaid: newStatus,
+          paymentStatus: newStatus ? 'paid' : 'unpaid',
+          paymentDate: newStatus ? new Date().toISOString().split('T')[0] : null,
+          paymentReference: newStatus ? `PAY-${Date.now()}` : null
+        };
+        
+        const result = await supplierService.updateProcurementPaymentStatus(procurement.id, paymentData);
+        
+        if (result.success) {
+          console.log("Payment status updated successfully:", result);
+          
+          // Show success message
+          let message = `Payment status updated successfully!\n\n`;
+          message += `Procurement: ${procurement.reference || procurement.id}\n`;
+          message += `Status: ${statusText}\n`;
+          message += `Supplier: ${procurement.supplierName}\n`;
+          message += `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n`;
+          
+          if (newStatus) {
+            message += `\n✅ Payment recorded and supplier balance updated`;
+          } else {
+            message += `\n❌ Payment removed and supplier balance restored`;
+          }
+          
+          alert(message);
+          
+          // Refresh the procurement list to show updated status
+          await fetchAllProcurements();
+          
+        } else {
+          console.error("Error updating payment status:", result.error);
+          setError(`Error updating payment status: ${result.error}`);
+        }
+        
+      } catch (error) {
+        console.error('Error updating payment status:', error);
+        setError(`Error updating payment status: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
-  // Handle status filter change
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
-  };
-
-  // Handle action clicks
   const handleViewProcurement = (procurement) => {
     console.log('View procurement:', procurement.id);
     // Use the view function to open the form in read-only mode
@@ -5039,10 +5103,10 @@ const ProcurementManagementForm = () => {
           message += `Deleted Procurement:\n`;
           message += `• Reference: ${result.reference || procurement.id}\n`;
           message += `• Supplier: ${result.supplierName}\n`;
-          message += `• Amount: ₱${formatPrice(result.deletedGrandTotal?.toString() || '0')}\n\n`;
-          message += `✅ Supplier balance updated\n`;
-          message += `✅ Ledger entry marked as deleted\n`;
-          message += `✅ Procurement record removed`;
+          message += `• Amount: ₱${formatPrice(result.grandTotal?.toString() || '0')}\n\n`;
+          message += `Supplier Balance Effects:\n`;
+          message += `• Outstanding balance reduced by ₱${formatPrice(result.grandTotal?.toString() || '0')}\n`;
+          message += `• Ledger entries marked as deleted\n`;
           
           alert(message);
           
@@ -5051,7 +5115,7 @@ const ProcurementManagementForm = () => {
           
         } else {
           console.error("Error deleting procurement:", result.error);
-          setError(`Failed to delete procurement: ${result.error}`);
+          setError(`Error deleting procurement: ${result.error}`);
         }
         
       } catch (error) {
@@ -5062,7 +5126,19 @@ const ProcurementManagementForm = () => {
       }
     }
   };
-{/* Part 3 End - Event Handlers and Filter Logic */}
+
+  // ====== SEARCH AND FILTER HANDLERS ======
+  
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Handle status filter change
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+{/* Part 3 End - Form Action Handlers with Payment Update */}
 
 {/* Part 4 Start - Loading and Error States */}
   // Show loading state
@@ -5362,9 +5438,14 @@ const ProcurementManagementForm = () => {
                             </span>
                           </td>
                           <td className="border px-3 py-3 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${paymentStatus.className}`}>
+                            {/* CHANGED: Convert Payment column to clickable status button */}
+                            <button
+                              onClick={() => handlePaymentUpdate(procurement)}
+                              className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${paymentStatus.className} hover:opacity-80 cursor-pointer`}
+                              title={`${paymentStatus.label === 'Paid' ? 'Click to mark as Unpaid' : 'Click to mark as Paid'}`}
+                            >
                               {paymentStatus.label}
-                            </span>
+                            </button>
                           </td>
                           <td className="border px-3 py-3 text-center">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${deliveryStatus.className}`}>
@@ -8195,6 +8276,1256 @@ export default InventoryListForm;
 {/* Part 6 End - Main Component JSX */}
 </file>
 
+<file path="src/components/phone-selection/PhoneSelectionForm.jsx">
+import { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PhoneBasicInfo from './PhoneBasicInfo';
+import PhonePriceInfo from './PhonePriceInfo';
+import PhoneColorInfo from './PhoneColorInfo';
+import PhoneAdditionalInfo from './PhoneAdditionalInfo';
+import usePhoneOptions from './hooks/usePhoneOptions';
+import usePhoneCache from './hooks/usePhoneCache';
+import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import { 
+  formatNumberWithCommas,
+  validateImei, 
+  validatePrice,
+  handleKeyDown, 
+  getCurrentDate 
+} from './utils/phoneUtils';
+import { 
+  checkDuplicateImeis, 
+  addPhoneToInventory 
+} from './services/inventoryService';
+import { Search, ArrowRight, CircleAlert } from 'lucide-react';
+
+const PhoneSelectionForm = () => {
+  // ====== STATE DEFINITIONS ======
+  // Core state for selections
+  const [selectedManufacturer, setSelectedManufacturer] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedStorage, setSelectedStorage] = useState('');
+  const [selectedRam, setSelectedRam] = useState('');
+  
+  // Barcode search
+  const [barcodeSearch, setBarcodeSearch] = useState('');
+  const [isBarcodeSearching, setIsBarcodeSearching] = useState(false);
+  const [barcodeSearchError, setBarcodeSearchError] = useState('');
+  
+  // Get options and loading state from custom hook
+  const { 
+    manufacturers, 
+    models, 
+    colors, 
+    storage, 
+    ram, 
+    loading: optionsLoading, 
+    error: optionsError,
+    fetchManufacturers,
+    fetchModels,
+    fetchOptions
+  } = usePhoneOptions();
+  
+  // Get price cache from custom hook (keeping for backward compatibility in form submission)
+  const {
+    updatePriceConfiguration
+  } = usePhoneCache();
+  
+  // Track previous selection to avoid overwriting user edits
+  const prevSelectionRef = useRef('');
+  const prevColorRef = useRef('');
+  
+  // Form input fields state
+  const [imei1, setImei1] = useState('');
+  const [imei2, setImei2] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [dealersPrice, setDealersPrice] = useState('');
+  const [retailPrice, setRetailPrice] = useState('');
+  const [status, setStatus] = useState('On-Hand');
+  
+  // UI state
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSpecsSelected, setIsSpecsSelected] = useState(false);
+  const [isCheckingImei, setIsCheckingImei] = useState(false);
+  const [imei1Error, setImei1Error] = useState('');
+  const [imei2Error, setImei2Error] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(getCurrentDate());
+  const [userEnteredBarcode, setUserEnteredBarcode] = useState(false);
+
+  // ====== EVENT HANDLERS ======
+  // Event handlers for form inputs
+  const handleManufacturerChange = (e) => {
+    const newManufacturer = e.target.value;
+    setSelectedManufacturer(newManufacturer);
+    setSelectedModel('');
+    setSelectedColor('');
+    setSelectedStorage('');
+    setSelectedRam('');
+    setDealersPrice('');
+    setRetailPrice('');
+    
+    if (newManufacturer) {
+      fetchModels(newManufacturer);
+    }
+  };
+
+  const handleModelChange = (e) => {
+    const newModel = e.target.value;
+    setSelectedModel(newModel);
+    setSelectedColor('');
+    setSelectedStorage('');
+    setSelectedRam('');
+    setDealersPrice('');
+    setRetailPrice('');
+    
+    if (selectedManufacturer && newModel) {
+      fetchOptions(selectedManufacturer, newModel);
+    }
+  };
+
+  const handleColorChange = (e) => {
+    setSelectedColor(e.target.value);
+    // Reset user entered flag when color changes
+    setUserEnteredBarcode(false);
+  };
+
+  const handleRamChange = (e) => {
+    const newRam = e.target.value;
+    setSelectedRam(newRam);
+  };
+
+  const handleStorageChange = (e) => {
+    const newStorage = e.target.value;
+    setSelectedStorage(newStorage);
+  };
+
+  const handleImei1Change = (e) => {
+    const newImei = validateImei(e.target.value);
+    setImei1(newImei);
+    setImei1Error(''); // Clear error on change
+  };
+
+  const handleImei2Change = (e) => {
+    const newImei = validateImei(e.target.value);
+    setImei2(newImei);
+    setImei2Error(''); // Clear error on change
+  };
+
+  const handleBarcodeChange = (e) => {
+    const newBarcode = e.target.value.toUpperCase();
+    setBarcode(newBarcode);
+    // Set flag that user has entered a barcode manually
+    setUserEnteredBarcode(true);
+  };
+
+  const handleBarcodeSearchChange = (e) => {
+    setBarcodeSearch(e.target.value.toUpperCase());
+    setBarcodeSearchError('');
+  };
+
+  const handleBarcodeSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleBarcodeSearch();
+    }
+  };
+
+  // Handle barcode search
+  const handleBarcodeSearch = async () => {
+    if (!barcodeSearch.trim()) {
+      setBarcodeSearchError('Please enter a barcode to search');
+      return;
+    }
+    
+    setIsBarcodeSearching(true);
+    setBarcodeSearchError('');
+    
+    try {
+      // Search for the barcode in inventory
+      const inventoryRef = collection(db, 'inventory');
+      const q = query(
+        inventoryRef, 
+        where("barcode", "==", barcodeSearch.trim())
+      );
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        setBarcodeSearchError('No matching phone found for this barcode');
+        setIsBarcodeSearching(false);
+        return;
+      }
+      
+      // Get the first matching record
+      const matchingPhone = snapshot.docs[0].data();
+      
+      // Set all the fields accordingly
+      setSelectedManufacturer(matchingPhone.manufacturer);
+      
+      // Fetch models for this manufacturer
+      await fetchModels(matchingPhone.manufacturer);
+      
+      setSelectedModel(matchingPhone.model);
+      
+      // Fetch options for this model
+      await fetchOptions(matchingPhone.manufacturer, matchingPhone.model);
+      
+      setSelectedRam(matchingPhone.ram);
+      setSelectedStorage(matchingPhone.storage);
+      setSelectedColor(matchingPhone.color);
+      
+      // Set prices
+      setDealersPrice(formatNumberWithCommas(matchingPhone.dealersPrice.toString()));
+      setRetailPrice(formatNumberWithCommas(matchingPhone.retailPrice.toString()));
+      
+      // Set isSpecsSelected to true BEFORE setting barcode
+      setIsSpecsSelected(true);
+      
+      // Use setTimeout to ensure the DOM has updated and the barcode field exists
+      setTimeout(() => {
+        // Set barcode
+        setBarcode(matchingPhone.barcode);
+        setUserEnteredBarcode(true); // Treat this as a user-confirmed barcode
+      }, 0);
+      
+      // Clear the barcode search
+      setBarcodeSearch('');
+      
+      // Clear IMEI fields (these should be empty for a new entry)
+      setImei1('');
+      setImei2('');
+      
+      // Set status and last updated
+      setStatus('On-Hand');
+      setLastUpdated(getCurrentDate());
+      
+    } catch (error) {
+      console.error("Error searching by barcode:", error);
+      setBarcodeSearchError('Error searching for barcode. Please try again.');
+    } finally {
+      setIsBarcodeSearching(false);
+    }
+  };
+
+  // Pricing input handlers with commas that work correctly
+  const handleDealersPriceChange = (e) => {
+    const rawValue = e.target.value;
+    
+    // Check if input is empty and store as-is if it is
+    if (rawValue === '') {
+      setDealersPrice('');
+    } else {
+      // Apply formatting if not empty
+      const validatedPrice = validatePrice(rawValue);
+      const formattedPrice = formatNumberWithCommas(validatedPrice);
+      setDealersPrice(formattedPrice);
+    }
+  };
+
+  const handleRetailPriceChange = (e) => {
+    const rawValue = e.target.value;
+    
+    // Check if input is empty and store as-is if it is
+    if (rawValue === '') {
+      setRetailPrice('');
+    } else {
+      // Apply formatting if not empty
+      const validatedPrice = validatePrice(rawValue);
+      const formattedPrice = formatNumberWithCommas(validatedPrice);
+      setRetailPrice(formattedPrice);
+    }
+  };
+
+  const handleStatusChange = (e) => {
+    const newStatus = e.target.value;
+    setStatus(newStatus);
+    setLastUpdated(getCurrentDate());
+  };
+
+  // Form submission handler
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Basic form validation
+    if (!selectedManufacturer || !selectedModel || !selectedRam || 
+        !selectedStorage || !selectedColor || !imei1 || !barcode || 
+        !dealersPrice || !retailPrice) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    // Set checking state and clear previous errors
+    setIsSubmitting(true);
+    setIsCheckingImei(true);
+    setImei1Error('');
+    setImei2Error('');
+    
+    // Check for duplicate IMEIs before submitting
+    const imeisCheck = await checkDuplicateImeis(imei1, imei2);
+    
+    setIsCheckingImei(false);
+    
+    if (!imeisCheck.isValid) {
+      setImei1Error(imeisCheck.imei1Error);
+      setImei2Error(imeisCheck.imei2Error);
+      setIsSubmitting(false);
+      return; // Don't proceed if IMEIs are invalid
+    }
+    
+    // Update lastUpdated on submit
+    const currentDate = getCurrentDate();
+    setLastUpdated(currentDate);
+    
+    // Parse prices properly removing commas
+    const dPrice = parseFloat(dealersPrice.replace(/,/g, '')) || 0;
+    const rPrice = parseFloat(retailPrice.replace(/,/g, '')) || 0;
+    
+    const phoneData = {
+      manufacturer: selectedManufacturer,
+      model: selectedModel,
+      color: selectedColor,
+      ram: selectedRam,
+      storage: selectedStorage,
+      imei1,
+      imei2,
+      barcode,
+      dealersPrice: dPrice,
+      retailPrice: rPrice,
+      status,
+      lastUpdated: currentDate,
+      dateAdded: currentDate  // New field to track when the entry was first added
+    };
+    
+    setLoading(true);
+    
+    try {
+      // Add the phone to inventory
+      const result = await addPhoneToInventory(phoneData);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to add phone to inventory');
+      }
+      
+      // IMPORTANT: Update the price configuration
+      // 1. First update base price (without color)
+      await updatePriceConfiguration(
+        selectedManufacturer,
+        selectedModel,
+        selectedRam,
+        selectedStorage,
+        dealersPrice,
+        retailPrice
+      );
+      
+      // 2. Then update color-specific price
+      await updatePriceConfiguration(
+        selectedManufacturer,
+        selectedModel,
+        selectedRam,
+        selectedStorage,
+        dealersPrice,
+        retailPrice,
+        selectedColor
+      );
+      
+      // Reset fields after successful submission
+      setImei1('');
+      setImei2('');
+      setStatus('On-Hand');
+      
+      // Set flag that the barcode value should persist
+      setUserEnteredBarcode(true);
+      
+      setLoading(false);
+      setIsSubmitting(false);
+      alert('Phone details saved successfully!');
+    } catch (error) {
+      console.error("Error adding document:", error);
+      setError(`Error saving phone: ${error.message}`);
+      setLoading(false);
+      setIsSubmitting(false);
+      alert('Error saving phone details. Please try again.');
+    }
+  };
+
+  // ====== EFFECT HOOKS ======
+  // Fetch manufacturers on component mount
+  useEffect(() => {
+    async function initializeForm() {
+      setLoading(true);
+      try {
+        // Fetch manufacturers list
+        await fetchManufacturers();
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error initializing form:", error);
+        setError(`Error loading data: ${error.message}`);
+        setLoading(false);
+      }
+    }
+    
+    initializeForm();
+  }, [fetchManufacturers]);
+
+  // Check if selections are complete and fetch prices directly from Firestore
+  useEffect(() => {
+    const fetchPricesDirectly = async () => {
+      // First, create a key to track our selections for pricing (without color)
+      const priceSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`;
+      
+      // Create a complete key that includes color for barcode lookup
+      // const barcodeSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`;
+      
+      // Track if we need to reset the barcode
+      const shouldResetBarcode = prevSelectionRef.current !== priceSelectionKey;
+      
+      // Only check when we have all the necessary selections
+      if (selectedManufacturer && selectedModel && selectedRam && selectedStorage) {
+        
+        // Reset barcode when the base configuration changes (manufacturer, model, RAM, storage)
+        if (shouldResetBarcode) {
+          setBarcode('');
+          setUserEnteredBarcode(false);
+        }
+        
+        // Fetch prices directly from Firestore instead of using cache
+        if (shouldResetBarcode) {
+          console.log("Selection changed - fetching prices from Firestore");
+          
+          try {
+            // Fetch base price configuration
+            const baseConfigId = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`.replace(/\s+/g, '_').toLowerCase();
+            const baseConfigRef = doc(db, 'price_configurations', baseConfigId);
+            const baseConfigSnap = await getDoc(baseConfigRef);
+            
+            if (baseConfigSnap.exists()) {
+              const baseData = baseConfigSnap.data();
+              console.log("Found base pricing:", baseData);
+              
+              if (baseData.dealersPrice) {
+                setDealersPrice(formatNumberWithCommas(baseData.dealersPrice.toString()));
+              }
+              if (baseData.retailPrice) {
+                setRetailPrice(formatNumberWithCommas(baseData.retailPrice.toString()));
+              }
+            } else {
+              console.log("No base pricing found for this configuration");
+              // Clear prices if no configuration found
+              setDealersPrice('');
+              setRetailPrice('');
+            }
+          } catch (error) {
+            console.error("Error fetching price configuration:", error);
+          }
+        }
+        
+        // Check for color-specific pricing and barcode if color is also selected
+        if (selectedColor) {
+          // Check if color changed - comparing with previous color
+          const colorChanged = prevColorRef.current !== selectedColor;
+          
+          // Fetch color-specific pricing and barcode when color changes or base selections change
+          if ((shouldResetBarcode || colorChanged) && !userEnteredBarcode) {
+            try {
+              const colorConfigId = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`.replace(/\s+/g, '_').toLowerCase();
+              const colorConfigRef = doc(db, 'price_configurations', colorConfigId);
+              const colorConfigSnap = await getDoc(colorConfigRef);
+              
+              if (colorConfigSnap.exists()) {
+                const colorData = colorConfigSnap.data();
+                console.log("Found color-specific pricing:", colorData);
+                
+                // Update prices with color-specific pricing if available
+                if (colorData.dealersPrice) {
+                  setDealersPrice(formatNumberWithCommas(colorData.dealersPrice.toString()));
+                }
+                if (colorData.retailPrice) {
+                  setRetailPrice(formatNumberWithCommas(colorData.retailPrice.toString()));
+                }
+              }
+              
+              // Also check for barcode from inventory
+              const inventoryQuery = query(
+                collection(db, 'inventory'),
+                where("manufacturer", "==", selectedManufacturer),
+                where("model", "==", selectedModel),
+                where("ram", "==", selectedRam),
+                where("storage", "==", selectedStorage),
+                where("color", "==", selectedColor),
+                limit(1)
+              );
+              
+              const inventorySnap = await getDocs(inventoryQuery);
+              if (!inventorySnap.empty) {
+                const inventoryItem = inventorySnap.docs[0].data();
+                if (inventoryItem.barcode) {
+                  setBarcode(inventoryItem.barcode);
+                }
+              } else if (colorChanged) {
+                // Only clear barcode when color changes and there's no barcode for this color
+                setBarcode('');
+              }
+            } catch (error) {
+              console.error("Error fetching color-specific pricing:", error);
+            }
+          }
+          
+          // If we have a complete selection including color, we can show the additional info section
+          setIsSpecsSelected(true);
+        } else {
+          setIsSpecsSelected(false);
+        }
+      } else {
+        setIsSpecsSelected(false);
+      }
+      
+      // Update the previous selection ref
+      prevSelectionRef.current = priceSelectionKey;
+      prevColorRef.current = selectedColor;
+    };
+    
+    fetchPricesDirectly();
+  }, [selectedManufacturer, selectedModel, selectedRam, selectedStorage, selectedColor, userEnteredBarcode]);
+
+  // Show loading state for initial load
+  if ((loading || optionsLoading) && manufacturers.length === 0) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white">Loading...</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p>Fetching data...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (error || optionsError) {
+    const errorMessage = error || optionsError;
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white">Error</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p>{errorMessage}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
+            >
+              Reload
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Main component render
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <form 
+        onSubmit={handleSubmit}
+        onKeyDown={handleKeyDown}>
+        <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white">Select Phone</CardTitle>
+          </CardHeader>
+
+          <CardContent className="bg-white p-4 space-y-4">
+            {/* Barcode Search */}
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="font-semibold text-lg text-[rgb(52,69,157)] mb-3">Quick Barcode Search</h3>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={barcodeSearch}
+                    onChange={handleBarcodeSearchChange}
+                    onKeyDown={handleBarcodeSearchKeyDown}
+                    placeholder="Enter barcode to auto-fill phone details"
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleBarcodeSearch}
+                  disabled={isBarcodeSearching || !barcodeSearch.trim()}
+                  className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
+                >
+                  {isBarcodeSearching ? (
+                    <span className="animate-spin mr-2">⊛</span>
+                  ) : (
+                    <Search className="h-5 w-5 mr-2" />
+                  )}
+                  Search
+                </button>
+              </div>
+              
+              {barcodeSearchError && (
+                <div className="mt-2 text-red-500 flex items-center">
+                  <CircleAlert className="h-4 w-4 mr-1" />
+                  {barcodeSearchError}
+                </div>
+              )}
+              
+              <div className="mt-2 text-sm text-gray-500 flex items-center">
+                <ArrowRight className="h-4 w-4 mr-1" />
+                <span>Scan or enter a barcode to automatically fill the phone details</span>
+              </div>
+            </div>
+
+            {/* Manual Selection Divider */}
+            <div className="relative text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-white px-3 text-gray-500 text-sm">Or select manually</span>
+              </div>
+            </div>
+
+            {/* Basic Information */}
+            <PhoneBasicInfo 
+              selectedManufacturer={selectedManufacturer}
+              selectedModel={selectedModel}
+              selectedRam={selectedRam}
+              selectedStorage={selectedStorage}
+              manufacturers={manufacturers}
+              models={models}
+              ram={ram}
+              storage={storage}
+              handleRamChange={handleRamChange}
+              handleStorageChange={handleStorageChange}
+              handleManufacturerChange={handleManufacturerChange}
+              handleModelChange={handleModelChange}
+            />
+
+            {/* Price Information */}
+            {selectedRam && selectedStorage && (
+              <PhonePriceInfo 
+                dealersPrice={dealersPrice}
+                retailPrice={retailPrice}
+                handleDealersPriceChange={handleDealersPriceChange}
+                handleRetailPriceChange={handleRetailPriceChange}
+              />
+            )}
+
+            {/* Color Information */}
+            {selectedModel && (
+              <PhoneColorInfo 
+                selectedColor={selectedColor}
+                colors={colors}
+                handleColorChange={handleColorChange}
+              />
+            )}
+
+            {/* Additional Information */}
+            {isSpecsSelected && (
+              <PhoneAdditionalInfo 
+                imei1={imei1}
+                imei2={imei2}
+                barcode={barcode}
+                status={status}
+                lastUpdated={lastUpdated}
+                handleImei1Change={handleImei1Change}
+                handleImei2Change={handleImei2Change}
+                handleBarcodeChange={handleBarcodeChange}
+                handleStatusChange={handleStatusChange}
+                imei1Error={imei1Error}
+                imei2Error={imei2Error}
+              />
+            )}
+
+            {/* Submit Button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90"
+                disabled={!isSpecsSelected || isCheckingImei || isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : 'Save Entry'}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </div>
+  );
+};
+
+export default PhoneSelectionForm;
+</file>
+
+<file path="src/App.jsx">
+// src/App.jsx
+import { useEffect } from 'react';
+import PhoneSpecForm from './components/PhoneSpecForm';
+import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
+import InventoryListForm from './components/InventoryListForm';
+import PhoneListForm from './components/PhoneListForm';
+import InventorySummaryForm from './components/InventorySummaryForm';
+import PriceManagementForm from './components/PriceManagementForm';
+import PhoneProcurementForm from './components/PhoneProcurementForm';
+import SupplierManagementForm from './components/SupplierManagementForm'; // NEW: Added supplier management import
+import ProcurementManagementForm from './components/ProcurementManagementForm'; // NEW: Added procurement management import
+// Import the hook from our consolidated file
+import { useGlobalState } from './context/GlobalStateContext';
+
+function App() {
+  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
+  
+  // For debugging
+  useEffect(() => {
+    console.log("App: Active component changed to:", activeComponent);
+    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
+  }, [activeComponent, phoneToEdit]);
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="p-4 bg-[rgb(52,69,157)] text-white">
+        <div className="max-w-6xl mx-auto flex flex-wrap gap-4">
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'summary' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('summary')}
+          >
+            Inventory Summary
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('inventory')}
+          >
+            Inventory List
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('selection')}
+          >
+            Add Phone Inventory
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'procurement' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('procurement')}
+          >
+            Phone Procurement
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'procurementmgmt' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('procurementmgmt')}
+          >
+            Procurement Management
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('suppliers')}
+          >
+            Supplier Management
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('form')}
+          >
+            Add Phone Model
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('phonelist')}
+          >
+            Phone Models
+          </button>
+          <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('prices')}
+          >
+            Price Management
+          </button>
+        </div>
+      </div>
+      
+      {activeComponent === 'summary' && <InventorySummaryForm />}
+      {activeComponent === 'selection' && <PhoneSelectionForm />}
+      {activeComponent === 'procurement' && <PhoneProcurementForm />}
+      {activeComponent === 'procurementmgmt' && <ProcurementManagementForm />}
+      {activeComponent === 'suppliers' && <SupplierManagementForm />}
+      {activeComponent === 'form' && <PhoneSpecForm />}
+      {activeComponent === 'inventory' && <InventoryListForm />}
+      {activeComponent === 'phonelist' && <PhoneListForm />}
+      {activeComponent === 'prices' && <PriceManagementForm />}
+    </div>
+  );
+}
+
+export default App;
+</file>
+
+<file path="src/components/inventory/InventoryTable.jsx">
+import { useState } from 'react';
+import PropTypes from 'prop-types';
+import { doc, updateDoc, runTransaction, increment, deleteDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import InventoryRow from './InventoryRow';
+import InventoryEditForm from './InventoryEditForm';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+// Import getCurrentDate utility function
+import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
+
+const InventoryTable = ({ 
+  inventoryItems, 
+  handleSort, 
+  sortField, 
+  sortDirection, 
+  allItems,
+  setAllItems,
+  setInventoryItems,
+  applyFilters
+}) => {
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: '',
+    color: '',
+    imei1: '',
+    barcode: '',
+    status: '',
+    retailPrice: 0 // NEW: Added retailPrice to initial state
+  });
+  const [savingItemId, setSavingItemId] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Handle edit button click
+  const handleEditClick = (item) => {
+    // If we're already editing, cancel it first
+    if (editingItemId) {
+      setEditingItemId(null);
+    }
+    
+    // Set the item to edit
+    setEditingItemId(item.id);
+    
+    // Populate form with item data
+    setEditFormData({
+      manufacturer: item.manufacturer,
+      model: item.model,
+      ram: item.ram,
+      storage: item.storage,
+      color: item.color,
+      imei1: item.imei1,
+      barcode: item.barcode || '',
+      status: item.status,
+      retailPrice: item.retailPrice // NEW: Added retailPrice to edit form data
+    });
+  };
+
+  // Handle delete button click
+  const handleDeleteClick = (itemId) => {
+    const item = allItems.find(item => item.id === itemId);
+    if (item) {
+      setItemToDelete(item);
+      setIsDeleteModalOpen(true);
+    }
+  };
+
+  // Handle delete confirmation - PRESERVED: Original working delete logic
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Get a reference to the document
+      const itemRef = doc(db, 'inventory', itemToDelete.id);
+      
+      // Delete the document
+      await deleteDoc(itemRef);
+      
+      // Update inventory counts
+      const inventoryId = `${itemToDelete.manufacturer}_${itemToDelete.model}_${itemToDelete.ram}_${itemToDelete.storage}_${itemToDelete.color}`.replace(/\s+/g, '_').toLowerCase();
+      
+      // Reference to the inventory count doc
+      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+      
+      // Update inventory counts based on the item's status
+      await runTransaction(db, async (transaction) => {
+        const inventoryDoc = await transaction.get(inventoryRef);
+        
+        if (inventoryDoc.exists()) {
+          // Determine which field to decrement based on status
+          const decrementField = 
+            itemToDelete.status === 'On-Hand' ? 'onHand' : 
+            itemToDelete.status === 'On-Display' ? 'onDisplay' : 
+            itemToDelete.status === 'Sold' ? 'sold' : 
+            itemToDelete.status === 'Reserved' ? 'reserved' : 
+            'defective';
+          
+          // Decrement total and status count
+          transaction.update(inventoryRef, {
+            total: increment(-1),
+            [decrementField]: increment(-1),
+            lastUpdated: new Date().toLocaleDateString()
+          });
+        }
+      });
+      
+      // Update local state by removing the deleted item
+      const updatedItems = allItems.filter(item => item.id !== itemToDelete.id);
+      setAllItems(updatedItems);
+      
+      // Re-apply filters
+      const filteredItems = applyFilters(updatedItems);
+      setInventoryItems(filteredItems);
+      
+      // Close the modal and reset state
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+      setIsDeleting(false);
+      
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      alert(`Error deleting item: ${error.message}`);
+      setIsDeleting(false);
+    }
+  };
+
+  // Handle cancel delete
+  const handleDeleteCancel = () => {
+    setIsDeleteModalOpen(false);
+    setItemToDelete(null);
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditFormData({
+      manufacturer: '',
+      model: '',
+      ram: '',
+      storage: '',
+      color: '',
+      imei1: '',
+      barcode: '',
+      status: '',
+      retailPrice: 0 // NEW: Added retailPrice to reset state
+    });
+  };
+
+  // Handle edit form input changes
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle save edits - includes lastUpdated
+  const handleSaveEdit = async (id) => {
+    setSavingItemId(id);
+    
+    try {
+      // Create an update object with the edited fields
+      const updateData = {
+        manufacturer: editFormData.manufacturer,
+        model: editFormData.model,
+        ram: editFormData.ram,
+        storage: editFormData.storage,
+        color: editFormData.color,
+        imei1: editFormData.imei1,
+        barcode: editFormData.barcode,
+        status: editFormData.status,
+        lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
+      };
+      
+      // Get a reference to the document
+      const itemRef = doc(db, 'inventory', id);
+      
+      // Update the document
+      await updateDoc(itemRef, updateData);
+      
+      // If the status was changed, update the inventory counts
+      const originalItem = allItems.find(item => item.id === id);
+      if (originalItem && originalItem.status !== editFormData.status) {
+        // Create a unique ID for this inventory item type
+        const inventoryId = `${editFormData.manufacturer}_${editFormData.model}_${editFormData.ram}_${editFormData.storage}_${editFormData.color}`.replace(/\s+/g, '_').toLowerCase();
+        
+        // Reference to the inventory count doc
+        const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+        
+        // Run as a transaction to ensure data consistency
+        await runTransaction(db, async (transaction) => {
+          const inventoryDoc = await transaction.get(inventoryRef);
+          
+          if (inventoryDoc.exists()) {
+            // Decrement the old status count
+            const decrementField = 
+              originalItem.status === 'On-Hand' ? 'onHand' : 
+              originalItem.status === 'On-Display' ? 'onDisplay' : 
+              originalItem.status === 'Sold' ? 'sold' : 
+              originalItem.status === 'Reserved' ? 'reserved' : 
+              'defective';
+            
+            // Increment the new status count
+            const incrementField = 
+              editFormData.status === 'On-Hand' ? 'onHand' : 
+              editFormData.status === 'On-Display' ? 'onDisplay' : 
+              editFormData.status === 'Sold' ? 'sold' : 
+              editFormData.status === 'Reserved' ? 'reserved' : 
+              'defective';
+            
+            // Update counters
+            transaction.update(inventoryRef, {
+              [decrementField]: increment(-1),
+              [incrementField]: increment(1),
+              lastUpdated: new Date().toLocaleDateString()
+            });
+          }
+        });
+      }
+      
+      // Update local state - includes lastUpdated
+      setAllItems(prevItems => 
+        prevItems.map(item => 
+          item.id === id 
+            ? { 
+                ...item, 
+                ...updateData,
+                // Keep original prices since we're not editing them
+                dealersPrice: item.dealersPrice,
+                retailPrice: item.retailPrice
+              } 
+            : item
+        )
+      );
+      
+      // Reset editing state
+      setEditingItemId(null);
+      setSavingItemId(null);
+      
+      // Re-apply filters to update the displayed inventory items - includes lastUpdated
+      const updatedItems = allItems.map(item => 
+        item.id === id 
+          ? { 
+              ...item, 
+              ...updateData,
+              // Keep original prices since we're not editing them
+              dealersPrice: item.dealersPrice,
+              retailPrice: item.retailPrice
+            } 
+          : item
+      );
+      const filteredItems = applyFilters(updatedItems);
+      setInventoryItems(filteredItems);
+      
+    } catch (error) {
+      console.error("Error updating item:", error);
+      alert(`Error updating item: ${error.message}`);
+      setSavingItemId(null);
+    }
+  };
+  
+  // UPDATED: Enhanced sorting logic for new sortable columns
+  const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
+    // Handle numeric fields
+    if (sortField === 'retailPrice') {
+      if (sortDirection === 'asc') {
+        return a.retailPrice - b.retailPrice;
+      } else {
+        return b.retailPrice - a.retailPrice;
+      }
+    }
+    
+    // Handle date field (lastUpdated)
+    if (sortField === 'lastUpdated') {
+      const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
+      const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
+      
+      if (sortDirection === 'asc') {
+        return dateA - dateB;
+      } else {
+        return dateB - dateA;
+      }
+    }
+    
+    // Handle string fields
+    if (sortDirection === 'asc') {
+      return a[sortField]?.localeCompare(b[sortField] || '');
+    } else {
+      return b[sortField]?.localeCompare(a[sortField] || '');
+    }
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-base">
+        <thead>
+          <tr className="bg-gray-100">
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('manufacturer')}
+              style={{ width: '12%' }}
+            >
+              Manufacturer
+              {sortField === 'manufacturer' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('model')}
+              style={{ width: '12%' }}
+            >
+              Model
+              {sortField === 'model' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('ram')}
+              style={{ width: '7%' }}
+            >
+              RAM
+              {sortField === 'ram' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('storage')}
+              style={{ width: '7%' }}
+            >
+              Storage
+              {sortField === 'storage' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('color')}
+              style={{ width: '12%' }}
+            >
+              Color
+              {sortField === 'color' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('imei1')}
+              style={{ width: '15%' }}
+            >
+              IMEI1
+              {sortField === 'imei1' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('barcode')}
+              style={{ width: '15%' }}
+            >
+              Barcode
+              {sortField === 'barcode' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            {/* NEW: Added Retail Price column */}
+            <th 
+              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('retailPrice')}
+              style={{ width: '10%' }}
+            >
+              Price
+              {sortField === 'retailPrice' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('lastUpdated')}
+              style={{ width: '8%' }}
+            >
+              Date
+              {sortField === 'lastUpdated' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('status')}
+              style={{ width: '8%' }}
+            >
+              Status
+              {sortField === 'status' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '6%' }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedInventoryItems.map((item) => (
+            editingItemId === item.id ? (
+              <InventoryEditForm 
+                key={item.id}
+                itemId={item.id}
+                editFormData={editFormData}
+                handleEditInputChange={handleEditInputChange}
+                handleSaveEdit={handleSaveEdit}
+                handleCancelEdit={handleCancelEdit}
+                savingItemId={savingItemId}
+              />
+            ) : (
+              <InventoryRow 
+                key={item.id}
+                item={item}
+                handleEditClick={handleEditClick}
+                handleDeleteClick={handleDeleteClick}
+              />
+            )
+          ))}
+        </tbody>
+      </table>
+
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        itemToDelete={itemToDelete}
+        onCancel={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+      />
+    </div>
+  );
+};
+
+InventoryTable.propTypes = {
+  inventoryItems: PropTypes.array.isRequired,
+  handleSort: PropTypes.func.isRequired,
+  sortField: PropTypes.string.isRequired,
+  sortDirection: PropTypes.string.isRequired,
+  allItems: PropTypes.array.isRequired,
+  setAllItems: PropTypes.func.isRequired,
+  setInventoryItems: PropTypes.func.isRequired,
+  applyFilters: PropTypes.func.isRequired
+};
+
+export default InventoryTable;
+</file>
+
 <file path="src/components/InventorySummaryForm.jsx">
 {/* Part 1 Start - Complete File: Imports, State, and Helper Functions */}
 import React, { useState, useEffect, useCallback } from 'react';
@@ -9290,696 +10621,6 @@ const InventorySummaryForm = () => {
 
 export default InventorySummaryForm;
 {/* Part 6 End - Inventory Value Summary and Footer */}
-</file>
-
-<file path="src/components/phone-selection/PhoneSelectionForm.jsx">
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import PhoneBasicInfo from './PhoneBasicInfo';
-import PhonePriceInfo from './PhonePriceInfo';
-import PhoneColorInfo from './PhoneColorInfo';
-import PhoneAdditionalInfo from './PhoneAdditionalInfo';
-import usePhoneOptions from './hooks/usePhoneOptions';
-import usePhoneCache from './hooks/usePhoneCache';
-import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore';
-import { db } from '../../firebase/config';
-import { 
-  formatNumberWithCommas,
-  validateImei, 
-  validatePrice,
-  handleKeyDown, 
-  getCurrentDate 
-} from './utils/phoneUtils';
-import { 
-  checkDuplicateImeis, 
-  addPhoneToInventory 
-} from './services/inventoryService';
-import { Search, ArrowRight, CircleAlert } from 'lucide-react';
-
-const PhoneSelectionForm = () => {
-  // ====== STATE DEFINITIONS ======
-  // Core state for selections
-  const [selectedManufacturer, setSelectedManufacturer] = useState('');
-  const [selectedModel, setSelectedModel] = useState('');
-  const [selectedColor, setSelectedColor] = useState('');
-  const [selectedStorage, setSelectedStorage] = useState('');
-  const [selectedRam, setSelectedRam] = useState('');
-  
-  // Barcode search
-  const [barcodeSearch, setBarcodeSearch] = useState('');
-  const [isBarcodeSearching, setIsBarcodeSearching] = useState(false);
-  const [barcodeSearchError, setBarcodeSearchError] = useState('');
-  
-  // Get options and loading state from custom hook
-  const { 
-    manufacturers, 
-    models, 
-    colors, 
-    storage, 
-    ram, 
-    loading: optionsLoading, 
-    error: optionsError,
-    fetchManufacturers,
-    fetchModels,
-    fetchOptions
-  } = usePhoneOptions();
-  
-  // Get price cache from custom hook (keeping for backward compatibility in form submission)
-  const {
-    updatePriceConfiguration
-  } = usePhoneCache();
-  
-  // Track previous selection to avoid overwriting user edits
-  const prevSelectionRef = useRef('');
-  const prevColorRef = useRef('');
-  
-  // Form input fields state
-  const [imei1, setImei1] = useState('');
-  const [imei2, setImei2] = useState('');
-  const [barcode, setBarcode] = useState('');
-  const [dealersPrice, setDealersPrice] = useState('');
-  const [retailPrice, setRetailPrice] = useState('');
-  const [status, setStatus] = useState('On-Hand');
-  
-  // UI state
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSpecsSelected, setIsSpecsSelected] = useState(false);
-  const [isCheckingImei, setIsCheckingImei] = useState(false);
-  const [imei1Error, setImei1Error] = useState('');
-  const [imei2Error, setImei2Error] = useState('');
-  const [lastUpdated, setLastUpdated] = useState(getCurrentDate());
-  const [userEnteredBarcode, setUserEnteredBarcode] = useState(false);
-
-  // ====== EVENT HANDLERS ======
-  // Event handlers for form inputs
-  const handleManufacturerChange = (e) => {
-    const newManufacturer = e.target.value;
-    setSelectedManufacturer(newManufacturer);
-    setSelectedModel('');
-    setSelectedColor('');
-    setSelectedStorage('');
-    setSelectedRam('');
-    setDealersPrice('');
-    setRetailPrice('');
-    
-    if (newManufacturer) {
-      fetchModels(newManufacturer);
-    }
-  };
-
-  const handleModelChange = (e) => {
-    const newModel = e.target.value;
-    setSelectedModel(newModel);
-    setSelectedColor('');
-    setSelectedStorage('');
-    setSelectedRam('');
-    setDealersPrice('');
-    setRetailPrice('');
-    
-    if (selectedManufacturer && newModel) {
-      fetchOptions(selectedManufacturer, newModel);
-    }
-  };
-
-  const handleColorChange = (e) => {
-    setSelectedColor(e.target.value);
-    // Reset user entered flag when color changes
-    setUserEnteredBarcode(false);
-  };
-
-  const handleRamChange = (e) => {
-    const newRam = e.target.value;
-    setSelectedRam(newRam);
-  };
-
-  const handleStorageChange = (e) => {
-    const newStorage = e.target.value;
-    setSelectedStorage(newStorage);
-  };
-
-  const handleImei1Change = (e) => {
-    const newImei = validateImei(e.target.value);
-    setImei1(newImei);
-    setImei1Error(''); // Clear error on change
-  };
-
-  const handleImei2Change = (e) => {
-    const newImei = validateImei(e.target.value);
-    setImei2(newImei);
-    setImei2Error(''); // Clear error on change
-  };
-
-  const handleBarcodeChange = (e) => {
-    const newBarcode = e.target.value.toUpperCase();
-    setBarcode(newBarcode);
-    // Set flag that user has entered a barcode manually
-    setUserEnteredBarcode(true);
-  };
-
-  const handleBarcodeSearchChange = (e) => {
-    setBarcodeSearch(e.target.value.toUpperCase());
-    setBarcodeSearchError('');
-  };
-
-  const handleBarcodeSearchKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleBarcodeSearch();
-    }
-  };
-
-  // Handle barcode search
-  const handleBarcodeSearch = async () => {
-    if (!barcodeSearch.trim()) {
-      setBarcodeSearchError('Please enter a barcode to search');
-      return;
-    }
-    
-    setIsBarcodeSearching(true);
-    setBarcodeSearchError('');
-    
-    try {
-      // Search for the barcode in inventory
-      const inventoryRef = collection(db, 'inventory');
-      const q = query(
-        inventoryRef, 
-        where("barcode", "==", barcodeSearch.trim())
-      );
-      const snapshot = await getDocs(q);
-      
-      if (snapshot.empty) {
-        setBarcodeSearchError('No matching phone found for this barcode');
-        setIsBarcodeSearching(false);
-        return;
-      }
-      
-      // Get the first matching record
-      const matchingPhone = snapshot.docs[0].data();
-      
-      // Set all the fields accordingly
-      setSelectedManufacturer(matchingPhone.manufacturer);
-      
-      // Fetch models for this manufacturer
-      await fetchModels(matchingPhone.manufacturer);
-      
-      setSelectedModel(matchingPhone.model);
-      
-      // Fetch options for this model
-      await fetchOptions(matchingPhone.manufacturer, matchingPhone.model);
-      
-      setSelectedRam(matchingPhone.ram);
-      setSelectedStorage(matchingPhone.storage);
-      setSelectedColor(matchingPhone.color);
-      
-      // Set prices
-      setDealersPrice(formatNumberWithCommas(matchingPhone.dealersPrice.toString()));
-      setRetailPrice(formatNumberWithCommas(matchingPhone.retailPrice.toString()));
-      
-      // Set isSpecsSelected to true BEFORE setting barcode
-      setIsSpecsSelected(true);
-      
-      // Use setTimeout to ensure the DOM has updated and the barcode field exists
-      setTimeout(() => {
-        // Set barcode
-        setBarcode(matchingPhone.barcode);
-        setUserEnteredBarcode(true); // Treat this as a user-confirmed barcode
-      }, 0);
-      
-      // Clear the barcode search
-      setBarcodeSearch('');
-      
-      // Clear IMEI fields (these should be empty for a new entry)
-      setImei1('');
-      setImei2('');
-      
-      // Set status and last updated
-      setStatus('On-Hand');
-      setLastUpdated(getCurrentDate());
-      
-    } catch (error) {
-      console.error("Error searching by barcode:", error);
-      setBarcodeSearchError('Error searching for barcode. Please try again.');
-    } finally {
-      setIsBarcodeSearching(false);
-    }
-  };
-
-  // Pricing input handlers with commas that work correctly
-  const handleDealersPriceChange = (e) => {
-    const rawValue = e.target.value;
-    
-    // Check if input is empty and store as-is if it is
-    if (rawValue === '') {
-      setDealersPrice('');
-    } else {
-      // Apply formatting if not empty
-      const validatedPrice = validatePrice(rawValue);
-      const formattedPrice = formatNumberWithCommas(validatedPrice);
-      setDealersPrice(formattedPrice);
-    }
-  };
-
-  const handleRetailPriceChange = (e) => {
-    const rawValue = e.target.value;
-    
-    // Check if input is empty and store as-is if it is
-    if (rawValue === '') {
-      setRetailPrice('');
-    } else {
-      // Apply formatting if not empty
-      const validatedPrice = validatePrice(rawValue);
-      const formattedPrice = formatNumberWithCommas(validatedPrice);
-      setRetailPrice(formattedPrice);
-    }
-  };
-
-  const handleStatusChange = (e) => {
-    const newStatus = e.target.value;
-    setStatus(newStatus);
-    setLastUpdated(getCurrentDate());
-  };
-
-  // Form submission handler
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Basic form validation
-    if (!selectedManufacturer || !selectedModel || !selectedRam || 
-        !selectedStorage || !selectedColor || !imei1 || !barcode || 
-        !dealersPrice || !retailPrice) {
-      alert('Please fill in all required fields');
-      return;
-    }
-    
-    // Set checking state and clear previous errors
-    setIsSubmitting(true);
-    setIsCheckingImei(true);
-    setImei1Error('');
-    setImei2Error('');
-    
-    // Check for duplicate IMEIs before submitting
-    const imeisCheck = await checkDuplicateImeis(imei1, imei2);
-    
-    setIsCheckingImei(false);
-    
-    if (!imeisCheck.isValid) {
-      setImei1Error(imeisCheck.imei1Error);
-      setImei2Error(imeisCheck.imei2Error);
-      setIsSubmitting(false);
-      return; // Don't proceed if IMEIs are invalid
-    }
-    
-    // Update lastUpdated on submit
-    const currentDate = getCurrentDate();
-    setLastUpdated(currentDate);
-    
-    // Parse prices properly removing commas
-    const dPrice = parseFloat(dealersPrice.replace(/,/g, '')) || 0;
-    const rPrice = parseFloat(retailPrice.replace(/,/g, '')) || 0;
-    
-    const phoneData = {
-      manufacturer: selectedManufacturer,
-      model: selectedModel,
-      color: selectedColor,
-      ram: selectedRam,
-      storage: selectedStorage,
-      imei1,
-      imei2,
-      barcode,
-      dealersPrice: dPrice,
-      retailPrice: rPrice,
-      status,
-      lastUpdated: currentDate,
-      dateAdded: currentDate  // New field to track when the entry was first added
-    };
-    
-    setLoading(true);
-    
-    try {
-      // Add the phone to inventory
-      const result = await addPhoneToInventory(phoneData);
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to add phone to inventory');
-      }
-      
-      // IMPORTANT: Update the price configuration
-      // 1. First update base price (without color)
-      await updatePriceConfiguration(
-        selectedManufacturer,
-        selectedModel,
-        selectedRam,
-        selectedStorage,
-        dealersPrice,
-        retailPrice
-      );
-      
-      // 2. Then update color-specific price
-      await updatePriceConfiguration(
-        selectedManufacturer,
-        selectedModel,
-        selectedRam,
-        selectedStorage,
-        dealersPrice,
-        retailPrice,
-        selectedColor
-      );
-      
-      // Reset fields after successful submission
-      setImei1('');
-      setImei2('');
-      setStatus('On-Hand');
-      
-      // Set flag that the barcode value should persist
-      setUserEnteredBarcode(true);
-      
-      setLoading(false);
-      setIsSubmitting(false);
-      alert('Phone details saved successfully!');
-    } catch (error) {
-      console.error("Error adding document:", error);
-      setError(`Error saving phone: ${error.message}`);
-      setLoading(false);
-      setIsSubmitting(false);
-      alert('Error saving phone details. Please try again.');
-    }
-  };
-
-  // ====== EFFECT HOOKS ======
-  // Fetch manufacturers on component mount
-  useEffect(() => {
-    async function initializeForm() {
-      setLoading(true);
-      try {
-        // Fetch manufacturers list
-        await fetchManufacturers();
-        
-        setLoading(false);
-      } catch (error) {
-        console.error("Error initializing form:", error);
-        setError(`Error loading data: ${error.message}`);
-        setLoading(false);
-      }
-    }
-    
-    initializeForm();
-  }, [fetchManufacturers]);
-
-  // Check if selections are complete and fetch prices directly from Firestore
-  useEffect(() => {
-    const fetchPricesDirectly = async () => {
-      // First, create a key to track our selections for pricing (without color)
-      const priceSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`;
-      
-      // Create a complete key that includes color for barcode lookup
-      // const barcodeSelectionKey = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`;
-      
-      // Track if we need to reset the barcode
-      const shouldResetBarcode = prevSelectionRef.current !== priceSelectionKey;
-      
-      // Only check when we have all the necessary selections
-      if (selectedManufacturer && selectedModel && selectedRam && selectedStorage) {
-        
-        // Reset barcode when the base configuration changes (manufacturer, model, RAM, storage)
-        if (shouldResetBarcode) {
-          setBarcode('');
-          setUserEnteredBarcode(false);
-        }
-        
-        // Fetch prices directly from Firestore instead of using cache
-        if (shouldResetBarcode) {
-          console.log("Selection changed - fetching prices from Firestore");
-          
-          try {
-            // Fetch base price configuration
-            const baseConfigId = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}`.replace(/\s+/g, '_').toLowerCase();
-            const baseConfigRef = doc(db, 'price_configurations', baseConfigId);
-            const baseConfigSnap = await getDoc(baseConfigRef);
-            
-            if (baseConfigSnap.exists()) {
-              const baseData = baseConfigSnap.data();
-              console.log("Found base pricing:", baseData);
-              
-              if (baseData.dealersPrice) {
-                setDealersPrice(formatNumberWithCommas(baseData.dealersPrice.toString()));
-              }
-              if (baseData.retailPrice) {
-                setRetailPrice(formatNumberWithCommas(baseData.retailPrice.toString()));
-              }
-            } else {
-              console.log("No base pricing found for this configuration");
-              // Clear prices if no configuration found
-              setDealersPrice('');
-              setRetailPrice('');
-            }
-          } catch (error) {
-            console.error("Error fetching price configuration:", error);
-          }
-        }
-        
-        // Check for color-specific pricing and barcode if color is also selected
-        if (selectedColor) {
-          // Check if color changed - comparing with previous color
-          const colorChanged = prevColorRef.current !== selectedColor;
-          
-          // Fetch color-specific pricing and barcode when color changes or base selections change
-          if ((shouldResetBarcode || colorChanged) && !userEnteredBarcode) {
-            try {
-              const colorConfigId = `${selectedManufacturer}_${selectedModel}_${selectedRam}_${selectedStorage}_${selectedColor}`.replace(/\s+/g, '_').toLowerCase();
-              const colorConfigRef = doc(db, 'price_configurations', colorConfigId);
-              const colorConfigSnap = await getDoc(colorConfigRef);
-              
-              if (colorConfigSnap.exists()) {
-                const colorData = colorConfigSnap.data();
-                console.log("Found color-specific pricing:", colorData);
-                
-                // Update prices with color-specific pricing if available
-                if (colorData.dealersPrice) {
-                  setDealersPrice(formatNumberWithCommas(colorData.dealersPrice.toString()));
-                }
-                if (colorData.retailPrice) {
-                  setRetailPrice(formatNumberWithCommas(colorData.retailPrice.toString()));
-                }
-              }
-              
-              // Also check for barcode from inventory
-              const inventoryQuery = query(
-                collection(db, 'inventory'),
-                where("manufacturer", "==", selectedManufacturer),
-                where("model", "==", selectedModel),
-                where("ram", "==", selectedRam),
-                where("storage", "==", selectedStorage),
-                where("color", "==", selectedColor),
-                limit(1)
-              );
-              
-              const inventorySnap = await getDocs(inventoryQuery);
-              if (!inventorySnap.empty) {
-                const inventoryItem = inventorySnap.docs[0].data();
-                if (inventoryItem.barcode) {
-                  setBarcode(inventoryItem.barcode);
-                }
-              } else if (colorChanged) {
-                // Only clear barcode when color changes and there's no barcode for this color
-                setBarcode('');
-              }
-            } catch (error) {
-              console.error("Error fetching color-specific pricing:", error);
-            }
-          }
-          
-          // If we have a complete selection including color, we can show the additional info section
-          setIsSpecsSelected(true);
-        } else {
-          setIsSpecsSelected(false);
-        }
-      } else {
-        setIsSpecsSelected(false);
-      }
-      
-      // Update the previous selection ref
-      prevSelectionRef.current = priceSelectionKey;
-      prevColorRef.current = selectedColor;
-    };
-    
-    fetchPricesDirectly();
-  }, [selectedManufacturer, selectedModel, selectedRam, selectedStorage, selectedColor, userEnteredBarcode]);
-
-  // Show loading state for initial load
-  if ((loading || optionsLoading) && manufacturers.length === 0) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white">Loading...</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p>Fetching data...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  
-  // Show error state
-  if (error || optionsError) {
-    const errorMessage = error || optionsError;
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-red-600 py-3">
-            <CardTitle className="text-2xl text-white">Error</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p>{errorMessage}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
-            >
-              Reload
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Main component render
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <form 
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDown}>
-        <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white">Select Phone</CardTitle>
-          </CardHeader>
-
-          <CardContent className="bg-white p-4 space-y-4">
-            {/* Barcode Search */}
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <h3 className="font-semibold text-lg text-[rgb(52,69,157)] mb-3">Quick Barcode Search</h3>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={barcodeSearch}
-                    onChange={handleBarcodeSearchChange}
-                    onKeyDown={handleBarcodeSearchKeyDown}
-                    placeholder="Enter barcode to auto-fill phone details"
-                    className="w-full p-2 border rounded"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleBarcodeSearch}
-                  disabled={isBarcodeSearching || !barcodeSearch.trim()}
-                  className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
-                >
-                  {isBarcodeSearching ? (
-                    <span className="animate-spin mr-2">⊛</span>
-                  ) : (
-                    <Search className="h-5 w-5 mr-2" />
-                  )}
-                  Search
-                </button>
-              </div>
-              
-              {barcodeSearchError && (
-                <div className="mt-2 text-red-500 flex items-center">
-                  <CircleAlert className="h-4 w-4 mr-1" />
-                  {barcodeSearchError}
-                </div>
-              )}
-              
-              <div className="mt-2 text-sm text-gray-500 flex items-center">
-                <ArrowRight className="h-4 w-4 mr-1" />
-                <span>Scan or enter a barcode to automatically fill the phone details</span>
-              </div>
-            </div>
-
-            {/* Manual Selection Divider */}
-            <div className="relative text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-white px-3 text-gray-500 text-sm">Or select manually</span>
-              </div>
-            </div>
-
-            {/* Basic Information */}
-            <PhoneBasicInfo 
-              selectedManufacturer={selectedManufacturer}
-              selectedModel={selectedModel}
-              selectedRam={selectedRam}
-              selectedStorage={selectedStorage}
-              manufacturers={manufacturers}
-              models={models}
-              ram={ram}
-              storage={storage}
-              handleRamChange={handleRamChange}
-              handleStorageChange={handleStorageChange}
-              handleManufacturerChange={handleManufacturerChange}
-              handleModelChange={handleModelChange}
-            />
-
-            {/* Price Information */}
-            {selectedRam && selectedStorage && (
-              <PhonePriceInfo 
-                dealersPrice={dealersPrice}
-                retailPrice={retailPrice}
-                handleDealersPriceChange={handleDealersPriceChange}
-                handleRetailPriceChange={handleRetailPriceChange}
-              />
-            )}
-
-            {/* Color Information */}
-            {selectedModel && (
-              <PhoneColorInfo 
-                selectedColor={selectedColor}
-                colors={colors}
-                handleColorChange={handleColorChange}
-              />
-            )}
-
-            {/* Additional Information */}
-            {isSpecsSelected && (
-              <PhoneAdditionalInfo 
-                imei1={imei1}
-                imei2={imei2}
-                barcode={barcode}
-                status={status}
-                lastUpdated={lastUpdated}
-                handleImei1Change={handleImei1Change}
-                handleImei2Change={handleImei2Change}
-                handleBarcodeChange={handleBarcodeChange}
-                handleStatusChange={handleStatusChange}
-                imei1Error={imei1Error}
-                imei2Error={imei2Error}
-              />
-            )}
-
-            {/* Submit Button */}
-            <div className="pt-4">
-              <button
-                type="submit"
-                className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90"
-                disabled={!isSpecsSelected || isCheckingImei || isSubmitting}
-              >
-                {isSubmitting ? 'Saving...' : 'Save Entry'}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      </form>
-    </div>
-  );
-};
-
-export default PhoneSelectionForm;
 </file>
 
 <file path="src/components/PhoneProcurementForm.jsx">
@@ -11383,8 +12024,8 @@ const PhoneProcurementForm = () => {
                     </tbody>
                     <tfoot>
                       <tr className="bg-blue-50 font-semibold">
-                        <td colSpan="4" className="border px-3 py-2 text-right">Total Items:</td>
-                        <td className="border px-3 py-2 text-center">
+                        <td colSpan="5" className="border px-3 py-2 text-right">Total Items:</td>
+                        <td className="border px-3 py-2 text-center font-mono">
                           {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
                         </td>
                         <td className="border px-3 py-2 text-right">Grand Total:</td>
@@ -11489,566 +12130,6 @@ const PhoneProcurementForm = () => {
 
 export default PhoneProcurementForm;
 {/* Part 10 End - Summary and Submit Button */}
-</file>
-
-<file path="src/App.jsx">
-// src/App.jsx
-import { useEffect } from 'react';
-import PhoneSpecForm from './components/PhoneSpecForm';
-import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
-import InventoryListForm from './components/InventoryListForm';
-import PhoneListForm from './components/PhoneListForm';
-import InventorySummaryForm from './components/InventorySummaryForm';
-import PriceManagementForm from './components/PriceManagementForm';
-import PhoneProcurementForm from './components/PhoneProcurementForm';
-import SupplierManagementForm from './components/SupplierManagementForm'; // NEW: Added supplier management import
-import ProcurementManagementForm from './components/ProcurementManagementForm'; // NEW: Added procurement management import
-// Import the hook from our consolidated file
-import { useGlobalState } from './context/GlobalStateContext';
-
-function App() {
-  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
-  
-  // For debugging
-  useEffect(() => {
-    console.log("App: Active component changed to:", activeComponent);
-    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
-  }, [activeComponent, phoneToEdit]);
-
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="p-4 bg-[rgb(52,69,157)] text-white">
-        <div className="max-w-6xl mx-auto flex flex-wrap gap-4">
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'summary' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('summary')}
-          >
-            Inventory Summary
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('inventory')}
-          >
-            Inventory List
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('selection')}
-          >
-            Add Phone Inventory
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'procurement' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('procurement')}
-          >
-            Phone Procurement
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'procurementmgmt' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('procurementmgmt')}
-          >
-            Procurement Management
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('suppliers')}
-          >
-            Supplier Management
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('form')}
-          >
-            Add Phone Model
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('phonelist')}
-          >
-            Phone Models
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('prices')}
-          >
-            Price Management
-          </button>
-        </div>
-      </div>
-      
-      {activeComponent === 'summary' && <InventorySummaryForm />}
-      {activeComponent === 'selection' && <PhoneSelectionForm />}
-      {activeComponent === 'procurement' && <PhoneProcurementForm />}
-      {activeComponent === 'procurementmgmt' && <ProcurementManagementForm />}
-      {activeComponent === 'suppliers' && <SupplierManagementForm />}
-      {activeComponent === 'form' && <PhoneSpecForm />}
-      {activeComponent === 'inventory' && <InventoryListForm />}
-      {activeComponent === 'phonelist' && <PhoneListForm />}
-      {activeComponent === 'prices' && <PriceManagementForm />}
-    </div>
-  );
-}
-
-export default App;
-</file>
-
-<file path="src/components/inventory/InventoryTable.jsx">
-import { useState } from 'react';
-import PropTypes from 'prop-types';
-import { doc, updateDoc, runTransaction, increment, deleteDoc } from 'firebase/firestore';
-import { db } from '../../firebase/config';
-import InventoryRow from './InventoryRow';
-import InventoryEditForm from './InventoryEditForm';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
-// Import getCurrentDate utility function
-import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
-
-const InventoryTable = ({ 
-  inventoryItems, 
-  handleSort, 
-  sortField, 
-  sortDirection, 
-  allItems,
-  setAllItems,
-  setInventoryItems,
-  applyFilters
-}) => {
-  const [editingItemId, setEditingItemId] = useState(null);
-  const [editFormData, setEditFormData] = useState({
-    manufacturer: '',
-    model: '',
-    ram: '',
-    storage: '',
-    color: '',
-    imei1: '',
-    barcode: '',
-    status: '',
-    retailPrice: 0 // NEW: Added retailPrice to initial state
-  });
-  const [savingItemId, setSavingItemId] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Handle edit button click
-  const handleEditClick = (item) => {
-    // If we're already editing, cancel it first
-    if (editingItemId) {
-      setEditingItemId(null);
-    }
-    
-    // Set the item to edit
-    setEditingItemId(item.id);
-    
-    // Populate form with item data
-    setEditFormData({
-      manufacturer: item.manufacturer,
-      model: item.model,
-      ram: item.ram,
-      storage: item.storage,
-      color: item.color,
-      imei1: item.imei1,
-      barcode: item.barcode || '',
-      status: item.status,
-      retailPrice: item.retailPrice // NEW: Added retailPrice to edit form data
-    });
-  };
-
-  // Handle delete button click
-  const handleDeleteClick = (itemId) => {
-    const item = allItems.find(item => item.id === itemId);
-    if (item) {
-      setItemToDelete(item);
-      setIsDeleteModalOpen(true);
-    }
-  };
-
-  // Handle delete confirmation - PRESERVED: Original working delete logic
-  const handleDeleteConfirm = async () => {
-    if (!itemToDelete) return;
-    
-    setIsDeleting(true);
-    
-    try {
-      // Get a reference to the document
-      const itemRef = doc(db, 'inventory', itemToDelete.id);
-      
-      // Delete the document
-      await deleteDoc(itemRef);
-      
-      // Update inventory counts
-      const inventoryId = `${itemToDelete.manufacturer}_${itemToDelete.model}_${itemToDelete.ram}_${itemToDelete.storage}_${itemToDelete.color}`.replace(/\s+/g, '_').toLowerCase();
-      
-      // Reference to the inventory count doc
-      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
-      
-      // Update inventory counts based on the item's status
-      await runTransaction(db, async (transaction) => {
-        const inventoryDoc = await transaction.get(inventoryRef);
-        
-        if (inventoryDoc.exists()) {
-          // Determine which field to decrement based on status
-          const decrementField = 
-            itemToDelete.status === 'On-Hand' ? 'onHand' : 
-            itemToDelete.status === 'On-Display' ? 'onDisplay' : 
-            itemToDelete.status === 'Sold' ? 'sold' : 
-            itemToDelete.status === 'Reserved' ? 'reserved' : 
-            'defective';
-          
-          // Decrement total and status count
-          transaction.update(inventoryRef, {
-            total: increment(-1),
-            [decrementField]: increment(-1),
-            lastUpdated: new Date().toLocaleDateString()
-          });
-        }
-      });
-      
-      // Update local state by removing the deleted item
-      const updatedItems = allItems.filter(item => item.id !== itemToDelete.id);
-      setAllItems(updatedItems);
-      
-      // Re-apply filters
-      const filteredItems = applyFilters(updatedItems);
-      setInventoryItems(filteredItems);
-      
-      // Close the modal and reset state
-      setIsDeleteModalOpen(false);
-      setItemToDelete(null);
-      setIsDeleting(false);
-      
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      alert(`Error deleting item: ${error.message}`);
-      setIsDeleting(false);
-    }
-  };
-
-  // Handle cancel delete
-  const handleDeleteCancel = () => {
-    setIsDeleteModalOpen(false);
-    setItemToDelete(null);
-  };
-
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditingItemId(null);
-    setEditFormData({
-      manufacturer: '',
-      model: '',
-      ram: '',
-      storage: '',
-      color: '',
-      imei1: '',
-      barcode: '',
-      status: '',
-      retailPrice: 0 // NEW: Added retailPrice to reset state
-    });
-  };
-
-  // Handle edit form input changes
-  const handleEditInputChange = (e) => {
-    const { name, value } = e.target;
-    
-    setEditFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Handle save edits - includes lastUpdated
-  const handleSaveEdit = async (id) => {
-    setSavingItemId(id);
-    
-    try {
-      // Create an update object with the edited fields
-      const updateData = {
-        manufacturer: editFormData.manufacturer,
-        model: editFormData.model,
-        ram: editFormData.ram,
-        storage: editFormData.storage,
-        color: editFormData.color,
-        imei1: editFormData.imei1,
-        barcode: editFormData.barcode,
-        status: editFormData.status,
-        lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
-      };
-      
-      // Get a reference to the document
-      const itemRef = doc(db, 'inventory', id);
-      
-      // Update the document
-      await updateDoc(itemRef, updateData);
-      
-      // If the status was changed, update the inventory counts
-      const originalItem = allItems.find(item => item.id === id);
-      if (originalItem && originalItem.status !== editFormData.status) {
-        // Create a unique ID for this inventory item type
-        const inventoryId = `${editFormData.manufacturer}_${editFormData.model}_${editFormData.ram}_${editFormData.storage}_${editFormData.color}`.replace(/\s+/g, '_').toLowerCase();
-        
-        // Reference to the inventory count doc
-        const inventoryRef = doc(db, 'inventory_counts', inventoryId);
-        
-        // Run as a transaction to ensure data consistency
-        await runTransaction(db, async (transaction) => {
-          const inventoryDoc = await transaction.get(inventoryRef);
-          
-          if (inventoryDoc.exists()) {
-            // Decrement the old status count
-            const decrementField = 
-              originalItem.status === 'On-Hand' ? 'onHand' : 
-              originalItem.status === 'On-Display' ? 'onDisplay' : 
-              originalItem.status === 'Sold' ? 'sold' : 
-              originalItem.status === 'Reserved' ? 'reserved' : 
-              'defective';
-            
-            // Increment the new status count
-            const incrementField = 
-              editFormData.status === 'On-Hand' ? 'onHand' : 
-              editFormData.status === 'On-Display' ? 'onDisplay' : 
-              editFormData.status === 'Sold' ? 'sold' : 
-              editFormData.status === 'Reserved' ? 'reserved' : 
-              'defective';
-            
-            // Update counters
-            transaction.update(inventoryRef, {
-              [decrementField]: increment(-1),
-              [incrementField]: increment(1),
-              lastUpdated: new Date().toLocaleDateString()
-            });
-          }
-        });
-      }
-      
-      // Update local state - includes lastUpdated
-      setAllItems(prevItems => 
-        prevItems.map(item => 
-          item.id === id 
-            ? { 
-                ...item, 
-                ...updateData,
-                // Keep original prices since we're not editing them
-                dealersPrice: item.dealersPrice,
-                retailPrice: item.retailPrice
-              } 
-            : item
-        )
-      );
-      
-      // Reset editing state
-      setEditingItemId(null);
-      setSavingItemId(null);
-      
-      // Re-apply filters to update the displayed inventory items - includes lastUpdated
-      const updatedItems = allItems.map(item => 
-        item.id === id 
-          ? { 
-              ...item, 
-              ...updateData,
-              // Keep original prices since we're not editing them
-              dealersPrice: item.dealersPrice,
-              retailPrice: item.retailPrice
-            } 
-          : item
-      );
-      const filteredItems = applyFilters(updatedItems);
-      setInventoryItems(filteredItems);
-      
-    } catch (error) {
-      console.error("Error updating item:", error);
-      alert(`Error updating item: ${error.message}`);
-      setSavingItemId(null);
-    }
-  };
-  
-  // UPDATED: Enhanced sorting logic for new sortable columns
-  const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
-    // Handle numeric fields
-    if (sortField === 'retailPrice') {
-      if (sortDirection === 'asc') {
-        return a.retailPrice - b.retailPrice;
-      } else {
-        return b.retailPrice - a.retailPrice;
-      }
-    }
-    
-    // Handle date field (lastUpdated)
-    if (sortField === 'lastUpdated') {
-      const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
-      const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
-      
-      if (sortDirection === 'asc') {
-        return dateA - dateB;
-      } else {
-        return dateB - dateA;
-      }
-    }
-    
-    // Handle string fields
-    if (sortDirection === 'asc') {
-      return a[sortField]?.localeCompare(b[sortField] || '');
-    } else {
-      return b[sortField]?.localeCompare(a[sortField] || '');
-    }
-  });
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-base">
-        <thead>
-          <tr className="bg-gray-100">
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('manufacturer')}
-              style={{ width: '12%' }}
-            >
-              Manufacturer
-              {sortField === 'manufacturer' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('model')}
-              style={{ width: '12%' }}
-            >
-              Model
-              {sortField === 'model' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('ram')}
-              style={{ width: '7%' }}
-            >
-              RAM
-              {sortField === 'ram' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('storage')}
-              style={{ width: '7%' }}
-            >
-              Storage
-              {sortField === 'storage' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('color')}
-              style={{ width: '12%' }}
-            >
-              Color
-              {sortField === 'color' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('imei1')}
-              style={{ width: '15%' }}
-            >
-              IMEI1
-              {sortField === 'imei1' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('barcode')}
-              style={{ width: '15%' }}
-            >
-              Barcode
-              {sortField === 'barcode' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            {/* NEW: Added Retail Price column */}
-            <th 
-              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('retailPrice')}
-              style={{ width: '10%' }}
-            >
-              Price
-              {sortField === 'retailPrice' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('lastUpdated')}
-              style={{ width: '8%' }}
-            >
-              Date
-              {sortField === 'lastUpdated' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('status')}
-              style={{ width: '8%' }}
-            >
-              Status
-              {sortField === 'status' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '6%' }}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedInventoryItems.map((item) => (
-            editingItemId === item.id ? (
-              <InventoryEditForm 
-                key={item.id}
-                itemId={item.id}
-                editFormData={editFormData}
-                handleEditInputChange={handleEditInputChange}
-                handleSaveEdit={handleSaveEdit}
-                handleCancelEdit={handleCancelEdit}
-                savingItemId={savingItemId}
-              />
-            ) : (
-              <InventoryRow 
-                key={item.id}
-                item={item}
-                handleEditClick={handleEditClick}
-                handleDeleteClick={handleDeleteClick}
-              />
-            )
-          ))}
-        </tbody>
-      </table>
-
-      {/* Delete confirmation modal */}
-      <DeleteConfirmationModal
-        isOpen={isDeleteModalOpen}
-        itemToDelete={itemToDelete}
-        onCancel={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-        isDeleting={isDeleting}
-      />
-    </div>
-  );
-};
-
-InventoryTable.propTypes = {
-  inventoryItems: PropTypes.array.isRequired,
-  handleSort: PropTypes.func.isRequired,
-  sortField: PropTypes.string.isRequired,
-  sortDirection: PropTypes.string.isRequired,
-  allItems: PropTypes.array.isRequired,
-  setAllItems: PropTypes.func.isRequired,
-  setInventoryItems: PropTypes.func.isRequired,
-  applyFilters: PropTypes.func.isRequired
-};
-
-export default InventoryTable;
 </file>
 
 </files>

@@ -169,77 +169,10 @@ const ProcurementManagementForm = () => {
 {/* Part 3 Start - Form Action Handlers with Payment Update */}
   // ====== FORM ACTION HANDLERS ======
   
-  // NEW: Handle payment status update
+  // Handle payment status click (no dialog)
   const handlePaymentUpdate = async (procurement) => {
-    console.log('Update payment status:', procurement.id);
-    
-    // Check current payment status
-    const isPaid = procurement.isPaid === true || procurement.paymentStatus === 'paid';
-    const newStatus = !isPaid; // Toggle the status
-    
-    // Enhanced confirmation dialog
-    const statusText = newStatus ? 'PAID' : 'UNPAID';
-    const actionText = newStatus ? 'mark as paid' : 'mark as unpaid';
-    
-    const confirmMessage = `Are you sure you want to ${actionText}?\n\n` +
-      `Reference: ${procurement.reference || procurement.id}\n` +
-      `Supplier: ${procurement.supplierName}\n` +
-      `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n\n` +
-      `This will:\n` +
-      `• Update payment status to: ${statusText}\n` +
-      `${newStatus ? '• Reduce supplier outstanding balance\n• Create payment ledger entry' : '• Increase supplier outstanding balance\n• Remove payment ledger entry'}\n\n` +
-      `Continue with payment update?`;
-    
-    if (window.confirm(confirmMessage)) {
-      try {
-        setLoading(true);
-        setError('');
-        
-        console.log("Updating payment status with supplier service:", procurement.id, newStatus);
-        
-        // Prepare payment data
-        const paymentData = {
-          isPaid: newStatus,
-          paymentStatus: newStatus ? 'paid' : 'unpaid',
-          paymentDate: newStatus ? new Date().toISOString().split('T')[0] : null,
-          paymentReference: newStatus ? `PAY-${Date.now()}` : null
-        };
-        
-        const result = await supplierService.updateProcurementPaymentStatus(procurement.id, paymentData);
-        
-        if (result.success) {
-          console.log("Payment status updated successfully:", result);
-          
-          // Show success message
-          let message = `Payment status updated successfully!\n\n`;
-          message += `Procurement: ${procurement.reference || procurement.id}\n`;
-          message += `Status: ${statusText}\n`;
-          message += `Supplier: ${procurement.supplierName}\n`;
-          message += `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n`;
-          
-          if (newStatus) {
-            message += `\n✅ Payment recorded and supplier balance updated`;
-          } else {
-            message += `\n❌ Payment removed and supplier balance restored`;
-          }
-          
-          alert(message);
-          
-          // Refresh the procurement list to show updated status
-          await fetchAllProcurements();
-          
-        } else {
-          console.error("Error updating payment status:", result.error);
-          setError(`Error updating payment status: ${result.error}`);
-        }
-        
-      } catch (error) {
-        console.error('Error updating payment status:', error);
-        setError(`Error updating payment status: ${error.message}`);
-      } finally {
-        setLoading(false);
-      }
-    }
+    console.log('Payment clicked for procurement:', procurement.id);
+    // Click handler preserved but dialog functionality removed
   };
 
   const handleViewProcurement = (procurement) => {
@@ -255,19 +188,12 @@ const ProcurementManagementForm = () => {
   };
 
   const handleDeleteProcurement = async (procurement) => {
-    console.log('Delete procurement:', procurement.id);
-    
-    // Enhanced confirmation dialog with detailed information
     const confirmMessage = `Are you sure you want to delete this procurement?\n\n` +
       `Reference: ${procurement.reference || procurement.id}\n` +
       `Supplier: ${procurement.supplierName}\n` +
-      `Items: ${procurement.items?.length || 0}\n` +
-      `Total Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n\n` +
-      `This will:\n` +
-      `• Remove ₱${formatPrice(procurement.grandTotal?.toString() || '0')} from supplier's outstanding balance\n` +
-      `• Mark the ledger entry as deleted\n` +
-      `• Permanently delete the procurement record\n\n` +
-      `This action cannot be undone.`;
+      `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n` +
+      `Items: ${procurement.totalQuantity || 0}\n\n` +
+      `This action cannot be undone!`;
     
     if (window.confirm(confirmMessage)) {
       try {
@@ -281,17 +207,8 @@ const ProcurementManagementForm = () => {
         if (result.success) {
           console.log("Procurement deleted successfully:", result);
           
-          // Show detailed success message
-          let message = `Procurement deleted successfully!\n\n`;
-          message += `Deleted Procurement:\n`;
-          message += `• Reference: ${result.reference || procurement.id}\n`;
-          message += `• Supplier: ${result.supplierName}\n`;
-          message += `• Amount: ₱${formatPrice(result.grandTotal?.toString() || '0')}\n\n`;
-          message += `Supplier Balance Effects:\n`;
-          message += `• Outstanding balance reduced by ₱${formatPrice(result.grandTotal?.toString() || '0')}\n`;
-          message += `• Ledger entries marked as deleted\n`;
-          
-          alert(message);
+          // Show success message
+          alert(`Procurement deleted successfully!\n\nReference: ${procurement.reference || procurement.id}\nSupplier: ${procurement.supplierName}`);
           
           // Refresh the procurement list
           await fetchAllProcurements();
