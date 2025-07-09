@@ -4814,688 +4814,6 @@ export default PriceManagementForm;
 {/* Part 9 End - Expanded Color Rows and Footer */}
 </file>
 
-<file path="src/components/ProcurementManagementForm.jsx">
-{/* Part 1 Start - Imports, State, and Helper Functions */}
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { 
-  RefreshCw, 
-  Package,
-  Search,
-  Calendar,
-  Building2,
-  Hash,
-  DollarSign,
-  CreditCard,
-  Truck,
-  Eye,
-  Edit,
-  Trash2,
-  Settings
-} from 'lucide-react';
-import { useGlobalState } from '../context/GlobalStateContext'; // NEW: Import global state
-import supplierService from '../services/supplierService'; // NEW: Import supplier service
-
-const ProcurementManagementForm = () => {
-  // ====== GLOBAL STATE ======
-  const { editProcurement, viewProcurement } = useGlobalState(); // NEW: Get both edit and view functions
-
-  // ====== STATE DEFINITIONS ======
-  // State for procurement data
-  const [procurements, setProcurements] = useState([]);
-  const [filteredProcurements, setFilteredProcurements] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Search and filter state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-
-  // ====== HELPER FUNCTIONS ======
-  // Format price with commas and two decimal places
-  const formatPrice = (value) => {
-    if (!value && value !== 0) return '0.00';
-    const numValue = parseFloat(value.toString().replace(/,/g, ''));
-    if (isNaN(numValue)) return '0.00';
-    return numValue.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Get payment status display
-  const getPaymentStatus = (procurement) => {
-    if (procurement.isPaid === true || procurement.paymentStatus === 'paid') {
-      return {
-        label: 'Paid',
-        className: 'bg-green-100 text-green-800'
-      };
-    }
-    return {
-      label: 'Unpaid',
-      className: 'bg-red-100 text-red-800'
-    };
-  };
-
-  // Get delivery status display
-  const getDeliveryStatus = (procurement) => {
-    if (procurement.isReceived === true || procurement.deliveryStatus === 'delivered') {
-      return {
-        label: 'Delivered',
-        className: 'bg-green-100 text-green-800'
-      };
-    }
-    return {
-      label: 'Pending',
-      className: 'bg-yellow-100 text-yellow-800'
-    };
-  };
-{/* Part 1 End - Imports, State, and Helper Functions */}
-
-{/* Part 2 Start - Data Fetching Functions */}
-  // Fetch all procurement entries
-  const fetchAllProcurements = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const procurementsRef = collection(db, 'procurements');
-      const q = query(procurementsRef, orderBy('purchaseDate', 'desc'));
-      const snapshot = await getDocs(q);
-      
-      const procurementsList = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        procurementsList.push({
-          id: doc.id,
-          ...data,
-          // Ensure we have the necessary fields with fallbacks
-          totalQuantity: data.totalQuantity || (data.items ? data.items.reduce((sum, item) => sum + (item.quantity || 0), 0) : 0),
-          grandTotal: data.grandTotal || 0,
-          paymentStatus: data.paymentStatus || (data.isPaid ? 'paid' : 'pending'),
-          deliveryStatus: data.deliveryStatus || (data.isReceived ? 'delivered' : 'pending')
-        });
-      });
-      
-      setProcurements(procurementsList);
-      setFilteredProcurements(procurementsList);
-      console.log('Fetched procurements:', procurementsList.length);
-      
-    } catch (error) {
-      console.error('Error fetching procurements:', error);
-      setError('Failed to load procurement data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Initialize data fetch
-  useEffect(() => {
-    fetchAllProcurements();
-  }, []);
-
-  // Filter procurements based on search and status
-  useEffect(() => {
-    let filtered = [...procurements];
-    
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(procurement =>
-        procurement.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        procurement.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        procurement.purchaseDate?.includes(searchTerm) ||
-        procurement.id.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(procurement => {
-        switch (statusFilter) {
-          case 'paid':
-            return procurement.isPaid === true || procurement.paymentStatus === 'paid';
-          case 'unpaid':
-            return procurement.isPaid !== true && procurement.paymentStatus !== 'paid';
-          case 'delivered':
-            return procurement.isReceived === true || procurement.deliveryStatus === 'delivered';
-          case 'pending':
-            return procurement.isReceived !== true && procurement.deliveryStatus !== 'delivered';
-          default:
-            return true;
-        }
-      });
-    }
-    
-    setFilteredProcurements(filtered);
-  }, [procurements, searchTerm, statusFilter]);
-{/* Part 2 End - Data Fetching Functions */}
-
-{/* Part 3 Start - Form Action Handlers with Payment Update */}
-  // ====== FORM ACTION HANDLERS ======
-  
-  // NEW: Handle payment status update
-  const handlePaymentUpdate = async (procurement) => {
-    console.log('Update payment status:', procurement.id);
-    
-    // Check current payment status
-    const isPaid = procurement.isPaid === true || procurement.paymentStatus === 'paid';
-    const newStatus = !isPaid; // Toggle the status
-    
-    // Enhanced confirmation dialog
-    const statusText = newStatus ? 'PAID' : 'UNPAID';
-    const actionText = newStatus ? 'mark as paid' : 'mark as unpaid';
-    
-    const confirmMessage = `Are you sure you want to ${actionText}?\n\n` +
-      `Reference: ${procurement.reference || procurement.id}\n` +
-      `Supplier: ${procurement.supplierName}\n` +
-      `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n\n` +
-      `This will:\n` +
-      `• Update payment status to: ${statusText}\n` +
-      `${newStatus ? '• Reduce supplier outstanding balance\n• Create payment ledger entry' : '• Increase supplier outstanding balance\n• Remove payment ledger entry'}\n\n` +
-      `Continue with payment update?`;
-    
-    if (window.confirm(confirmMessage)) {
-      try {
-        setLoading(true);
-        setError('');
-        
-        console.log("Updating payment status with supplier service:", procurement.id, newStatus);
-        
-        // Prepare payment data
-        const paymentData = {
-          isPaid: newStatus,
-          paymentStatus: newStatus ? 'paid' : 'unpaid',
-          paymentDate: newStatus ? new Date().toISOString().split('T')[0] : null,
-          paymentReference: newStatus ? `PAY-${Date.now()}` : null
-        };
-        
-        const result = await supplierService.updateProcurementPaymentStatus(procurement.id, paymentData);
-        
-        if (result.success) {
-          console.log("Payment status updated successfully:", result);
-          
-          // Show success message
-          let message = `Payment status updated successfully!\n\n`;
-          message += `Procurement: ${procurement.reference || procurement.id}\n`;
-          message += `Status: ${statusText}\n`;
-          message += `Supplier: ${procurement.supplierName}\n`;
-          message += `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n`;
-          
-          if (newStatus) {
-            message += `\n✅ Payment recorded and supplier balance updated`;
-          } else {
-            message += `\n❌ Payment removed and supplier balance restored`;
-          }
-          
-          alert(message);
-          
-          // Refresh the procurement list to show updated status
-          await fetchAllProcurements();
-          
-        } else {
-          console.error("Error updating payment status:", result.error);
-          setError(`Error updating payment status: ${result.error}`);
-        }
-        
-      } catch (error) {
-        console.error('Error updating payment status:', error);
-        setError(`Error updating payment status: ${error.message}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleViewProcurement = (procurement) => {
-    console.log('View procurement:', procurement.id);
-    // Use the view function to open the form in read-only mode
-    viewProcurement(procurement);
-  };
-
-  const handleEditProcurement = (procurement) => {
-    console.log('Edit procurement:', procurement.id);
-    // Use global state to edit procurement and switch to procurement form
-    editProcurement(procurement);
-  };
-
-  const handleDeleteProcurement = async (procurement) => {
-    console.log('Delete procurement:', procurement.id);
-    
-    // Enhanced confirmation dialog with detailed information
-    const confirmMessage = `Are you sure you want to delete this procurement?\n\n` +
-      `Reference: ${procurement.reference || procurement.id}\n` +
-      `Supplier: ${procurement.supplierName}\n` +
-      `Items: ${procurement.items?.length || 0}\n` +
-      `Total Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n\n` +
-      `This will:\n` +
-      `• Remove ₱${formatPrice(procurement.grandTotal?.toString() || '0')} from supplier's outstanding balance\n` +
-      `• Mark the ledger entry as deleted\n` +
-      `• Permanently delete the procurement record\n\n` +
-      `This action cannot be undone.`;
-    
-    if (window.confirm(confirmMessage)) {
-      try {
-        setLoading(true);
-        setError('');
-        
-        console.log("Deleting procurement with supplier service:", procurement.id);
-        
-        const result = await supplierService.deleteProcurement(procurement.id);
-        
-        if (result.success) {
-          console.log("Procurement deleted successfully:", result);
-          
-          // Show detailed success message
-          let message = `Procurement deleted successfully!\n\n`;
-          message += `Deleted Procurement:\n`;
-          message += `• Reference: ${result.reference || procurement.id}\n`;
-          message += `• Supplier: ${result.supplierName}\n`;
-          message += `• Amount: ₱${formatPrice(result.grandTotal?.toString() || '0')}\n\n`;
-          message += `Supplier Balance Effects:\n`;
-          message += `• Outstanding balance reduced by ₱${formatPrice(result.grandTotal?.toString() || '0')}\n`;
-          message += `• Ledger entries marked as deleted\n`;
-          
-          alert(message);
-          
-          // Refresh the procurement list
-          await fetchAllProcurements();
-          
-        } else {
-          console.error("Error deleting procurement:", result.error);
-          setError(`Error deleting procurement: ${result.error}`);
-        }
-        
-      } catch (error) {
-        console.error('Error deleting procurement:', error);
-        setError(`Error deleting procurement: ${error.message}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  // ====== SEARCH AND FILTER HANDLERS ======
-  
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  // Handle status filter change
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
-  };
-{/* Part 3 End - Form Action Handlers with Payment Update */}
-
-{/* Part 4 Start - Loading and Error States */}
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white flex items-center">
-              <Package className="h-6 w-6 mr-2" />
-              Procurement Management
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
-              <p className="mt-2 text-gray-600">Loading procurement data...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-red-600 py-3">
-            <CardTitle className="text-2xl text-white flex items-center">
-              <Package className="h-6 w-6 mr-2" />
-              Error
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-            <button 
-              onClick={fetchAllProcurements}
-              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-{/* Part 4 End - Loading and Error States */}
-
-{/* Part 5 Start - Main Component Render */}
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-        <CardHeader className="bg-[rgb(52,69,157)] py-3">
-          <CardTitle className="text-2xl text-white flex items-center">
-            <Package className="h-6 w-6 mr-2" />
-            Procurement Management
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="bg-white p-4 space-y-6">
-{/* Part 5 End - Main Component Render */}
-
-{/* Part 6 Start - Search and Filter Section */}
-          {/* Search and Filter Section */}
-          <div className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Search Input */}
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Search by supplier name, reference, or date..."
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                    className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Status Filter */}
-              <div className="w-full md:w-48">
-                <select
-                  value={statusFilter}
-                  onChange={handleStatusFilterChange}
-                  className="w-full p-2 border rounded-lg text-sm"
-                >
-                  <option value="all">All Status</option>
-                  <option value="paid">Paid Only</option>
-                  <option value="unpaid">Unpaid Only</option>
-                  <option value="delivered">Delivered Only</option>
-                  <option value="pending">Pending Delivery</option>
-                </select>
-              </div>
-
-              {/* Refresh Button */}
-              <button
-                onClick={fetchAllProcurements}
-                className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-lg hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </button>
-            </div>
-          </div>
-{/* Part 6 End - Search and Filter Section */}
-
-{/* Part 7 Start - Enhanced Procurement Summary */}
-          {/* Procurement Summary - Enhanced Design */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Procurement Summary</h3>
-              <div className="text-sm text-gray-600">
-                {searchTerm || statusFilter !== 'all' 
-                  ? `${filteredProcurements.length} of ${procurements.length} entries (filtered)`
-                  : `${filteredProcurements.length} entries`}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">Total Procurement Value</p>
-                    <p className="text-xs text-gray-500">Combined value of all procurements</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-blue-600">
-                      ₱{(() => {
-                        const totalValue = filteredProcurements.reduce((total, procurement) => {
-                          return total + (procurement.grandTotal || 0);
-                        }, 0);
-                        return totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                      })()}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {filteredProcurements.length} {filteredProcurements.length === 1 ? 'entry' : 'entries'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">Total Units Procured</p>
-                    <p className="text-xs text-gray-500">Combined quantity across all entries</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-green-600">
-                      {(() => {
-                        const totalQuantity = filteredProcurements.reduce((total, procurement) => {
-                          return total + (procurement.totalQuantity || 0);
-                        }, 0);
-                        return totalQuantity.toLocaleString('en-US');
-                      })()}
-                    </p>
-                    <p className="text-xs text-gray-500">units</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">Payment Status</p>
-                    <p className="text-xs text-gray-500">Paid vs Outstanding amounts</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-purple-600">
-                      ₱{(() => {
-                        const paidAmount = filteredProcurements.reduce((total, procurement) => {
-                          if (procurement.isPaid === true || procurement.paymentStatus === 'paid') {
-                            return total + (procurement.grandTotal || 0);
-                          }
-                          return total;
-                        }, 0);
-                        return paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                      })()} paid
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {(() => {
-                        const paidCount = filteredProcurements.filter(p => 
-                          p.isPaid === true || p.paymentStatus === 'paid'
-                        ).length;
-                        const totalCount = filteredProcurements.length;
-                        const percentage = totalCount > 0 ? (paidCount / totalCount * 100) : 0;
-                        return `${percentage.toFixed(1)}% completed`;
-                      })()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-{/* Part 7 End - Enhanced Procurement Summary */}
-
-{/* Part 8 Start - Procurement Entries Table */}
-          {/* Procurement List */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
-                Procurement Entries ({filteredProcurements.length} items)
-              </h3>
-            </div>
-
-            {filteredProcurements.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h4 className="text-lg font-medium text-gray-700 mb-2">
-                  {procurements.length === 0 ? 'No procurement entries found' : 'No entries match your filters'}
-                </h4>
-                <p className="text-gray-500">
-                  {procurements.length === 0 
-                    ? 'Create procurement entries from the Phone Procurement form'
-                    : 'Try adjusting your search criteria or filters'
-                  }
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border px-3 py-3 text-left font-semibold">
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Date
-                        </div>
-                      </th>
-                      <th className="border px-3 py-3 text-left font-semibold">
-                        <div className="flex items-center">
-                          <Building2 className="h-4 w-4 mr-2" />
-                          Supplier
-                        </div>
-                      </th>
-                      <th className="border px-3 py-3 text-center font-semibold">
-                        <div className="flex items-center justify-center">
-                          <Hash className="h-4 w-4 mr-2" />
-                          Total Items
-                        </div>
-                      </th>
-                      <th className="border px-3 py-3 text-right font-semibold">
-                        <div className="flex items-center justify-end">
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          Amount
-                        </div>
-                      </th>
-                      <th className="border px-3 py-3 text-center font-semibold">
-                        <div className="flex items-center justify-center">
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Payment
-                        </div>
-                      </th>
-                      <th className="border px-3 py-3 text-center font-semibold">
-                        <div className="flex items-center justify-center">
-                          <Truck className="h-4 w-4 mr-2" />
-                          Delivery
-                        </div>
-                      </th>
-                      <th className="border px-3 py-3 text-center font-semibold">
-                        <div className="flex items-center justify-center">
-                          <Settings className="h-4 w-4 mr-2" />
-                          Actions
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProcurements.map((procurement, index) => {
-                      const paymentStatus = getPaymentStatus(procurement);
-                      const deliveryStatus = getDeliveryStatus(procurement);
-                      
-                      return (
-                        <tr key={procurement.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="border px-3 py-3">
-                            <div className="font-medium">{formatDate(procurement.purchaseDate)}</div>
-                            <div className="text-xs text-gray-500">ID: {procurement.id.slice(-8)}</div>
-                          </td>
-                          <td className="border px-3 py-3">
-                            <div className="font-medium">{procurement.supplierName || 'Unknown'}</div>
-                            {procurement.reference && (
-                              <div className="text-xs text-gray-500">Ref: {procurement.reference}</div>
-                            )}
-                          </td>
-                          <td className="border px-3 py-3 text-center">
-                            <span className="font-semibold">{procurement.totalQuantity || 0}</span>
-                          </td>
-                          <td className="border px-3 py-3 text-right">
-                            <span className="font-mono font-semibold">
-                              ₱{(procurement.grandTotal || 0).toLocaleString('en-US', { 
-                                minimumFractionDigits: 2, 
-                                maximumFractionDigits: 2 
-                              })}
-                            </span>
-                          </td>
-                          <td className="border px-3 py-3 text-center">
-                            {/* CHANGED: Convert Payment column to clickable status button */}
-                            <button
-                              onClick={() => handlePaymentUpdate(procurement)}
-                              className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${paymentStatus.className} hover:opacity-80 cursor-pointer`}
-                              title={`${paymentStatus.label === 'Paid' ? 'Click to mark as Unpaid' : 'Click to mark as Paid'}`}
-                            >
-                              {paymentStatus.label}
-                            </button>
-                          </td>
-                          <td className="border px-3 py-3 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${deliveryStatus.className}`}>
-                              {deliveryStatus.label}
-                            </span>
-                          </td>
-                          <td className="border px-3 py-3">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => handleViewProcurement(procurement)}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                                title="View Details"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleEditProcurement(procurement)}
-                                className="p-1 text-green-600 hover:bg-green-100 rounded"
-                                title="Edit Procurement"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProcurement(procurement)}
-                                className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                title="Delete Procurement"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-{/* Part 8 End - Procurement Entries Table */}
-
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-export default ProcurementManagementForm;
-</file>
-
 <file path="src/components/SupplierManagementForm.jsx">
 {/* Part 1 Start - Updated Imports and Initial State */}
 import { useState, useEffect } from 'react';
@@ -6421,95 +5739,6 @@ export default SupplierManagementForm;
 {/* Part 6 End - Ledger Tab and Component Export - FIXED */}
 </file>
 
-<file path="src/context/GlobalStateContext.jsx">
-{/* Part 1 Start - Imports and Context Creation */}
-// src/context/GlobalStateContext.jsx
-import PropTypes from 'prop-types';
-import { createContext, useState, useContext } from 'react';
-
-// Create context
-export const GlobalStateContext = createContext();
-
-// Custom hook for easier context usage
-export const useGlobalState = () => useContext(GlobalStateContext);
-{/* Part 1 End - Imports and Context Creation */}
-
-{/* Part 2 Start - GlobalStateProvider Component */}
-// Create provider
-export const GlobalStateProvider = ({ children }) => {
-  // ====== STATE DEFINITIONS ======
-  const [phoneToEdit, setPhoneToEdit] = useState(null);
-  const [procurementToEdit, setProcurementToEdit] = useState(null);
-  const [activeComponent, setActiveComponent] = useState('summary');
-  const [isViewingProcurement, setIsViewingProcurement] = useState(false); // NEW: Track view vs edit mode
-  
-  // ====== PHONE EDITING FUNCTIONS ======
-  // Function to set a phone for editing and switch to form
-  const editPhone = (phone) => {
-    setPhoneToEdit(phone);
-    setActiveComponent('form');
-  };
-  
-  // Function to clear the selected phone
-  const clearPhoneToEdit = () => {
-    setPhoneToEdit(null);
-  };
-  
-  // ====== PROCUREMENT EDITING FUNCTIONS ======
-  // Function to set a procurement for editing and switch to procurement form
-  const editProcurement = (procurement) => {
-    setProcurementToEdit(procurement);
-    setIsViewingProcurement(false); // Set to edit mode
-    setActiveComponent('procurement');
-  };
-  
-  // NEW: Function to set a procurement for viewing (read-only)
-  const viewProcurement = (procurement) => {
-    setProcurementToEdit(procurement);
-    setIsViewingProcurement(true); // Set to view mode
-    setActiveComponent('procurement');
-  };
-  
-  // Function to clear the selected procurement
-  const clearProcurementToEdit = () => {
-    setProcurementToEdit(null);
-    setIsViewingProcurement(false); // Reset view mode
-  };
-  
-  // ====== CONTEXT VALUE OBJECT ======
-  // Create a value object with all the state and functions
-  const contextValue = {
-    phoneToEdit,
-    editPhone,
-    clearPhoneToEdit,
-    procurementToEdit,
-    editProcurement,
-    viewProcurement, // NEW: Add view function
-    clearProcurementToEdit,
-    isViewingProcurement, // NEW: Add view mode state
-    activeComponent,
-    setActiveComponent
-  };
-  
-  return (
-    <GlobalStateContext.Provider value={contextValue}>
-      {children}
-    </GlobalStateContext.Provider>
-  );
-};
-
-// Add prop types for validation
-GlobalStateProvider.propTypes = {
-  children: PropTypes.node.isRequired
-};
-{/* Part 2 End - GlobalStateProvider Component */}
-
-{/* Part 3 Start - Export Default Hook */}
-// Also provide a default export for the hook for backward compatibility
-export default useGlobalState;
-{/* Part 3 End - Export Default Hook */}
-</file>
-
 <file path="src/services/supplierService.js">
 {/* Part 1 Start - Imports and Database Configuration */}
 import { 
@@ -7009,6 +6238,7 @@ export const updateProcurement = async (procurementId, updatedProcurementData, n
  * - Removing the procurement document
  * - Adjusting supplier outstanding balances (subtracting the amount)
  * - Marking corresponding ledger entries as deleted with original amount preserved
+ * - FIXED: Also handles payment ledger entries for paid procurements
  */
 export const deleteProcurement = async (procurementId) => {
   try {
@@ -7023,15 +6253,25 @@ export const deleteProcurement = async (procurementId) => {
     // 🚨 PRE-READ LEDGER ENTRIES OUTSIDE TRANSACTION
     // =============================
     
-    // Get existing ledger entries BEFORE starting transaction
-    const ledgerQuery = query(
+    // Get existing PURCHASE ledger entries BEFORE starting transaction
+    const purchaseLedgerQuery = query(
       collection(db, 'supplier_ledger'),
       where('procurementId', '==', procurementId),
       where('entryType', '==', 'purchase')
     );
     
-    const ledgerQuerySnap = await getDocs(ledgerQuery);
-    console.log('Found ledger entries:', ledgerQuerySnap.size);
+    const purchaseLedgerQuerySnap = await getDocs(purchaseLedgerQuery);
+    console.log('Found purchase ledger entries:', purchaseLedgerQuerySnap.size);
+    
+    // NEW: Get existing PAYMENT ledger entries
+    const paymentLedgerQuery = query(
+      collection(db, 'supplier_ledger'),
+      where('procurementId', '==', procurementId),
+      where('entryType', '==', 'payment')
+    );
+    
+    const paymentLedgerQuerySnap = await getDocs(paymentLedgerQuery);
+    console.log('Found payment ledger entries:', paymentLedgerQuerySnap.size);
     
     // =============================
     // 🔄 START TRANSACTION
@@ -7051,12 +6291,14 @@ export const deleteProcurement = async (procurementId) => {
       const originalProcurement = procurementSnap.data();
       const originalGrandTotal = originalProcurement.grandTotal || 0;
       const supplierId = originalProcurement.supplierId;
+      const isPaid = originalProcurement.isPaid || originalProcurement.paymentStatus === 'paid';
       
       console.log('Procurement to delete:', {
         id: procurementId,
         grandTotal: originalGrandTotal,
         supplierId: supplierId,
-        reference: originalProcurement.reference
+        reference: originalProcurement.reference,
+        isPaid: isPaid
       });
       
       // Get supplier document
@@ -7074,30 +6316,64 @@ export const deleteProcurement = async (procurementId) => {
       // 1. Delete the procurement document
       transaction.delete(procurementRef);
       
-      // 2. Update supplier outstanding balance (subtract the deleted amount)
-      const newOutstanding = (supplierData.totalOutstanding || 0) - originalGrandTotal;
+      // 2. Update supplier outstanding balance
+      // FIXED: For paid procurements, balance doesn't change because both purchase and payment are removed
+      // For unpaid procurements, subtract the purchase amount
+      let newOutstanding = supplierData.totalOutstanding || 0;
+      
+      if (!isPaid) {
+        // Only adjust balance for unpaid procurements
+        newOutstanding = newOutstanding - originalGrandTotal;
+      }
+      // For paid procurements, balance remains the same since we're removing both purchase and payment
+      
       transaction.update(supplierRef, {
-        totalOutstanding: Math.max(0, newOutstanding), // Ensure balance doesn't go negative
+        totalOutstanding: Math.max(0, newOutstanding),
         lastUpdated: Timestamp.now()
       });
       
-      // 3. Update the corresponding ledger entry with original amount preserved
-      if (!ledgerQuerySnap.empty) {
-        const ledgerDoc = ledgerQuerySnap.docs.find(doc => 
+      // 3. Update the PURCHASE ledger entry with original amount preserved
+      if (!purchaseLedgerQuerySnap.empty) {
+        const purchaseLedgerDoc = purchaseLedgerQuerySnap.docs.find(doc => 
           doc.data().supplierId === supplierId
         );
         
-        if (ledgerDoc) {
-          const ledgerData = ledgerDoc.data();
+        if (purchaseLedgerDoc) {
+          const ledgerData = purchaseLedgerDoc.data();
           const originalDescription = ledgerData.description || '';
           const originalAmount = ledgerData.amountDue || 0;
           
           // Create enhanced description with original amount preserved
           const updatedDescription = `${originalDescription} - DELETED (Original: ₱${formatPrice(originalAmount.toString())})`;
           
-          transaction.update(ledgerDoc.ref, {
+          transaction.update(purchaseLedgerDoc.ref, {
             description: updatedDescription,
             amountDue: 0, // Zero out for balance calculations
+            runningBalance: Math.max(0, newOutstanding),
+            isDeleted: true, // Mark as deleted for audit purposes
+            deletedDate: Timestamp.now(),
+            lastUpdated: Timestamp.now()
+          });
+        }
+      }
+      
+      // 4. NEW: Handle PAYMENT ledger entry if procurement was paid
+      if (isPaid && !paymentLedgerQuerySnap.empty) {
+        const paymentLedgerDoc = paymentLedgerQuerySnap.docs.find(doc => 
+          doc.data().supplierId === supplierId
+        );
+        
+        if (paymentLedgerDoc) {
+          const paymentData = paymentLedgerDoc.data();
+          const originalPaymentAmount = paymentData.amountPaid || 0;
+          const originalPaymentDescription = paymentData.description || '';
+          
+          // Create enhanced description with original payment amount preserved
+          const updatedPaymentDescription = `${originalPaymentDescription} - DELETED (Original Payment: ₱${formatPrice(originalPaymentAmount.toString())})`;
+          
+          transaction.update(paymentLedgerDoc.ref, {
+            description: updatedPaymentDescription,
+            amountPaid: 0, // Zero out for balance calculations
             runningBalance: Math.max(0, newOutstanding),
             isDeleted: true, // Mark as deleted for audit purposes
             deletedDate: Timestamp.now(),
@@ -7113,7 +6389,9 @@ export const deleteProcurement = async (procurementId) => {
         deletedGrandTotal: originalGrandTotal,
         supplierId: supplierId,
         supplierName: supplierData.supplierName,
-        reference: originalProcurement.reference
+        reference: originalProcurement.reference,
+        wasPaid: isPaid,
+        finalBalance: newOutstanding
       };
     });
     
@@ -7122,11 +6400,15 @@ export const deleteProcurement = async (procurementId) => {
     return {
       success: true,
       procurementId: result.procurementId,
-      deletedGrandTotal: result.deletedGrandTotal,
+      grandTotal: result.deletedGrandTotal, // Keep as grandTotal for compatibility with existing code
       supplierId: result.supplierId,
       supplierName: result.supplierName,
       reference: result.reference,
-      message: 'Procurement deleted successfully with proper balance adjustments'
+      wasPaid: result.wasPaid,
+      finalBalance: result.finalBalance,
+      message: result.wasPaid 
+        ? 'Paid procurement deleted successfully. Both purchase and payment entries marked as deleted.'
+        : 'Unpaid procurement deleted successfully with proper balance adjustments.'
     };
     
   } catch (error) {
@@ -8966,6 +8248,109 @@ const PhoneSelectionForm = () => {
 export default PhoneSelectionForm;
 </file>
 
+<file path="src/context/GlobalStateContext.jsx">
+{/* Part 1 Start - Imports and Context Creation */}
+// src/context/GlobalStateContext.jsx
+import PropTypes from 'prop-types';
+import { createContext, useState, useContext } from 'react';
+
+// Create context
+export const GlobalStateContext = createContext();
+
+// Custom hook for easier context usage
+export const useGlobalState = () => useContext(GlobalStateContext);
+{/* Part 1 End - Imports and Context Creation */}
+
+{/* Part 2 Start - GlobalStateProvider Component */}
+// Create provider
+export const GlobalStateProvider = ({ children }) => {
+  // ====== STATE DEFINITIONS ======
+  const [phoneToEdit, setPhoneToEdit] = useState(null);
+  const [procurementToEdit, setProcurementToEdit] = useState(null);
+  const [activeComponent, setActiveComponent] = useState('summary');
+  const [isViewingProcurement, setIsViewingProcurement] = useState(false); // Track view vs edit mode
+  const [procurementMode, setProcurementMode] = useState(''); // NEW: Track procurement mode ('view', 'edit', 'payment')
+  
+  // ====== PHONE EDITING FUNCTIONS ======
+  // Function to set a phone for editing and switch to form
+  const editPhone = (phone) => {
+    setPhoneToEdit(phone);
+    setActiveComponent('form');
+  };
+  
+  // Function to clear the selected phone
+  const clearPhoneToEdit = () => {
+    setPhoneToEdit(null);
+  };
+  
+  // ====== PROCUREMENT EDITING FUNCTIONS ======
+  // Function to set a procurement for editing and switch to procurement form
+  const editProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(false); // Set to edit mode
+    setProcurementMode('edit'); // NEW: Set mode to edit
+    setActiveComponent('procurement');
+  };
+  
+  // Function to set a procurement for viewing (read-only)
+  const viewProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(true); // Set to view mode
+    setProcurementMode('view'); // NEW: Set mode to view
+    setActiveComponent('procurement');
+  };
+  
+  // NEW: Function to set a procurement for payment entry
+  const paymentProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(false); // Not in pure view mode
+    setProcurementMode('payment'); // Set mode to payment
+    setActiveComponent('procurement');
+  };
+  
+  // Function to clear the selected procurement
+  const clearProcurementToEdit = () => {
+    setProcurementToEdit(null);
+    setIsViewingProcurement(false); // Reset view mode
+    setProcurementMode(''); // NEW: Reset mode
+  };
+  
+  // ====== CONTEXT VALUE OBJECT ======
+  // Create a value object with all the state and functions
+  const contextValue = {
+    phoneToEdit,
+    editPhone,
+    clearPhoneToEdit,
+    procurementToEdit,
+    editProcurement,
+    viewProcurement,
+    paymentProcurement, // NEW: Add payment function
+    clearProcurementToEdit,
+    isViewingProcurement,
+    procurementMode, // NEW: Add procurement mode state
+    activeComponent,
+    setActiveComponent
+  };
+  
+  return (
+    <GlobalStateContext.Provider value={contextValue}>
+      {children}
+    </GlobalStateContext.Provider>
+  );
+};
+
+// Add prop types for validation
+GlobalStateProvider.propTypes = {
+  children: PropTypes.node.isRequired
+};
+{/* Part 2 End - GlobalStateProvider Component */}
+
+{/* Part 3 Start - Export Default Hook */}
+// Also provide a default export for the hook for backward compatibility
+export default useGlobalState;
+{/* Part 3 End - Export Default Hook */}
+</file>
+
 <file path="src/App.jsx">
 // src/App.jsx
 import { useEffect } from 'react';
@@ -10623,6 +10008,630 @@ export default InventorySummaryForm;
 {/* Part 6 End - Inventory Value Summary and Footer */}
 </file>
 
+<file path="src/components/ProcurementManagementForm.jsx">
+{/* Part 1 Start - Imports, State, and Helper Functions */}
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { 
+  RefreshCw, 
+  Package,
+  Search,
+  Calendar,
+  Building2,
+  Hash,
+  DollarSign,
+  CreditCard,
+  Truck,
+  Eye,
+  Edit,
+  Trash2,
+  Settings
+} from 'lucide-react';
+import { useGlobalState } from '../context/GlobalStateContext';
+import supplierService from '../services/supplierService';
+
+const ProcurementManagementForm = () => {
+  // ====== GLOBAL STATE ======
+  const { editProcurement, viewProcurement, paymentProcurement } = useGlobalState(); // ADDED: paymentProcurement
+
+  // ====== STATE DEFINITIONS ======
+  // State for procurement data
+  const [procurements, setProcurements] = useState([]);
+  const [filteredProcurements, setFilteredProcurements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // ====== HELPER FUNCTIONS ======
+  // Format price with commas and two decimal places
+  const formatPrice = (value) => {
+    if (!value && value !== 0) return '0.00';
+    const numValue = parseFloat(value.toString().replace(/,/g, ''));
+    if (isNaN(numValue)) return '0.00';
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Get payment status display
+  const getPaymentStatus = (procurement) => {
+    if (procurement.isPaid === true || procurement.paymentStatus === 'paid') {
+      return {
+        label: 'Paid',
+        className: 'bg-green-100 text-green-800'
+      };
+    }
+    return {
+      label: 'Unpaid',
+      className: 'bg-red-100 text-red-800'
+    };
+  };
+
+  // Get delivery status display
+  const getDeliveryStatus = (procurement) => {
+    if (procurement.isReceived === true || procurement.deliveryStatus === 'delivered') {
+      return {
+        label: 'Delivered',
+        className: 'bg-green-100 text-green-800'
+      };
+    }
+    return {
+      label: 'Pending',
+      className: 'bg-yellow-100 text-yellow-800'
+    };
+  };
+{/* Part 1 End - Imports, State, and Helper Functions */}
+
+{/* Part 2 Start - Data Fetching Functions */}
+  // Fetch all procurement entries
+  const fetchAllProcurements = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const procurementsRef = collection(db, 'procurements');
+      const q = query(procurementsRef, orderBy('purchaseDate', 'desc'));
+      const snapshot = await getDocs(q);
+      
+      const procurementsList = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        procurementsList.push({
+          id: doc.id,
+          ...data,
+          // Ensure we have the necessary fields with fallbacks
+          totalQuantity: data.totalQuantity || (data.items ? data.items.reduce((sum, item) => sum + (item.quantity || 0), 0) : 0),
+          grandTotal: data.grandTotal || 0,
+          paymentStatus: data.paymentStatus || (data.isPaid ? 'paid' : 'pending'),
+          deliveryStatus: data.deliveryStatus || (data.isReceived ? 'delivered' : 'pending')
+        });
+      });
+      
+      setProcurements(procurementsList);
+      setFilteredProcurements(procurementsList);
+      console.log('Fetched procurements:', procurementsList.length);
+      
+    } catch (error) {
+      console.error('Error fetching procurements:', error);
+      setError('Failed to load procurement data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initialize data fetch
+  useEffect(() => {
+    fetchAllProcurements();
+  }, []);
+
+  // Filter procurements based on search and status
+  useEffect(() => {
+    let filtered = [...procurements];
+    
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(procurement =>
+        procurement.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        procurement.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        procurement.purchaseDate?.includes(searchTerm) ||
+        procurement.id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(procurement => {
+        switch (statusFilter) {
+          case 'paid':
+            return procurement.isPaid === true || procurement.paymentStatus === 'paid';
+          case 'unpaid':
+            return procurement.isPaid !== true && procurement.paymentStatus !== 'paid';
+          case 'delivered':
+            return procurement.isReceived === true || procurement.deliveryStatus === 'delivered';
+          case 'pending':
+            return procurement.isReceived !== true && procurement.deliveryStatus !== 'delivered';
+          default:
+            return true;
+        }
+      });
+    }
+    
+    setFilteredProcurements(filtered);
+  }, [procurements, searchTerm, statusFilter]);
+{/* Part 2 End - Data Fetching Functions */}
+
+{/* Part 3 Start - Form Action Handlers with Payment Update */}
+  // ====== FORM ACTION HANDLERS ======
+  
+  // CHANGED: Handle payment status click to open payment mode
+  const handlePaymentUpdate = (procurement) => {
+    console.log('Opening payment mode for procurement:', procurement.id);
+    // Use global state to open procurement in payment mode
+    paymentProcurement(procurement);
+  };
+
+  const handleViewProcurement = (procurement) => {
+    console.log('View procurement:', procurement.id);
+    // Use the view function to open the form in read-only mode
+    viewProcurement(procurement);
+  };
+
+  const handleEditProcurement = (procurement) => {
+    console.log('Edit procurement:', procurement.id);
+    // Use global state to edit procurement and switch to procurement form
+    editProcurement(procurement);
+  };
+
+  const handleDeleteProcurement = async (procurement) => {
+    // ENHANCED: Check if procurement is paid and show appropriate warning
+    const isPaid = procurement.isPaid === true || procurement.paymentStatus === 'paid';
+    
+    const confirmMessage = `Are you sure you want to delete this procurement?\n\n` +
+      `Reference: ${procurement.reference || procurement.id}\n` +
+      `Supplier: ${procurement.supplierName}\n` +
+      `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n` +
+      `Items: ${procurement.totalQuantity || 0}\n` +
+      `Payment Status: ${isPaid ? 'PAID' : 'UNPAID'}\n\n` +
+      `This will:\n` +
+      (isPaid 
+        ? `• Mark both purchase and payment ledger entries as deleted\n• Supplier balance will remain unchanged\n`
+        : `• Remove ₱${formatPrice(procurement.grandTotal?.toString() || '0')} from supplier's outstanding balance\n• Mark the purchase ledger entry as deleted\n`) +
+      `• Permanently delete the procurement record\n\n` +
+      `This action cannot be undone!`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        setLoading(true);
+        setError('');
+        
+        console.log("Deleting procurement with supplier service:", procurement.id);
+        
+        const result = await supplierService.deleteProcurement(procurement.id);
+        
+        if (result.success) {
+          console.log("Procurement deleted successfully:", result);
+          
+          // ENHANCED: Show detailed success message based on payment status
+          let message = `Procurement deleted successfully!\n\n`;
+          message += `Reference: ${procurement.reference || procurement.id}\n`;
+          message += `Supplier: ${procurement.supplierName}\n`;
+          message += `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n`;
+          
+          if (result.wasPaid) {
+            message += `\n✅ This was a PAID procurement\n`;
+            message += `• Both purchase and payment entries marked as deleted\n`;
+            message += `• Supplier balance remains: ₱${formatPrice(result.finalBalance?.toString() || '0')}`;
+          } else {
+            message += `\n❌ This was an UNPAID procurement\n`;
+            message += `• Purchase entry marked as deleted\n`;
+            message += `• Supplier balance reduced to: ₱${formatPrice(result.finalBalance?.toString() || '0')}`;
+          }
+          
+          alert(message);
+          
+          // Refresh the procurement list
+          await fetchAllProcurements();
+          
+        } else {
+          console.error("Error deleting procurement:", result.error);
+          setError(`Error deleting procurement: ${result.error}`);
+        }
+        
+      } catch (error) {
+        console.error('Error deleting procurement:', error);
+        setError(`Error deleting procurement: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // ====== SEARCH AND FILTER HANDLERS ======
+  
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Handle status filter change
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+{/* Part 3 End - Form Action Handlers with Payment Update */}
+
+{/* Part 4 Start - Loading and Error States */}
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <Package className="h-6 w-6 mr-2" />
+              Procurement Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
+              <p className="mt-2 text-gray-600">Loading procurement data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white flex items-center">
+              <Package className="h-6 w-6 mr-2" />
+              Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={fetchAllProcurements}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded flex items-center"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+{/* Part 4 End - Loading and Error States */}
+
+{/* Part 5 Start - Main Component Render */}
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <CardHeader className="bg-[rgb(52,69,157)] py-3">
+          <CardTitle className="text-2xl text-white flex items-center">
+            <Package className="h-6 w-6 mr-2" />
+            Procurement Management
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="bg-white p-4 space-y-6">
+{/* Part 5 End - Main Component Render */}
+
+{/* Part 6 Start - Search and Filter Section */}
+          {/* Search and Filter Section */}
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search Input */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search by supplier name, reference, or date..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div className="w-full md:w-48">
+                <select
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  className="w-full p-2 border rounded-lg text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="paid">Paid Only</option>
+                  <option value="unpaid">Unpaid Only</option>
+                  <option value="delivered">Delivered Only</option>
+                  <option value="pending">Pending Delivery</option>
+                </select>
+              </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={fetchAllProcurements}
+                className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-lg hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </button>
+            </div>
+          </div>
+{/* Part 6 End - Search and Filter Section */}
+
+{/* Part 7 Start - Enhanced Procurement Summary */}
+          {/* Procurement Summary - Enhanced Design */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Procurement Summary</h3>
+              <div className="text-sm text-gray-600">
+                {searchTerm || statusFilter !== 'all' 
+                  ? `${filteredProcurements.length} of ${procurements.length} entries (filtered)`
+                  : `${filteredProcurements.length} entries`}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Total Procurement Value</p>
+                    <p className="text-xs text-gray-500">Combined value of all procurements</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-blue-600">
+                      ₱{(() => {
+                        const totalValue = filteredProcurements.reduce((total, procurement) => {
+                          return total + (procurement.grandTotal || 0);
+                        }, 0);
+                        return totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {filteredProcurements.length} {filteredProcurements.length === 1 ? 'entry' : 'entries'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Total Units Procured</p>
+                    <p className="text-xs text-gray-500">Combined quantity across all entries</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-green-600">
+                      {(() => {
+                        const totalQuantity = filteredProcurements.reduce((total, procurement) => {
+                          return total + (procurement.totalQuantity || 0);
+                        }, 0);
+                        return totalQuantity.toLocaleString('en-US');
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-500">units</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Payment Status</p>
+                    <p className="text-xs text-gray-500">Paid vs Outstanding amounts</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-purple-600">
+                      ₱{(() => {
+                        const paidAmount = filteredProcurements.reduce((total, procurement) => {
+                          if (procurement.isPaid === true || procurement.paymentStatus === 'paid') {
+                            return total + (procurement.grandTotal || 0);
+                          }
+                          return total;
+                        }, 0);
+                        return paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      })()} paid
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {(() => {
+                        const paidCount = filteredProcurements.filter(p => 
+                          p.isPaid === true || p.paymentStatus === 'paid'
+                        ).length;
+                        const totalCount = filteredProcurements.length;
+                        const percentage = totalCount > 0 ? (paidCount / totalCount * 100) : 0;
+                        return `${percentage.toFixed(1)}% completed`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+{/* Part 7 End - Enhanced Procurement Summary */}
+
+{/* Part 8 Start - Procurement Entries Table */}
+          {/* Procurement List */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
+                Procurement Entries ({filteredProcurements.length} items)
+              </h3>
+            </div>
+
+            {filteredProcurements.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-gray-700 mb-2">
+                  {procurements.length === 0 ? 'No procurement entries found' : 'No entries match your filters'}
+                </h4>
+                <p className="text-gray-500">
+                  {procurements.length === 0 
+                    ? 'Create procurement entries from the Phone Procurement form'
+                    : 'Try adjusting your search criteria or filters'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border px-3 py-3 text-left font-semibold">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Date
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-left font-semibold">
+                        <div className="flex items-center">
+                          <Building2 className="h-4 w-4 mr-2" />
+                          Supplier
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold">
+                        <div className="flex items-center justify-center">
+                          <Hash className="h-4 w-4 mr-2" />
+                          Total Items
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-right font-semibold">
+                        <div className="flex items-center justify-end">
+                          <DollarSign className="h-4 w-4 mr-2" />
+                          Amount
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold">
+                        <div className="flex items-center justify-center">
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Payment
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold">
+                        <div className="flex items-center justify-center">
+                          <Truck className="h-4 w-4 mr-2" />
+                          Delivery
+                        </div>
+                      </th>
+                      <th className="border px-3 py-3 text-center font-semibold">
+                        <div className="flex items-center justify-center">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Actions
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProcurements.map((procurement, index) => {
+                      const paymentStatus = getPaymentStatus(procurement);
+                      const deliveryStatus = getDeliveryStatus(procurement);
+                      
+                      return (
+                        <tr key={procurement.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="border px-3 py-3">
+                            <div className="font-medium">{formatDate(procurement.purchaseDate)}</div>
+                            <div className="text-xs text-gray-500">ID: {procurement.id.slice(-8)}</div>
+                          </td>
+                          <td className="border px-3 py-3">
+                            <div className="font-medium">{procurement.supplierName || 'Unknown'}</div>
+                            {procurement.reference && (
+                              <div className="text-xs text-gray-500">Ref: {procurement.reference}</div>
+                            )}
+                          </td>
+                          <td className="border px-3 py-3 text-center">
+                            <span className="font-semibold">{procurement.totalQuantity || 0}</span>
+                          </td>
+                          <td className="border px-3 py-3 text-right">
+                            <span className="font-mono font-semibold">
+                              ₱{(procurement.grandTotal || 0).toLocaleString('en-US', { 
+                                minimumFractionDigits: 2, 
+                                maximumFractionDigits: 2 
+                              })}
+                            </span>
+                          </td>
+                          <td className="border px-3 py-3 text-center">
+                            {/* CHANGED: Convert Payment column to clickable status button */}
+                            <button
+                              onClick={() => handlePaymentUpdate(procurement)}
+                              className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${paymentStatus.className} hover:opacity-80 cursor-pointer`}
+                              title={`${paymentStatus.label === 'Paid' ? 'Click to mark as Unpaid' : 'Click to mark as Paid'}`}
+                            >
+                              {paymentStatus.label}
+                            </button>
+                          </td>
+                          <td className="border px-3 py-3 text-center">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${deliveryStatus.className}`}>
+                              {deliveryStatus.label}
+                            </span>
+                          </td>
+                          <td className="border px-3 py-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleViewProcurement(procurement)}
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleEditProcurement(procurement)}
+                                className="p-1 text-green-600 hover:bg-green-100 rounded"
+                                title="Edit Procurement"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProcurement(procurement)}
+                                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                title="Delete Procurement"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+{/* Part 8 End - Procurement Entries Table */}
+
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ProcurementManagementForm;
+</file>
+
 <file path="src/components/PhoneProcurementForm.jsx">
 {/* Part 1 Start - Imports, State, and Helper Functions */}
 import { useState, useEffect } from 'react';
@@ -10643,7 +10652,7 @@ import { useGlobalState } from '../context/GlobalStateContext';
 
 const PhoneProcurementForm = () => {
   // ====== GLOBAL STATE FOR EDITING ======
-  const { procurementToEdit, clearProcurementToEdit, isViewingProcurement } = useGlobalState(); // NEW: Add isViewingProcurement
+  const { procurementToEdit, clearProcurementToEdit, isViewingProcurement, procurementMode } = useGlobalState(); // ADDED: procurementMode
   
   // ====== EDITING STATE ======
   const [isEditing, setIsEditing] = useState(false);
@@ -10683,8 +10692,9 @@ const PhoneProcurementForm = () => {
   // General procurement details
   const [purchaseDate, setPurchaseDate] = useState('');
   
-  // Payment and delivery status - Read-only values for new entries
-  const [datePaid] = useState(''); // Read-only, empty for new entries
+  // Payment and delivery status - MODIFIED for payment mode
+  const [paymentStatus, setPaymentStatus] = useState('unpaid'); // NEW: Added payment status state
+  const [datePaid, setDatePaid] = useState(''); // MODIFIED: Now can be updated in payment mode
   const [dateDelivered] = useState(''); // Read-only, empty for new entries
   const [paymentReference, setPaymentReference] = useState('');
   const [bankName, setBankName] = useState('');
@@ -10779,7 +10789,7 @@ const PhoneProcurementForm = () => {
     resetForm();
   };
 
-  // Reset form function - UPDATED to properly clear global state
+  // Reset form function - UPDATED to include payment fields
   const resetForm = () => {
     setProcurementItems([]);
     setNextId(1);
@@ -10791,6 +10801,8 @@ const PhoneProcurementForm = () => {
     setBankAccount('');
     setAccountPayable('');
     setPaymentReference('');
+    setPaymentStatus('unpaid'); // NEW: Reset payment status
+    setDatePaid(''); // NEW: Reset date paid
     setIsSubmitting(false);
     setIsEditing(false);
     setEditingId(null);
@@ -10828,6 +10840,10 @@ const PhoneProcurementForm = () => {
       setBankAccount(procurementToEdit.bankAccount || '');
       setAccountPayable(accountPayableValue);
       setPaymentReference(procurementToEdit.paymentReference || '');
+      
+      // NEW: Set payment-related fields for payment mode
+      setPaymentStatus((procurementToEdit.paymentStatus === 'paid' || procurementToEdit.isPaid) ? 'paid' : 'unpaid');
+      setDatePaid(procurementToEdit.datePaid || procurementToEdit.paymentDate || '');
       
       // Find and set supplier data WITHOUT triggering auto-populate behavior
       if (procurementToEdit.supplierId && suppliers.length > 0) {
@@ -10911,6 +10927,14 @@ const PhoneProcurementForm = () => {
       setItemColorOptions({}); // Clear color options
     }
   }, [procurementToEdit, suppliers]);
+
+  // NEW: Clear payment fields when payment status changes to unpaid
+  useEffect(() => {
+    if (procurementMode === 'payment' && paymentStatus === 'unpaid') {
+      setDatePaid('');
+      setPaymentReference('');
+    }
+  }, [paymentStatus, procurementMode]);
 
   // Fetch suppliers on component mount
   useEffect(() => {
@@ -11228,8 +11252,12 @@ const PhoneProcurementForm = () => {
     }));
   };
 
+  // UPDATED: Handle payment reference change - now works in payment mode
   const handlePaymentReferenceChange = (e) => {
-    setPaymentReference(e.target.value);
+    const value = e.target.value;
+    // Allow alphanumeric and common reference characters
+    const sanitized = value.replace(/[^a-zA-Z0-9-_#/\s]/g, '');
+    setPaymentReference(sanitized);
   };
 
   const handleBankNameChange = (e) => {
@@ -11356,6 +11384,45 @@ const PhoneProcurementForm = () => {
     setProcurementItems(prev => [...prev, newItem]);
     setNextId(prev => prev + 1);
     resetCurrentItem();
+  };
+
+  // NEW: Handle payment update (only saves payment fields)
+  const handlePaymentUpdate = async () => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      console.log('Updating payment details for procurement:', editingId);
+
+      // Prepare payment data
+      const paymentData = {
+        isPaid: paymentStatus === 'paid',
+        paymentStatus: paymentStatus,
+        paymentDate: datePaid || null,
+        datePaid: datePaid || null,
+        paymentReference: paymentReference || null
+      };
+
+      // Use supplier service to update payment status
+      const result = await supplierService.updateProcurementPaymentStatus(editingId, paymentData);
+
+      if (result.success) {
+        console.log('Payment details updated successfully');
+        
+        // Show success message
+        alert(`Payment details updated successfully!\n\nProcurement: ${procurementToEdit?.reference || editingId}\nStatus: ${paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}`);
+        
+        // Clear the form and return to procurement management
+        resetToCreateMode();
+      } else {
+        setError(`Error updating payment details: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating payment details:', error);
+      setError(`Error updating payment details: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 {/* Part 4 End - Essential Functions */}
 
@@ -11547,11 +11614,13 @@ const PhoneProcurementForm = () => {
             <div className="flex justify-between items-center">
               <CardTitle className="text-2xl text-white flex items-center">
                 <ShoppingCart className="h-6 w-6 mr-2" />
-                {isViewingProcurement 
-                  ? `View Phone Procurement - ${procurementToEdit?.reference || procurementToEdit?.id}`
-                  : (isEditing || procurementToEdit) 
-                    ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` 
-                    : 'Phone Procurement'}
+                {procurementMode === 'payment' 
+                  ? `Enter Payment Details - ${procurementToEdit?.reference || procurementToEdit?.id}`
+                  : isViewingProcurement 
+                    ? `View Phone Procurement - ${procurementToEdit?.reference || procurementToEdit?.id}`
+                    : (isEditing || procurementToEdit) 
+                      ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` 
+                      : 'Phone Procurement'}
               </CardTitle>
               
               {/* Cancel Edit Button */}
@@ -11560,9 +11629,17 @@ const PhoneProcurementForm = () => {
                   type="button"
                   onClick={resetToCreateMode}
                   className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center text-sm"
-                  title={isViewingProcurement ? "Close view and return to create mode" : "Cancel editing and return to create mode"}
+                  title={procurementMode === 'payment' 
+                    ? "Close payment entry and return to procurement management" 
+                    : isViewingProcurement 
+                      ? "Close view and return to create mode" 
+                      : "Cancel editing and return to create mode"}
                 >
-                  ✕ {isViewingProcurement ? 'Close' : 'Cancel Edit'}
+                  ✕ {procurementMode === 'payment' 
+                    ? 'Close Payment' 
+                    : isViewingProcurement 
+                      ? 'Close' 
+                      : 'Cancel Edit'}
                 </button>
               )}
             </div>
@@ -11586,7 +11663,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={purchaseDate}
                     onChange={handlePurchaseDateChange}
-                    disabled={isViewingProcurement}
+                    disabled={isViewingProcurement || procurementMode === 'payment'}
                     required
                   />
                 </div>
@@ -11598,7 +11675,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={selectedSupplier}
                     onChange={handleSupplierChange}
-                    disabled={isViewingProcurement}
+                    disabled={isViewingProcurement || procurementMode === 'payment'}
                     required
                   >
                     <option value="">-- Select Supplier --</option>
@@ -11652,38 +11729,56 @@ const PhoneProcurementForm = () => {
 
               {/* Second Row: Payment Status, Date Paid, Payment Reference, Delivery Status, Date Delivered */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Payment Status - Read-only */}
+                {/* Payment Status - ENHANCED with color styling */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Status:</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
-                    value="Pending"
-                    disabled={true}
-                  />
+                  <select 
+                    className={`w-full p-2 border rounded text-sm h-10 font-medium ${
+                      procurementMode === 'payment' 
+                        ? paymentStatus === 'paid' 
+                          ? 'bg-green-100 text-green-800 border-green-300' 
+                          : 'bg-red-100 text-red-800 border-red-300'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value)}
+                    disabled={procurementMode !== 'payment'}
+                  >
+                    <option value="unpaid">Unpaid</option>
+                    <option value="paid">Paid</option>
+                  </select>
                 </div>
 
-                {/* Date Paid - Read-only */}
+                {/* Date Paid - ENABLED only when payment status is 'paid' in payment mode */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Paid:</label>
                   <input 
                     type="date" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    className={`w-full p-2 border rounded text-sm h-10 ${
+                      procurementMode === 'payment' && paymentStatus === 'paid'
+                        ? 'bg-white text-black' 
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
                     value={datePaid}
-                    disabled={true}
+                    onChange={(e) => setDatePaid(e.target.value)}
+                    disabled={procurementMode !== 'payment' || paymentStatus !== 'paid'}
                   />
                 </div>
 
-                {/* Payment Reference - DISABLED in both create and edit modes */}
+                {/* Payment Reference - ENABLED only when payment status is 'paid' in payment mode */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
                   <input 
                     type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    className={`w-full p-2 border rounded text-sm h-10 ${
+                      procurementMode === 'payment' && paymentStatus === 'paid'
+                        ? 'bg-white text-black' 
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
                     value={paymentReference}
                     onChange={handlePaymentReferenceChange}
                     placeholder="Payment reference"
-                    disabled={true}
+                    disabled={procurementMode !== 'payment' || paymentStatus !== 'paid'}
                   />
                 </div>
 
@@ -11726,7 +11821,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.manufacturer}
                     onChange={handleCurrentManufacturerChange}
-                    disabled={isViewingProcurement}
+                    disabled={isViewingProcurement || procurementMode === 'payment'}
                   >
                     <option value="">-- Select Manufacturer --</option>
                     {manufacturers.map(manufacturer => (
@@ -11744,7 +11839,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.model}
                     onChange={handleCurrentModelChange}
-                    disabled={isViewingProcurement || !currentItem.manufacturer}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.manufacturer}
                   >
                     <option value="">-- Select Model --</option>
                     {models.map(model => (
@@ -11762,7 +11857,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.ram}
                     onChange={handleCurrentRamChange}
-                    disabled={isViewingProcurement || !currentItem.model}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.model}
                   >
                     <option value="">-- Select RAM --</option>
                     {rams.map(ram => (
@@ -11780,7 +11875,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.storage}
                     onChange={handleCurrentStorageChange}
-                    disabled={isViewingProcurement || !currentItem.ram}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.ram}
                   >
                     <option value="">-- Select Storage --</option>
                     {storages.map(storage => (
@@ -11798,7 +11893,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.color}
                     onChange={handleCurrentColorChange}
-                    disabled={isViewingProcurement || !currentItem.storage}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.storage}
                   >
                     <option value="">-- Select Color --</option>
                     {colors.map(color => (
@@ -11819,7 +11914,7 @@ const PhoneProcurementForm = () => {
                     <button
                       type="button"
                       onClick={decrementCurrentQuantity}
-                      disabled={currentItem.quantity <= 1 || isViewingProcurement}
+                      disabled={currentItem.quantity <= 1 || isViewingProcurement || procurementMode === 'payment'}
                       className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       <Minus className="h-3 w-3" />
@@ -11829,13 +11924,13 @@ const PhoneProcurementForm = () => {
                       className="w-32 p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:bg-gray-100 disabled:text-gray-500"
                       value={currentItem.quantity}
                       onChange={handleCurrentQuantityChange}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       min="1"
                     />
                     <button
                       type="button"
                       onClick={incrementCurrentQuantity}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       <Plus className="h-3 w-3" />
@@ -11853,7 +11948,7 @@ const PhoneProcurementForm = () => {
                       className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-500"
                       value={currentItem.dealersPrice ? formatNumberWithCommas(currentItem.dealersPrice) : ''}
                       onChange={handleCurrentDealersPriceChange}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       placeholder="0.00"
                     />
                   </div>
@@ -11869,7 +11964,7 @@ const PhoneProcurementForm = () => {
                       className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-500"
                       value={currentItem.retailPrice ? formatNumberWithCommas(currentItem.retailPrice) : ''}
                       onChange={handleCurrentRetailPriceChange}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       placeholder="0.00"
                     />
                   </div>
@@ -11910,7 +12005,7 @@ const PhoneProcurementForm = () => {
                     <button
                       type="button"
                       onClick={addItemToTable}
-                      disabled={!isCurrentItemValid || isViewingProcurement}
+                      disabled={!isCurrentItemValid || isViewingProcurement || procurementMode === 'payment'}
                       className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -11932,7 +12027,7 @@ const PhoneProcurementForm = () => {
                 <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
                   Procurement List ({procurementItems.length} items)
                 </h3>
-                {procurementItems.length > 0 && !isViewingProcurement && (
+                {procurementItems.length > 0 && !isViewingProcurement && procurementMode !== 'payment' && (
                   <button
                     type="button"
                     onClick={clearAllItems}
@@ -11972,7 +12067,7 @@ const PhoneProcurementForm = () => {
                           <td className="border px-3 py-2 text-center">{formatWithGB(item.ram)}</td>
                           <td className="border px-3 py-2 text-center">{formatWithGB(item.storage)}</td>
                           <td className="border px-3 py-2 text-center">
-                            {isViewingProcurement ? (
+                            {isViewingProcurement || procurementMode === 'payment' ? (
                               <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
                                 {item.color}
                               </span>
@@ -11989,29 +12084,35 @@ const PhoneProcurementForm = () => {
                             )}
                           </td>
                           <td className="border px-3 py-2 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => decrementTableQuantity(item.id)}
-                                disabled={isViewingProcurement}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
-                                title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
+                            {isViewingProcurement || procurementMode === 'payment' ? (
                               <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
                                 {item.quantity}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => incrementTableQuantity(item.id)}
-                                disabled={isViewingProcurement}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
-                                title="Increase quantity"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => decrementTableQuantity(item.id)}
+                                  disabled={isViewingProcurement || procurementMode === 'payment'}
+                                  className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
+                                  title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => incrementTableQuantity(item.id)}
+                                  disabled={isViewingProcurement || procurementMode === 'payment'}
+                                  className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
+                                  title="Increase quantity"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td className="border px-3 py-2 text-right font-mono">
                             ₱{formatPrice(item.dealersPrice)}
@@ -12094,31 +12195,49 @@ const PhoneProcurementForm = () => {
               </div>
             )}
 
-            {/* Submit Button - Hide when viewing */}
+            {/* Submit Button - Different for payment mode */}
             {!isViewingProcurement && (
               <div className="pt-4">
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={
-                    procurementItems.length === 0 || 
-                    isSubmitting || 
-                    !purchaseDate || 
-                    !selectedSupplier
-                  }
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="animate-spin h-5 w-5 mr-2" />
-                      {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
-                    </>
-                  )}
-                </button>
+                {procurementMode === 'payment' ? (
+                  <button
+                    type="button"
+                    onClick={handlePaymentUpdate}
+                    disabled={isSubmitting}
+                    className="w-full py-3 bg-green-600 text-white rounded hover:bg-green-700 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                        Saving Payment Details...
+                      </>
+                    ) : (
+                      'Save Payment Details'
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={
+                      procurementItems.length === 0 || 
+                      isSubmitting || 
+                      !purchaseDate || 
+                      !selectedSupplier
+                    }
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                        {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="h-5 w-5 mr-2" />
+                        {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </CardContent>

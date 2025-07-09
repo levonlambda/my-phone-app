@@ -189,11 +189,20 @@ const ProcurementManagementForm = () => {
   };
 
   const handleDeleteProcurement = async (procurement) => {
+    // ENHANCED: Check if procurement is paid and show appropriate warning
+    const isPaid = procurement.isPaid === true || procurement.paymentStatus === 'paid';
+    
     const confirmMessage = `Are you sure you want to delete this procurement?\n\n` +
       `Reference: ${procurement.reference || procurement.id}\n` +
       `Supplier: ${procurement.supplierName}\n` +
       `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n` +
-      `Items: ${procurement.totalQuantity || 0}\n\n` +
+      `Items: ${procurement.totalQuantity || 0}\n` +
+      `Payment Status: ${isPaid ? 'PAID' : 'UNPAID'}\n\n` +
+      `This will:\n` +
+      (isPaid 
+        ? `• Mark both purchase and payment ledger entries as deleted\n• Supplier balance will remain unchanged\n`
+        : `• Remove ₱${formatPrice(procurement.grandTotal?.toString() || '0')} from supplier's outstanding balance\n• Mark the purchase ledger entry as deleted\n`) +
+      `• Permanently delete the procurement record\n\n` +
       `This action cannot be undone!`;
     
     if (window.confirm(confirmMessage)) {
@@ -208,8 +217,23 @@ const ProcurementManagementForm = () => {
         if (result.success) {
           console.log("Procurement deleted successfully:", result);
           
-          // Show success message
-          alert(`Procurement deleted successfully!\n\nReference: ${procurement.reference || procurement.id}\nSupplier: ${procurement.supplierName}`);
+          // ENHANCED: Show detailed success message based on payment status
+          let message = `Procurement deleted successfully!\n\n`;
+          message += `Reference: ${procurement.reference || procurement.id}\n`;
+          message += `Supplier: ${procurement.supplierName}\n`;
+          message += `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n`;
+          
+          if (result.wasPaid) {
+            message += `\n✅ This was a PAID procurement\n`;
+            message += `• Both purchase and payment entries marked as deleted\n`;
+            message += `• Supplier balance remains: ₱${formatPrice(result.finalBalance?.toString() || '0')}`;
+          } else {
+            message += `\n❌ This was an UNPAID procurement\n`;
+            message += `• Purchase entry marked as deleted\n`;
+            message += `• Supplier balance reduced to: ₱${formatPrice(result.finalBalance?.toString() || '0')}`;
+          }
+          
+          alert(message);
           
           // Refresh the procurement list
           await fetchAllProcurements();

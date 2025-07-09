@@ -10,7 +10,8 @@ import {
   where, 
   orderBy, 
   Timestamp,
-  runTransaction
+  runTransaction,
+  writeBatch  // ONLY ADDED THIS for batch operations in recalculateSupplierBalance
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
@@ -496,6 +497,7 @@ export const updateProcurement = async (procurementId, updatedProcurementData, n
  * - Removing the procurement document
  * - Adjusting supplier outstanding balances (subtracting the amount)
  * - Marking corresponding ledger entries as deleted with original amount preserved
+ * - FIXED: Also handles payment ledger entries for paid procurements
  */
 export const deleteProcurement = async (procurementId) => {
   try {
@@ -510,15 +512,25 @@ export const deleteProcurement = async (procurementId) => {
     // 🚨 PRE-READ LEDGER ENTRIES OUTSIDE TRANSACTION
     // =============================
     
-    // Get existing ledger entries BEFORE starting transaction
-    const ledgerQuery = query(
+    // Get existing PURCHASE ledger entries BEFORE starting transaction
+    const purchaseLedgerQuery = query(
       collection(db, 'supplier_ledger'),
       where('procurementId', '==', procurementId),
       where('entryType', '==', 'purchase')
     );
     
-    const ledgerQuerySnap = await getDocs(ledgerQuery);
-    console.log('Found ledger entries:', ledgerQuerySnap.size);
+    const purchaseLedgerQuerySnap = await getDocs(purchaseLedgerQuery);
+    console.log('Found purchase ledger entries:', purchaseLedgerQuerySnap.size);
+    
+    // NEW: Get existing PAYMENT ledger entries
+    const paymentLedgerQuery = query(
+      collection(db, 'supplier_ledger'),
+      where('procurementId', '==', procurementId),
+      where('entryType', '==', 'payment')
+    );
+    
+    const paymentLedgerQuerySnap = await getDocs(paymentLedgerQuery);
+    console.log('Found payment ledger entries:', paymentLedgerQuerySnap.size);
     
     // =============================
     // 🔄 START TRANSACTION
@@ -538,12 +550,14 @@ export const deleteProcurement = async (procurementId) => {
       const originalProcurement = procurementSnap.data();
       const originalGrandTotal = originalProcurement.grandTotal || 0;
       const supplierId = originalProcurement.supplierId;
+      const isPaid = originalProcurement.isPaid || originalProcurement.paymentStatus === 'paid';
       
       console.log('Procurement to delete:', {
         id: procurementId,
         grandTotal: originalGrandTotal,
         supplierId: supplierId,
-        reference: originalProcurement.reference
+        reference: originalProcurement.reference,
+        isPaid: isPaid
       });
       
       // Get supplier document
@@ -561,30 +575,64 @@ export const deleteProcurement = async (procurementId) => {
       // 1. Delete the procurement document
       transaction.delete(procurementRef);
       
-      // 2. Update supplier outstanding balance (subtract the deleted amount)
-      const newOutstanding = (supplierData.totalOutstanding || 0) - originalGrandTotal;
+      // 2. Update supplier outstanding balance
+      // FIXED: For paid procurements, balance doesn't change because both purchase and payment are removed
+      // For unpaid procurements, subtract the purchase amount
+      let newOutstanding = supplierData.totalOutstanding || 0;
+      
+      if (!isPaid) {
+        // Only adjust balance for unpaid procurements
+        newOutstanding = newOutstanding - originalGrandTotal;
+      }
+      // For paid procurements, balance remains the same since we're removing both purchase and payment
+      
       transaction.update(supplierRef, {
-        totalOutstanding: Math.max(0, newOutstanding), // Ensure balance doesn't go negative
+        totalOutstanding: Math.max(0, newOutstanding),
         lastUpdated: Timestamp.now()
       });
       
-      // 3. Update the corresponding ledger entry with original amount preserved
-      if (!ledgerQuerySnap.empty) {
-        const ledgerDoc = ledgerQuerySnap.docs.find(doc => 
+      // 3. Update the PURCHASE ledger entry with original amount preserved
+      if (!purchaseLedgerQuerySnap.empty) {
+        const purchaseLedgerDoc = purchaseLedgerQuerySnap.docs.find(doc => 
           doc.data().supplierId === supplierId
         );
         
-        if (ledgerDoc) {
-          const ledgerData = ledgerDoc.data();
+        if (purchaseLedgerDoc) {
+          const ledgerData = purchaseLedgerDoc.data();
           const originalDescription = ledgerData.description || '';
           const originalAmount = ledgerData.amountDue || 0;
           
           // Create enhanced description with original amount preserved
           const updatedDescription = `${originalDescription} - DELETED (Original: ₱${formatPrice(originalAmount.toString())})`;
           
-          transaction.update(ledgerDoc.ref, {
+          transaction.update(purchaseLedgerDoc.ref, {
             description: updatedDescription,
             amountDue: 0, // Zero out for balance calculations
+            runningBalance: Math.max(0, newOutstanding),
+            isDeleted: true, // Mark as deleted for audit purposes
+            deletedDate: Timestamp.now(),
+            lastUpdated: Timestamp.now()
+          });
+        }
+      }
+      
+      // 4. NEW: Handle PAYMENT ledger entry if procurement was paid
+      if (isPaid && !paymentLedgerQuerySnap.empty) {
+        const paymentLedgerDoc = paymentLedgerQuerySnap.docs.find(doc => 
+          doc.data().supplierId === supplierId
+        );
+        
+        if (paymentLedgerDoc) {
+          const paymentData = paymentLedgerDoc.data();
+          const originalPaymentAmount = paymentData.amountPaid || 0;
+          const originalPaymentDescription = paymentData.description || '';
+          
+          // Create enhanced description with original payment amount preserved
+          const updatedPaymentDescription = `${originalPaymentDescription} - DELETED (Original Payment: ₱${formatPrice(originalPaymentAmount.toString())})`;
+          
+          transaction.update(paymentLedgerDoc.ref, {
+            description: updatedPaymentDescription,
+            amountPaid: 0, // Zero out for balance calculations
             runningBalance: Math.max(0, newOutstanding),
             isDeleted: true, // Mark as deleted for audit purposes
             deletedDate: Timestamp.now(),
@@ -600,7 +648,9 @@ export const deleteProcurement = async (procurementId) => {
         deletedGrandTotal: originalGrandTotal,
         supplierId: supplierId,
         supplierName: supplierData.supplierName,
-        reference: originalProcurement.reference
+        reference: originalProcurement.reference,
+        wasPaid: isPaid,
+        finalBalance: newOutstanding
       };
     });
     
@@ -609,11 +659,15 @@ export const deleteProcurement = async (procurementId) => {
     return {
       success: true,
       procurementId: result.procurementId,
-      deletedGrandTotal: result.deletedGrandTotal,
+      grandTotal: result.deletedGrandTotal, // Keep as grandTotal for compatibility with existing code
       supplierId: result.supplierId,
       supplierName: result.supplierName,
       reference: result.reference,
-      message: 'Procurement deleted successfully with proper balance adjustments'
+      wasPaid: result.wasPaid,
+      finalBalance: result.finalBalance,
+      message: result.wasPaid 
+        ? 'Paid procurement deleted successfully. Both purchase and payment entries marked as deleted.'
+        : 'Unpaid procurement deleted successfully with proper balance adjustments.'
     };
     
   } catch (error) {
@@ -751,29 +805,105 @@ export const getProcurementsBySupplier = async (supplierId) => {
 
 /**
  * Get supplier ledger entries
+ * Modified to group entries by procurementId so payments always appear below their procurement
  */
 export const getSupplierLedger = async (supplierId) => {
   try {
     const q = query(
       collection(db, 'supplier_ledger'),
-      where('supplierId', '==', supplierId),
-      orderBy('entryDate', 'desc'),
-      orderBy('sortOrder', 'asc')
+      where('supplierId', '==', supplierId)
     );
     
     const querySnapshot = await getDocs(q);
-    const ledgerEntries = [];
+    const allEntries = [];
     
     querySnapshot.forEach((doc) => {
-      ledgerEntries.push({
+      allEntries.push({
         id: doc.id,
         ...doc.data()
       });
     });
     
+    // Group entries by procurementId
+    const entriesByProcurement = {};
+    const standaloneEntries = [];
+    
+    allEntries.forEach(entry => {
+      if (entry.procurementId) {
+        if (!entriesByProcurement[entry.procurementId]) {
+          entriesByProcurement[entry.procurementId] = [];
+        }
+        entriesByProcurement[entry.procurementId].push(entry);
+      } else {
+        // Handle entries without procurementId (if any exist)
+        standaloneEntries.push(entry);
+      }
+    });
+    
+    // Sort entries within each procurement group by sortOrder
+    Object.keys(entriesByProcurement).forEach(procurementId => {
+      entriesByProcurement[procurementId].sort((a, b) => {
+        // First by sortOrder (purchase=1, payment=2)
+        if (a.sortOrder !== b.sortOrder) {
+          return a.sortOrder - b.sortOrder;
+        }
+        // Then by date if same sortOrder
+        return b.entryDate.localeCompare(a.entryDate);
+      });
+    });
+    
+    // Get the procurement entry date and creation time for each group for sorting
+    const procurementGroups = Object.keys(entriesByProcurement).map(procurementId => {
+      const entries = entriesByProcurement[procurementId];
+      const procurementEntry = entries.find(e => e.entryType === 'purchase');
+      return {
+        procurementId,
+        entries,
+        // Use dateCreated for true chronological order since entryDate might be same
+        dateCreated: procurementEntry ? procurementEntry.dateCreated : entries[0].dateCreated,
+        reference: procurementEntry ? procurementEntry.reference : entries[0].reference
+      };
+    });
+    
+    // Sort groups by creation time (OLDEST first) - use dateCreated or reference
+    procurementGroups.sort((a, b) => {
+      // If dateCreated exists and is a Timestamp, use it
+      if (a.dateCreated && b.dateCreated && a.dateCreated.seconds && b.dateCreated.seconds) {
+        return a.dateCreated.seconds - b.dateCreated.seconds;
+      }
+      // Otherwise fall back to reference comparison
+      return a.reference.localeCompare(b.reference);
+    });
+    
+    // Flatten the sorted groups back into a single array
+    const sortedEntries = [];
+    procurementGroups.forEach(group => {
+      sortedEntries.push(...group.entries);
+    });
+    
+    // Add standalone entries at the end (sorted by date - oldest first)
+    standaloneEntries.sort((a, b) => {
+      if (a.dateCreated && b.dateCreated && a.dateCreated.seconds && b.dateCreated.seconds) {
+        return a.dateCreated.seconds - b.dateCreated.seconds;
+      }
+      return a.entryDate.localeCompare(b.entryDate);
+    });
+    sortedEntries.push(...standaloneEntries);
+    
+    // Calculate running balance based on display order
+    let runningBalance = 0;
+    sortedEntries.forEach(entry => {
+      if (entry.entryType === 'purchase' && !entry.isDeleted) {
+        runningBalance += entry.amountDue || 0;
+      } else if (entry.entryType === 'payment') {
+        runningBalance -= entry.amountPaid || 0;
+      }
+      entry.runningBalance = Math.max(0, runningBalance);
+    });
+    
     return {
       success: true,
-      ledgerEntries
+      ledgerEntries: sortedEntries
     };
   } catch (error) {
     console.error('Error fetching supplier ledger:', error);
@@ -790,7 +920,7 @@ export const getSupplierLedger = async (supplierId) => {
  */
 export const recalculateSupplierBalance = async (supplierId) => {
   try {
-    // Get all ledger entries for the supplier
+    // Get all ledger entries in display order (grouped by procurement)
     const ledgerResult = await getSupplierLedger(supplierId);
     
     if (!ledgerResult.success) {
@@ -799,21 +929,44 @@ export const recalculateSupplierBalance = async (supplierId) => {
     
     let totalDue = 0;
     let totalPaid = 0;
+    let runningBalance = 0;
+    let entriesUpdated = 0;
     
-    // Calculate totals from ledger entries
-    ledgerResult.ledgerEntries.forEach(entry => {
+    // Create a batch for efficient updates
+    const batch = writeBatch(db);
+    
+    // Process entries in display order for correct running balance
+    for (const entry of ledgerResult.ledgerEntries) {
       if (entry.entryType === 'purchase' && !entry.isDeleted) {
         totalDue += entry.amountDue || 0;
+        runningBalance += entry.amountDue || 0;
       } else if (entry.entryType === 'payment') {
         totalPaid += entry.amountPaid || 0;
+        runningBalance -= entry.amountPaid || 0;
       }
-    });
+      
+      // Update running balance if different
+      const correctBalance = Math.max(0, runningBalance);
+      if (entry.runningBalance !== correctBalance) {
+        const entryRef = doc(db, 'supplier_ledger', entry.id);
+        batch.update(entryRef, {
+          runningBalance: correctBalance,
+          lastUpdated: Timestamp.now()
+        });
+        entriesUpdated++;
+      }
+    }
     
-    const outstandingBalance = totalDue - totalPaid;
+    // Commit batch updates
+    if (entriesUpdated > 0) {
+      await batch.commit();
+    }
+    
+    const finalBalance = Math.max(0, runningBalance);
     
     // Update supplier document
     await updateDoc(doc(db, 'suppliers', supplierId), {
-      totalOutstanding: Math.max(0, outstandingBalance),
+      totalOutstanding: finalBalance,
       lastUpdated: Timestamp.now()
     });
     
@@ -821,7 +974,8 @@ export const recalculateSupplierBalance = async (supplierId) => {
       success: true,
       totalDue,
       totalPaid,
-      outstandingBalance: Math.max(0, outstandingBalance)
+      finalBalance,
+      entriesUpdated
     };
     
   } catch (error) {
