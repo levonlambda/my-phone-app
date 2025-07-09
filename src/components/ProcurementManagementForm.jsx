@@ -18,12 +18,12 @@ import {
   Trash2,
   Settings
 } from 'lucide-react';
-import { useGlobalState } from '../context/GlobalStateContext'; // NEW: Import global state
-import supplierService from '../services/supplierService'; // NEW: Import supplier service
+import { useGlobalState } from '../context/GlobalStateContext';
+import supplierService from '../services/supplierService';
 
 const ProcurementManagementForm = () => {
   // ====== GLOBAL STATE ======
-  const { editProcurement, viewProcurement } = useGlobalState(); // NEW: Get both edit and view functions
+  const { editProcurement, viewProcurement, paymentProcurement } = useGlobalState(); // ADDED: paymentProcurement
 
   // ====== STATE DEFINITIONS ======
   // State for procurement data
@@ -169,10 +169,11 @@ const ProcurementManagementForm = () => {
 {/* Part 3 Start - Form Action Handlers with Payment Update */}
   // ====== FORM ACTION HANDLERS ======
   
-  // Handle payment status click (no dialog)
-  const handlePaymentUpdate = async (procurement) => {
-    console.log('Payment clicked for procurement:', procurement.id);
-    // Click handler preserved but dialog functionality removed
+  // CHANGED: Handle payment status click to open payment mode
+  const handlePaymentUpdate = (procurement) => {
+    console.log('Opening payment mode for procurement:', procurement.id);
+    // Use global state to open procurement in payment mode
+    paymentProcurement(procurement);
   };
 
   const handleViewProcurement = (procurement) => {

@@ -17,7 +17,7 @@ import { useGlobalState } from '../context/GlobalStateContext';
 
 const PhoneProcurementForm = () => {
   // ====== GLOBAL STATE FOR EDITING ======
-  const { procurementToEdit, clearProcurementToEdit, isViewingProcurement } = useGlobalState(); // NEW: Add isViewingProcurement
+  const { procurementToEdit, clearProcurementToEdit, isViewingProcurement, procurementMode } = useGlobalState(); // ADDED: procurementMode
   
   // ====== EDITING STATE ======
   const [isEditing, setIsEditing] = useState(false);
@@ -57,8 +57,9 @@ const PhoneProcurementForm = () => {
   // General procurement details
   const [purchaseDate, setPurchaseDate] = useState('');
   
-  // Payment and delivery status - Read-only values for new entries
-  const [datePaid] = useState(''); // Read-only, empty for new entries
+  // Payment and delivery status - MODIFIED for payment mode
+  const [paymentStatus, setPaymentStatus] = useState('unpaid'); // NEW: Added payment status state
+  const [datePaid, setDatePaid] = useState(''); // MODIFIED: Now can be updated in payment mode
   const [dateDelivered] = useState(''); // Read-only, empty for new entries
   const [paymentReference, setPaymentReference] = useState('');
   const [bankName, setBankName] = useState('');
@@ -153,7 +154,7 @@ const PhoneProcurementForm = () => {
     resetForm();
   };
 
-  // Reset form function - UPDATED to properly clear global state
+  // Reset form function - UPDATED to include payment fields
   const resetForm = () => {
     setProcurementItems([]);
     setNextId(1);
@@ -165,6 +166,8 @@ const PhoneProcurementForm = () => {
     setBankAccount('');
     setAccountPayable('');
     setPaymentReference('');
+    setPaymentStatus('unpaid'); // NEW: Reset payment status
+    setDatePaid(''); // NEW: Reset date paid
     setIsSubmitting(false);
     setIsEditing(false);
     setEditingId(null);
@@ -202,6 +205,10 @@ const PhoneProcurementForm = () => {
       setBankAccount(procurementToEdit.bankAccount || '');
       setAccountPayable(accountPayableValue);
       setPaymentReference(procurementToEdit.paymentReference || '');
+      
+      // NEW: Set payment-related fields for payment mode
+      setPaymentStatus((procurementToEdit.paymentStatus === 'paid' || procurementToEdit.isPaid) ? 'paid' : 'unpaid');
+      setDatePaid(procurementToEdit.datePaid || procurementToEdit.paymentDate || '');
       
       // Find and set supplier data WITHOUT triggering auto-populate behavior
       if (procurementToEdit.supplierId && suppliers.length > 0) {
@@ -285,6 +292,14 @@ const PhoneProcurementForm = () => {
       setItemColorOptions({}); // Clear color options
     }
   }, [procurementToEdit, suppliers]);
+
+  // NEW: Clear payment fields when payment status changes to unpaid
+  useEffect(() => {
+    if (procurementMode === 'payment' && paymentStatus === 'unpaid') {
+      setDatePaid('');
+      setPaymentReference('');
+    }
+  }, [paymentStatus, procurementMode]);
 
   // Fetch suppliers on component mount
   useEffect(() => {
@@ -602,8 +617,12 @@ const PhoneProcurementForm = () => {
     }));
   };
 
+  // UPDATED: Handle payment reference change - now works in payment mode
   const handlePaymentReferenceChange = (e) => {
-    setPaymentReference(e.target.value);
+    const value = e.target.value;
+    // Allow alphanumeric and common reference characters
+    const sanitized = value.replace(/[^a-zA-Z0-9-_#/\s]/g, '');
+    setPaymentReference(sanitized);
   };
 
   const handleBankNameChange = (e) => {
@@ -730,6 +749,45 @@ const PhoneProcurementForm = () => {
     setProcurementItems(prev => [...prev, newItem]);
     setNextId(prev => prev + 1);
     resetCurrentItem();
+  };
+
+  // NEW: Handle payment update (only saves payment fields)
+  const handlePaymentUpdate = async () => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      console.log('Updating payment details for procurement:', editingId);
+
+      // Prepare payment data
+      const paymentData = {
+        isPaid: paymentStatus === 'paid',
+        paymentStatus: paymentStatus,
+        paymentDate: datePaid || null,
+        datePaid: datePaid || null,
+        paymentReference: paymentReference || null
+      };
+
+      // Use supplier service to update payment status
+      const result = await supplierService.updateProcurementPaymentStatus(editingId, paymentData);
+
+      if (result.success) {
+        console.log('Payment details updated successfully');
+        
+        // Show success message
+        alert(`Payment details updated successfully!\n\nProcurement: ${procurementToEdit?.reference || editingId}\nStatus: ${paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}`);
+        
+        // Clear the form and return to procurement management
+        resetToCreateMode();
+      } else {
+        setError(`Error updating payment details: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating payment details:', error);
+      setError(`Error updating payment details: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 {/* Part 4 End - Essential Functions */}
 
@@ -921,11 +979,13 @@ const PhoneProcurementForm = () => {
             <div className="flex justify-between items-center">
               <CardTitle className="text-2xl text-white flex items-center">
                 <ShoppingCart className="h-6 w-6 mr-2" />
-                {isViewingProcurement 
-                  ? `View Phone Procurement - ${procurementToEdit?.reference || procurementToEdit?.id}`
-                  : (isEditing || procurementToEdit) 
-                    ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` 
-                    : 'Phone Procurement'}
+                {procurementMode === 'payment' 
+                  ? `Enter Payment Details - ${procurementToEdit?.reference || procurementToEdit?.id}`
+                  : isViewingProcurement 
+                    ? `View Phone Procurement - ${procurementToEdit?.reference || procurementToEdit?.id}`
+                    : (isEditing || procurementToEdit) 
+                      ? `Edit Phone Procurement - ${procurementToEdit?.reference || editingId}` 
+                      : 'Phone Procurement'}
               </CardTitle>
               
               {/* Cancel Edit Button */}
@@ -934,9 +994,17 @@ const PhoneProcurementForm = () => {
                   type="button"
                   onClick={resetToCreateMode}
                   className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center text-sm"
-                  title={isViewingProcurement ? "Close view and return to create mode" : "Cancel editing and return to create mode"}
+                  title={procurementMode === 'payment' 
+                    ? "Close payment entry and return to procurement management" 
+                    : isViewingProcurement 
+                      ? "Close view and return to create mode" 
+                      : "Cancel editing and return to create mode"}
                 >
-                  ✕ {isViewingProcurement ? 'Close' : 'Cancel Edit'}
+                  ✕ {procurementMode === 'payment' 
+                    ? 'Close Payment' 
+                    : isViewingProcurement 
+                      ? 'Close' 
+                      : 'Cancel Edit'}
                 </button>
               )}
             </div>
@@ -960,7 +1028,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={purchaseDate}
                     onChange={handlePurchaseDateChange}
-                    disabled={isViewingProcurement}
+                    disabled={isViewingProcurement || procurementMode === 'payment'}
                     required
                   />
                 </div>
@@ -972,7 +1040,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={selectedSupplier}
                     onChange={handleSupplierChange}
-                    disabled={isViewingProcurement}
+                    disabled={isViewingProcurement || procurementMode === 'payment'}
                     required
                   >
                     <option value="">-- Select Supplier --</option>
@@ -1026,38 +1094,56 @@ const PhoneProcurementForm = () => {
 
               {/* Second Row: Payment Status, Date Paid, Payment Reference, Delivery Status, Date Delivered */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Payment Status - Read-only */}
+                {/* Payment Status - ENHANCED with color styling */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Status:</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
-                    value="Pending"
-                    disabled={true}
-                  />
+                  <select 
+                    className={`w-full p-2 border rounded text-sm h-10 font-medium ${
+                      procurementMode === 'payment' 
+                        ? paymentStatus === 'paid' 
+                          ? 'bg-green-100 text-green-800 border-green-300' 
+                          : 'bg-red-100 text-red-800 border-red-300'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value)}
+                    disabled={procurementMode !== 'payment'}
+                  >
+                    <option value="unpaid">Unpaid</option>
+                    <option value="paid">Paid</option>
+                  </select>
                 </div>
 
-                {/* Date Paid - Read-only */}
+                {/* Date Paid - ENABLED only when payment status is 'paid' in payment mode */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Date Paid:</label>
                   <input 
                     type="date" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    className={`w-full p-2 border rounded text-sm h-10 ${
+                      procurementMode === 'payment' && paymentStatus === 'paid'
+                        ? 'bg-white text-black' 
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
                     value={datePaid}
-                    disabled={true}
+                    onChange={(e) => setDatePaid(e.target.value)}
+                    disabled={procurementMode !== 'payment' || paymentStatus !== 'paid'}
                   />
                 </div>
 
-                {/* Payment Reference - DISABLED in both create and edit modes */}
+                {/* Payment Reference - ENABLED only when payment status is 'paid' in payment mode */}
                 <div className="space-y-2">
                   <label className="block text-[rgb(52,69,157)] font-semibold text-sm">Payment Reference:</label>
                   <input 
                     type="text" 
-                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                    className={`w-full p-2 border rounded text-sm h-10 ${
+                      procurementMode === 'payment' && paymentStatus === 'paid'
+                        ? 'bg-white text-black' 
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
                     value={paymentReference}
                     onChange={handlePaymentReferenceChange}
                     placeholder="Payment reference"
-                    disabled={true}
+                    disabled={procurementMode !== 'payment' || paymentStatus !== 'paid'}
                   />
                 </div>
 
@@ -1100,7 +1186,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.manufacturer}
                     onChange={handleCurrentManufacturerChange}
-                    disabled={isViewingProcurement}
+                    disabled={isViewingProcurement || procurementMode === 'payment'}
                   >
                     <option value="">-- Select Manufacturer --</option>
                     {manufacturers.map(manufacturer => (
@@ -1118,7 +1204,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.model}
                     onChange={handleCurrentModelChange}
-                    disabled={isViewingProcurement || !currentItem.manufacturer}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.manufacturer}
                   >
                     <option value="">-- Select Model --</option>
                     {models.map(model => (
@@ -1136,7 +1222,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.ram}
                     onChange={handleCurrentRamChange}
-                    disabled={isViewingProcurement || !currentItem.model}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.model}
                   >
                     <option value="">-- Select RAM --</option>
                     {rams.map(ram => (
@@ -1154,7 +1240,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.storage}
                     onChange={handleCurrentStorageChange}
-                    disabled={isViewingProcurement || !currentItem.ram}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.ram}
                   >
                     <option value="">-- Select Storage --</option>
                     {storages.map(storage => (
@@ -1172,7 +1258,7 @@ const PhoneProcurementForm = () => {
                     className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                     value={currentItem.color}
                     onChange={handleCurrentColorChange}
-                    disabled={isViewingProcurement || !currentItem.storage}
+                    disabled={isViewingProcurement || procurementMode === 'payment' || !currentItem.storage}
                   >
                     <option value="">-- Select Color --</option>
                     {colors.map(color => (
@@ -1193,7 +1279,7 @@ const PhoneProcurementForm = () => {
                     <button
                       type="button"
                       onClick={decrementCurrentQuantity}
-                      disabled={currentItem.quantity <= 1 || isViewingProcurement}
+                      disabled={currentItem.quantity <= 1 || isViewingProcurement || procurementMode === 'payment'}
                       className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       <Minus className="h-3 w-3" />
@@ -1203,13 +1289,13 @@ const PhoneProcurementForm = () => {
                       className="w-32 p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:bg-gray-100 disabled:text-gray-500"
                       value={currentItem.quantity}
                       onChange={handleCurrentQuantityChange}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       min="1"
                     />
                     <button
                       type="button"
                       onClick={incrementCurrentQuantity}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       <Plus className="h-3 w-3" />
@@ -1227,7 +1313,7 @@ const PhoneProcurementForm = () => {
                       className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-500"
                       value={currentItem.dealersPrice ? formatNumberWithCommas(currentItem.dealersPrice) : ''}
                       onChange={handleCurrentDealersPriceChange}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       placeholder="0.00"
                     />
                   </div>
@@ -1243,7 +1329,7 @@ const PhoneProcurementForm = () => {
                       className="w-full p-2 pl-6 border rounded text-sm disabled:bg-gray-100 disabled:text-gray-500"
                       value={currentItem.retailPrice ? formatNumberWithCommas(currentItem.retailPrice) : ''}
                       onChange={handleCurrentRetailPriceChange}
-                      disabled={isViewingProcurement}
+                      disabled={isViewingProcurement || procurementMode === 'payment'}
                       placeholder="0.00"
                     />
                   </div>
@@ -1284,7 +1370,7 @@ const PhoneProcurementForm = () => {
                     <button
                       type="button"
                       onClick={addItemToTable}
-                      disabled={!isCurrentItemValid || isViewingProcurement}
+                      disabled={!isCurrentItemValid || isViewingProcurement || procurementMode === 'payment'}
                       className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -1306,7 +1392,7 @@ const PhoneProcurementForm = () => {
                 <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
                   Procurement List ({procurementItems.length} items)
                 </h3>
-                {procurementItems.length > 0 && !isViewingProcurement && (
+                {procurementItems.length > 0 && !isViewingProcurement && procurementMode !== 'payment' && (
                   <button
                     type="button"
                     onClick={clearAllItems}
@@ -1346,7 +1432,7 @@ const PhoneProcurementForm = () => {
                           <td className="border px-3 py-2 text-center">{formatWithGB(item.ram)}</td>
                           <td className="border px-3 py-2 text-center">{formatWithGB(item.storage)}</td>
                           <td className="border px-3 py-2 text-center">
-                            {isViewingProcurement ? (
+                            {isViewingProcurement || procurementMode === 'payment' ? (
                               <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
                                 {item.color}
                               </span>
@@ -1363,29 +1449,35 @@ const PhoneProcurementForm = () => {
                             )}
                           </td>
                           <td className="border px-3 py-2 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => decrementTableQuantity(item.id)}
-                                disabled={isViewingProcurement}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
-                                title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
+                            {isViewingProcurement || procurementMode === 'payment' ? (
                               <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
                                 {item.quantity}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => incrementTableQuantity(item.id)}
-                                disabled={isViewingProcurement}
-                                className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
-                                title="Increase quantity"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => decrementTableQuantity(item.id)}
+                                  disabled={isViewingProcurement || procurementMode === 'payment'}
+                                  className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
+                                  title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => incrementTableQuantity(item.id)}
+                                  disabled={isViewingProcurement || procurementMode === 'payment'}
+                                  className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs"
+                                  title="Increase quantity"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td className="border px-3 py-2 text-right font-mono">
                             ₱{formatPrice(item.dealersPrice)}
@@ -1468,31 +1560,49 @@ const PhoneProcurementForm = () => {
               </div>
             )}
 
-            {/* Submit Button - Hide when viewing */}
+            {/* Submit Button - Different for payment mode */}
             {!isViewingProcurement && (
               <div className="pt-4">
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={
-                    procurementItems.length === 0 || 
-                    isSubmitting || 
-                    !purchaseDate || 
-                    !selectedSupplier
-                  }
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="animate-spin h-5 w-5 mr-2" />
-                      {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
-                    </>
-                  )}
-                </button>
+                {procurementMode === 'payment' ? (
+                  <button
+                    type="button"
+                    onClick={handlePaymentUpdate}
+                    disabled={isSubmitting}
+                    className="w-full py-3 bg-green-600 text-white rounded hover:bg-green-700 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                        Saving Payment Details...
+                      </>
+                    ) : (
+                      'Save Payment Details'
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={
+                      procurementItems.length === 0 || 
+                      isSubmitting || 
+                      !purchaseDate || 
+                      !selectedSupplier
+                    }
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                        {isEditing ? 'Updating Procurement...' : 'Saving Procurement...'}
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="h-5 w-5 mr-2" />
+                        {isEditing ? `Update Procurement Record (${procurementItems.length} items)` : `Save Procurement Record (${procurementItems.length} items)`}
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </CardContent>

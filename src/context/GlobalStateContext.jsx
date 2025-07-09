@@ -17,7 +17,8 @@ export const GlobalStateProvider = ({ children }) => {
   const [phoneToEdit, setPhoneToEdit] = useState(null);
   const [procurementToEdit, setProcurementToEdit] = useState(null);
   const [activeComponent, setActiveComponent] = useState('summary');
-  const [isViewingProcurement, setIsViewingProcurement] = useState(false); // NEW: Track view vs edit mode
+  const [isViewingProcurement, setIsViewingProcurement] = useState(false); // Track view vs edit mode
+  const [procurementMode, setProcurementMode] = useState(''); // NEW: Track procurement mode ('view', 'edit', 'payment')
   
   // ====== PHONE EDITING FUNCTIONS ======
   // Function to set a phone for editing and switch to form
@@ -36,13 +37,23 @@ export const GlobalStateProvider = ({ children }) => {
   const editProcurement = (procurement) => {
     setProcurementToEdit(procurement);
     setIsViewingProcurement(false); // Set to edit mode
+    setProcurementMode('edit'); // NEW: Set mode to edit
     setActiveComponent('procurement');
   };
   
-  // NEW: Function to set a procurement for viewing (read-only)
+  // Function to set a procurement for viewing (read-only)
   const viewProcurement = (procurement) => {
     setProcurementToEdit(procurement);
     setIsViewingProcurement(true); // Set to view mode
+    setProcurementMode('view'); // NEW: Set mode to view
+    setActiveComponent('procurement');
+  };
+  
+  // NEW: Function to set a procurement for payment entry
+  const paymentProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(false); // Not in pure view mode
+    setProcurementMode('payment'); // Set mode to payment
     setActiveComponent('procurement');
   };
   
@@ -50,6 +61,7 @@ export const GlobalStateProvider = ({ children }) => {
   const clearProcurementToEdit = () => {
     setProcurementToEdit(null);
     setIsViewingProcurement(false); // Reset view mode
+    setProcurementMode(''); // NEW: Reset mode
   };
   
   // ====== CONTEXT VALUE OBJECT ======
@@ -60,9 +72,11 @@ export const GlobalStateProvider = ({ children }) => {
     clearPhoneToEdit,
     procurementToEdit,
     editProcurement,
-    viewProcurement, // NEW: Add view function
+    viewProcurement,
+    paymentProcurement, // NEW: Add payment function
     clearProcurementToEdit,
-    isViewingProcurement, // NEW: Add view mode state
+    isViewingProcurement,
+    procurementMode, // NEW: Add procurement mode state
     activeComponent,
     setActiveComponent
   };
