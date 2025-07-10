@@ -4,11 +4,13 @@ const PhoneAdditionalInfo = ({
   imei1,
   imei2,
   barcode,
+  serialNumber,
   status,
   lastUpdated,
   handleImei1Change,
   handleImei2Change,
   handleBarcodeChange,
+  handleSerialNumberChange,
   handleStatusChange,
   imei1Error,
   imei2Error,
@@ -50,17 +52,29 @@ const PhoneAdditionalInfo = ({
         </div>
       </div>
       
-      {/* Barcode */}
-      <div className="space-y-2">
-        <label className="block text-[rgb(52,69,157)] font-semibold">Barcode:</label>
-        <input 
-          type="text" 
-          className="w-full p-2 border rounded"
-          value={barcode}
-          onChange={handleBarcodeChange}
-          placeholder="Product barcode"
-          required
-        />
+      {/* Barcode and Serial Number Fields */}
+      <div className="flex gap-4">
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">Barcode:</label>
+          <input 
+            type="text" 
+            className="w-full p-2 border rounded"
+            value={barcode}
+            onChange={handleBarcodeChange}
+            placeholder="Product barcode"
+            required
+          />
+        </div>
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">Serial Number:</label>
+          <input 
+            type="text" 
+            className="w-full p-2 border rounded"
+            value={serialNumber}
+            onChange={handleSerialNumberChange}
+            placeholder=""
+          />
+        </div>
       </div>
       
       {/* Status and Last Updated Fields */}
@@ -98,11 +112,13 @@ PhoneAdditionalInfo.propTypes = {
   imei1: PropTypes.string.isRequired,
   imei2: PropTypes.string.isRequired,
   barcode: PropTypes.string.isRequired,
+  serialNumber: PropTypes.string.isRequired,
   status: PropTypes.string.isRequired,
   lastUpdated: PropTypes.string.isRequired,
   handleImei1Change: PropTypes.func.isRequired,
   handleImei2Change: PropTypes.func.isRequired,
   handleBarcodeChange: PropTypes.func.isRequired,
+  handleSerialNumberChange: PropTypes.func.isRequired,
   handleStatusChange: PropTypes.func.isRequired,
   imei1Error: PropTypes.string,
   imei2Error: PropTypes.string

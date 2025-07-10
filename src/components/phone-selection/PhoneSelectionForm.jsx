@@ -21,6 +21,7 @@ import {
 } from './services/inventoryService';
 import { Search, ArrowRight, CircleAlert } from 'lucide-react';
 
+{/* Part 1 Start - State Definitions */}
 const PhoneSelectionForm = () => {
   // ====== STATE DEFINITIONS ======
   // Core state for selections
@@ -62,6 +63,7 @@ const PhoneSelectionForm = () => {
   const [imei1, setImei1] = useState('');
   const [imei2, setImei2] = useState('');
   const [barcode, setBarcode] = useState('');
+  const [serialNumber, setSerialNumber] = useState(''); // NEW: Added serial number state
   const [dealersPrice, setDealersPrice] = useState('');
   const [retailPrice, setRetailPrice] = useState('');
   const [status, setStatus] = useState('On-Hand');
@@ -76,6 +78,7 @@ const PhoneSelectionForm = () => {
   const [imei2Error, setImei2Error] = useState('');
   const [lastUpdated, setLastUpdated] = useState(getCurrentDate());
   const [userEnteredBarcode, setUserEnteredBarcode] = useState(false);
+{/* Part 1 End - State Definitions */}
 
   // ====== EVENT HANDLERS ======
   // Event handlers for form inputs
@@ -141,6 +144,11 @@ const PhoneSelectionForm = () => {
     setBarcode(newBarcode);
     // Set flag that user has entered a barcode manually
     setUserEnteredBarcode(true);
+  };
+
+  const handleSerialNumberChange = (e) => {
+    const newSerialNumber = e.target.value.toUpperCase();
+    setSerialNumber(newSerialNumber);
   };
 
   const handleBarcodeSearchChange = (e) => {
@@ -313,6 +321,7 @@ const PhoneSelectionForm = () => {
       imei1,
       imei2,
       barcode,
+      serialNumber, // NEW: Added serial number to phone data
       dealersPrice: dPrice,
       retailPrice: rPrice,
       status,
@@ -355,6 +364,7 @@ const PhoneSelectionForm = () => {
       // Reset fields after successful submission
       setImei1('');
       setImei2('');
+      setSerialNumber(''); // NEW: Reset serial number after submission
       setStatus('On-Hand');
       
       // Set flag that the barcode value should persist
@@ -656,11 +666,13 @@ const PhoneSelectionForm = () => {
                 imei1={imei1}
                 imei2={imei2}
                 barcode={barcode}
+                serialNumber={serialNumber}
                 status={status}
                 lastUpdated={lastUpdated}
                 handleImei1Change={handleImei1Change}
                 handleImei2Change={handleImei2Change}
                 handleBarcodeChange={handleBarcodeChange}
+                handleSerialNumberChange={handleSerialNumberChange}
                 handleStatusChange={handleStatusChange}
                 imei1Error={imei1Error}
                 imei2Error={imei2Error}
