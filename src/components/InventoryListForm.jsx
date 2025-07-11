@@ -29,6 +29,7 @@ const InventoryListForm = () => {
     color: '',
     imei1: '',
     barcode: '',
+    serialNumber: '', // ADD THIS LINE
     startDate: '',
     endDate: ''
   });
@@ -39,6 +40,7 @@ const InventoryListForm = () => {
     maxPrice: '',
     imei1: '',
     barcode: '',
+    serialNumber: '', // ADD THIS LINE
     startDate: '',
     endDate: ''
   });
@@ -81,10 +83,11 @@ const InventoryListForm = () => {
       maxPrice: filters.maxPrice,
       imei1: filters.imei1,
       barcode: filters.barcode,
+      serialNumber: filters.serialNumber,
       startDate: filters.startDate,
       endDate: filters.endDate
     }));
-  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.startDate, filters.endDate]);
+  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.serialNumber, filters.startDate, filters.endDate]);
 
   // Load manufacturer list on component mount
   useEffect(() => {
@@ -155,6 +158,14 @@ const InventoryListForm = () => {
       // Apply barcode filter (partial match)
       if (filters.barcode && item.barcode && !item.barcode.includes(filters.barcode)) {
         return false;
+      }
+      
+      // Apply serial number filter (partial match)
+      if (filters.serialNumber) {
+        // If filter is set, item must have a serial number AND it must include the search term
+        if (!item.serialNumber || !item.serialNumber.includes(filters.serialNumber)) {
+          return false;
+        }
       }
       
       // Apply min price filter (using retail price)
@@ -252,7 +263,7 @@ const InventoryListForm = () => {
     const { name, value } = e.target;
     
     // For debounced text inputs (price fields, imei, barcode, dates)
-    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'startDate' || name === 'endDate') {
+    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'startDate' || name === 'endDate') {
       // For price fields, handle numeric input
       if (name === 'minPrice' || name === 'maxPrice') {
         // Allow only numbers and commas
@@ -297,7 +308,7 @@ const InventoryListForm = () => {
           }));
         }, 500); // 500ms delay for dates
       } else {
-        // For text search fields (IMEI, barcode)
+        // For text search fields (IMEI, barcode, serial number)
         setPendingFilters(prev => ({
           ...prev,
           [name]: value
@@ -357,6 +368,7 @@ const InventoryListForm = () => {
       maxPrice: '',
       imei1: '',
       barcode: '',
+      serialNumber: '',
       startDate: '',
       endDate: ''
     });
@@ -410,7 +422,9 @@ const InventoryListForm = () => {
           dealersPrice: data.dealersPrice || 0,
           retailPrice: data.retailPrice || 0,
           imei1: data.imei1 || '',
+          imei2: data.imei2 || '',  // Also add imei2 while we're at it
           barcode: data.barcode || '',
+          serialNumber: data.serialNumber || '', // ADD THIS LINE
           status: data.status || 'On-Hand',
           dateAdded: data.dateAdded || '',
           lastUpdated: data.lastUpdated || ''
@@ -519,7 +533,105 @@ const InventoryListForm = () => {
               />
             </div>
           )}
-          
+          {/* Inventory Summary Section */}
+          {!initialLoad && inventoryItems.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Inventory Summary</h3>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Item Count - 25% */}
+                <div className="w-full md:w-[25%] bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 font-medium">Item Count</p>
+                      <p className="text-xs text-gray-500">Total inventory items</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-blue-600">
+                        {inventoryItems.length.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {inventoryItems.length === 1 ? 'item' : 'items'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Total Value - 30% */}
+                <div className="w-full md:w-[30%] bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 font-medium">Total Value</p>
+                      <p className="text-xs text-gray-500">Combined retail price</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-green-600">
+                        ₱{(() => {
+                          const totalValue = inventoryItems.reduce((total, item) => {
+                            return total + (item.retailPrice || 0);
+                          }, 0);
+                          return totalValue.toLocaleString('en-US', { 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 2 
+                          });
+                        })()}
+                      </p>
+                      <p className="text-xs text-gray-500">retail value</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Status Breakdown - 45% */}
+                <div className="w-full md:w-[45%] bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                  <div className="flex items-start">
+                    <div className="mr-4">
+                      <p className="text-sm text-gray-600 font-medium">Status Breakdown</p>
+                      <p className="text-xs text-gray-500">Items by status</p>
+                    </div>
+                    <div className="flex flex-wrap gap-3 items-center">
+                      {(() => {
+                        const statusCounts = inventoryItems.reduce((counts, item) => {
+                          const status = item.status || 'Unknown';
+                          counts[status] = (counts[status] || 0) + 1;
+                          return counts;
+                        }, {});
+                        
+                        // Define order and display names
+                        const statusOrder = [
+                          { key: 'On-Hand', display: 'Stock' },
+                          { key: 'On-Display', display: 'Display' },
+                          { key: 'Sold', display: 'Sold' },
+                          { key: 'Reserved', display: 'Reserved' },
+                          { key: 'Defective', display: 'Defective' }
+                        ];
+                        
+                        return statusOrder
+                          .filter(status => statusCounts[status.key] > 0)
+                          .map((status) => (
+                            <div key={status.key} className="flex items-center">
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                status.key === 'On-Hand' ? 'bg-blue-100 text-blue-700' :
+                                status.key === 'On-Display' ? 'bg-yellow-100 text-yellow-700' :
+                                status.key === 'Sold' ? 'bg-purple-100 text-purple-700' :
+                                status.key === 'Reserved' ? 'bg-orange-100 text-orange-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {status.display}
+                              </span>
+                              <span className="font-semibold text-gray-700 ml-1">
+                                {statusCounts[status.key]}
+                              </span>
+                            </div>
+                          ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             {initialLoad ? (
               <div className="text-center py-12">
@@ -558,7 +670,7 @@ const InventoryListForm = () => {
               />
             )}
           </div>
-          
+          <div className="overflow-x-auto"></div>
           {/* Show loading state */}
           {loading && (
             <div className="text-center py-4">

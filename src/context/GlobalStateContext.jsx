@@ -16,6 +16,7 @@ export const GlobalStateProvider = ({ children }) => {
   // ====== STATE DEFINITIONS ======
   const [phoneToEdit, setPhoneToEdit] = useState(null);
   const [procurementToEdit, setProcurementToEdit] = useState(null);
+  const [inventoryItemToEdit, setInventoryItemToEdit] = useState(null); // NEW: State for inventory editing
   const [activeComponent, setActiveComponent] = useState('summary');
   const [isViewingProcurement, setIsViewingProcurement] = useState(false); // Track view vs edit mode
   const [procurementMode, setProcurementMode] = useState(''); // NEW: Track procurement mode ('view', 'edit', 'payment')
@@ -30,6 +31,18 @@ export const GlobalStateProvider = ({ children }) => {
   // Function to clear the selected phone
   const clearPhoneToEdit = () => {
     setPhoneToEdit(null);
+  };
+  
+  // ====== INVENTORY EDITING FUNCTIONS - NEW ======
+  // Function to set an inventory item for editing and switch to selection form
+  const editInventoryItem = (item) => {
+    setInventoryItemToEdit(item);
+    setActiveComponent('selection');
+  };
+  
+  // Function to clear the selected inventory item
+  const clearInventoryItemToEdit = () => {
+    setInventoryItemToEdit(null);
   };
   
   // ====== PROCUREMENT EDITING FUNCTIONS ======
@@ -70,6 +83,9 @@ export const GlobalStateProvider = ({ children }) => {
     phoneToEdit,
     editPhone,
     clearPhoneToEdit,
+    inventoryItemToEdit, // NEW: Add inventory item state
+    editInventoryItem, // NEW: Add inventory edit function
+    clearInventoryItemToEdit, // NEW: Add inventory clear function
     procurementToEdit,
     editProcurement,
     viewProcurement,

@@ -1,3 +1,5 @@
+import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
+import { updatePhoneInInventory } from './services/inventoryService'; // NEW: Import update function
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PhoneBasicInfo from './PhoneBasicInfo';
@@ -23,6 +25,9 @@ import { Search, ArrowRight, CircleAlert } from 'lucide-react';
 
 {/* Part 1 Start - State Definitions */}
 const PhoneSelectionForm = () => {
+  // Get inventory item to edit from global state
+  const { inventoryItemToEdit, clearInventoryItemToEdit } = useGlobalState(); // NEW: Get inventory edit state
+  
   // ====== STATE DEFINITIONS ======
   // Core state for selections
   const [selectedManufacturer, setSelectedManufacturer] = useState('');
@@ -30,6 +35,10 @@ const PhoneSelectionForm = () => {
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedStorage, setSelectedStorage] = useState('');
   const [selectedRam, setSelectedRam] = useState('');
+  
+  // NEW: Track if we're in edit mode
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editItemId, setEditItemId] = useState(null);
   
   // Barcode search
   const [barcodeSearch, setBarcodeSearch] = useState('');
@@ -68,6 +77,12 @@ const PhoneSelectionForm = () => {
   const [retailPrice, setRetailPrice] = useState('');
   const [status, setStatus] = useState('On-Hand');
   
+
+  // ADD THIS DEBUGGING USEEFFECT
+  useEffect(() => {
+    console.log('Serial number state changed to:', serialNumber);
+  }, [serialNumber]);
+
   // UI state
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -148,6 +163,7 @@ const PhoneSelectionForm = () => {
 
   const handleSerialNumberChange = (e) => {
     const newSerialNumber = e.target.value.toUpperCase();
+    console.log('Serial number changing to:', newSerialNumber); // ADD THIS
     setSerialNumber(newSerialNumber);
   };
 
@@ -226,7 +242,8 @@ const PhoneSelectionForm = () => {
       // Clear IMEI fields (these should be empty for a new entry)
       setImei1('');
       setImei2('');
-      
+      setSerialNumber('');
+
       // Set status and last updated
       setStatus('On-Hand');
       setLastUpdated(getCurrentDate());
@@ -292,8 +309,8 @@ const PhoneSelectionForm = () => {
     setImei1Error('');
     setImei2Error('');
     
-    // Check for duplicate IMEIs before submitting
-    const imeisCheck = await checkDuplicateImeis(imei1, imei2);
+    // Check for duplicate IMEIs before submitting (skip if editing same item)
+    const imeisCheck = await checkDuplicateImeis(imei1, imei2, isEditMode ? editItemId : null);
     
     setIsCheckingImei(false);
     
@@ -326,17 +343,24 @@ const PhoneSelectionForm = () => {
       retailPrice: rPrice,
       status,
       lastUpdated: currentDate,
-      dateAdded: currentDate  // New field to track when the entry was first added
+      dateAdded: isEditMode ? inventoryItemToEdit.dateAdded : currentDate // Preserve original date if editing
     };
     
     setLoading(true);
     
     try {
-      // Add the phone to inventory
-      const result = await addPhoneToInventory(phoneData);
+      let result;
+      
+      if (isEditMode) {
+        // Update existing phone in inventory
+        result = await updatePhoneInInventory(editItemId, phoneData, inventoryItemToEdit);
+      } else {
+        // Add new phone to inventory
+        result = await addPhoneToInventory(phoneData);
+      }
       
       if (!result.success) {
-        throw new Error(result.error || 'Failed to add phone to inventory');
+        throw new Error(result.error || `Failed to ${isEditMode ? 'update' : 'add'} phone to inventory`);
       }
       
       // IMPORTANT: Update the price configuration
@@ -367,40 +391,51 @@ const PhoneSelectionForm = () => {
       setSerialNumber(''); // NEW: Reset serial number after submission
       setStatus('On-Hand');
       
+      // Clear edit mode
+      if (isEditMode) {
+        clearInventoryItemToEdit();
+        setIsEditMode(false);
+        setEditItemId(null);
+      }
+      
       // Set flag that the barcode value should persist
       setUserEnteredBarcode(true);
       
       setLoading(false);
       setIsSubmitting(false);
-      alert('Phone details saved successfully!');
+      alert(`Phone details ${isEditMode ? 'updated' : 'saved'} successfully!`);
     } catch (error) {
-      console.error("Error adding document:", error);
-      setError(`Error saving phone: ${error.message}`);
+      console.error(`Error ${isEditMode ? 'updating' : 'adding'} document:`, error);
+      setError(`Error ${isEditMode ? 'updating' : 'saving'} phone: ${error.message}`);
       setLoading(false);
       setIsSubmitting(false);
-      alert('Error saving phone details. Please try again.');
+      alert(`Error ${isEditMode ? 'updating' : 'saving'} phone details. Please try again.`);
     }
   };
+  
 
   // ====== EFFECT HOOKS ======
   // Fetch manufacturers on component mount
   useEffect(() => {
-    async function initializeForm() {
-      setLoading(true);
-      try {
-        // Fetch manufacturers list
-        await fetchManufacturers();
-        
-        setLoading(false);
-      } catch (error) {
-        console.error("Error initializing form:", error);
-        setError(`Error loading data: ${error.message}`);
-        setLoading(false);
+    // Only fetch if manufacturers haven't been loaded yet
+    if (manufacturers.length === 0) {
+      async function initializeForm() {
+        setLoading(true);
+        try {
+          // Fetch manufacturers list
+          await fetchManufacturers();
+          
+          setLoading(false);
+        } catch (error) {
+          console.error("Error initializing form:", error);
+          setError(`Error loading data: ${error.message}`);
+          setLoading(false);
+        }
       }
+      
+      initializeForm();
     }
-    
-    initializeForm();
-  }, [fetchManufacturers]);
+  }, [manufacturers.length, fetchManufacturers]);
 
   // Check if selections are complete and fetch prices directly from Firestore
   useEffect(() => {
@@ -522,6 +557,54 @@ const PhoneSelectionForm = () => {
     fetchPricesDirectly();
   }, [selectedManufacturer, selectedModel, selectedRam, selectedStorage, selectedColor, userEnteredBarcode]);
 
+  // NEW: Handle inventory item editing
+  useEffect(() => {
+    if (inventoryItemToEdit && !isEditMode) {
+      // Set edit mode
+      setIsEditMode(true);
+      setEditItemId(inventoryItemToEdit.id);
+      
+      // Populate all fields with the item data
+      setSelectedManufacturer(inventoryItemToEdit.manufacturer);
+      setSelectedModel(inventoryItemToEdit.model);
+      setSelectedRam(inventoryItemToEdit.ram);
+      setSelectedStorage(inventoryItemToEdit.storage);
+      setSelectedColor(inventoryItemToEdit.color);
+      setImei1(inventoryItemToEdit.imei1);
+      setImei2(inventoryItemToEdit.imei2 || '');
+      setBarcode(inventoryItemToEdit.barcode || '');
+      setSerialNumber(inventoryItemToEdit.serialNumber || '');
+      setDealersPrice(formatNumberWithCommas(inventoryItemToEdit.dealersPrice?.toString() || '0'));
+      setRetailPrice(formatNumberWithCommas(inventoryItemToEdit.retailPrice?.toString() || '0'));
+      setStatus(inventoryItemToEdit.status);
+      setLastUpdated(inventoryItemToEdit.lastUpdated || getCurrentDate());
+      
+      // Set flags to show all sections
+      setIsSpecsSelected(true);
+      setUserEnteredBarcode(true);
+      
+      // Fetch options for the selected manufacturer and model
+      if (inventoryItemToEdit.manufacturer) {
+        fetchModels(inventoryItemToEdit.manufacturer).then(() => {
+          if (inventoryItemToEdit.model) {
+            fetchOptions(inventoryItemToEdit.manufacturer, inventoryItemToEdit.model);
+          }
+        });
+      }
+    }
+  }, [inventoryItemToEdit, isEditMode, fetchModels, fetchOptions]); // Include all dependencies
+  
+  // NEW: Clean up when component unmounts or switches away
+  useEffect(() => {
+    return () => {
+      if (isEditMode) {
+        clearInventoryItemToEdit();
+        setIsEditMode(false);
+        setEditItemId(null);
+      }
+    };
+  }, [isEditMode, clearInventoryItemToEdit]);
+
   // Show loading state for initial load
   if ((loading || optionsLoading) && manufacturers.length === 0) {
     return (
@@ -569,7 +652,9 @@ const PhoneSelectionForm = () => {
         onKeyDown={handleKeyDown}>
         <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
           <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white">Select Phone</CardTitle>
+            <CardTitle className="text-2xl text-white">
+              {isEditMode ? 'Edit Phone Details' : 'Select Phone'}
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="bg-white p-4 space-y-4">
@@ -686,7 +771,7 @@ const PhoneSelectionForm = () => {
                 className="w-full py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90"
                 disabled={!isSpecsSelected || isCheckingImei || isSubmitting}
               >
-                {isSubmitting ? 'Saving...' : 'Save Entry'}
+                {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Entry' : 'Save Entry')}
               </button>
             </div>
           </CardContent>

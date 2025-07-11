@@ -1,3 +1,4 @@
+import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { doc, updateDoc, runTransaction, increment, deleteDoc } from 'firebase/firestore';
@@ -34,7 +35,13 @@ const InventoryTable = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Get global state function for editing inventory items
+  const { editInventoryItem } = useGlobalState(); // NEW: Get edit function from context
 
+  // NEW: Handle edit details click
+  const handleEditDetailsClick = (item) => {
+    editInventoryItem(item);
+  };
   // Handle edit button click
   const handleEditClick = (item) => {
     // If we're already editing, cancel it first
@@ -419,11 +426,12 @@ const InventoryTable = ({
                 savingItemId={savingItemId}
               />
             ) : (
-              <InventoryRow 
+             <InventoryRow 
                 key={item.id}
                 item={item}
                 handleEditClick={handleEditClick}
                 handleDeleteClick={handleDeleteClick}
+                handleEditDetailsClick={handleEditDetailsClick}
               />
             )
           ))}

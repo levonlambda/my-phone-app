@@ -492,7 +492,7 @@ const InventoryFilters = ({
         />
       </div>
 
-      {/* NEW: Serial Number filter - Display only, no functionality */}
+      {/* Serial Number filter */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Serial Number
@@ -500,10 +500,10 @@ const InventoryFilters = ({
         <input
           type="text"
           name="serialNumber"
-          value=""
+          value={pendingFilters.serialNumber}
+          onChange={handleFilterChange}
           placeholder="Search serial number"
           className="w-full p-2 border rounded"
-          disabled
         />
       </div>
 
