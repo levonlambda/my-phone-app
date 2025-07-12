@@ -1,3 +1,4 @@
+{/* Part 1 Start - Imports */}
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
@@ -6,8 +7,13 @@ import { Smartphone, RefreshCw, Search, Filter, X, Eye, SlidersHorizontal, Edit 
 import PhoneDetailModal from './phone-list/PhoneDetailModal';
 import PhoneAdvancedSearch from './phone-list/PhoneAdvancedSearch';
 import { useGlobalState } from '../context/GlobalStateContext';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneListForm = () => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - State Management */}
   // Get global state functions
   const { editPhone } = useGlobalState();
   
@@ -38,7 +44,9 @@ const PhoneListForm = () => {
   // Detail modal state
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPhone, setSelectedPhone] = useState(null);
+  {/* Part 3 End - State Management */}
 
+  {/* Part 4 Start - Filter and Search Functions */}
   // Apply filters function defined before fetchPhones to avoid dependency issues
   const applyFilters = useCallback((phonesData) => {
     let filtered = [...phonesData];
@@ -175,7 +183,9 @@ const PhoneListForm = () => {
       setLoading(false);
     }
   }, [sortField, sortDirection, applyFilters]); // Added applyFilters dependency here
+  {/* Part 4 End - Filter and Search Functions */}
 
+  {/* Part 5 Start - Event Handlers */}
   // Handle filter change
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -244,7 +254,9 @@ const PhoneListForm = () => {
     editPhone(phone);
     // No need to manually change location, the context will handle this
   };
+  {/* Part 5 End - Event Handlers */}
 
+  {/* Part 6 Start - UseEffect Hooks */}
   // Initial data fetch
   useEffect(() => {
     fetchPhones();
@@ -256,7 +268,9 @@ const PhoneListForm = () => {
       applyFilters(phones);
     }
   }, [filters, phones, applyFilters, advancedSearchCriteria]);
+  {/* Part 6 End - UseEffect Hooks */}
 
+  {/* Part 7 Start - Helper Functions */}
   // Format storage array as string
   const formatStorage = (storageArray) => {
     if (!storageArray || !Array.isArray(storageArray)) return '-';
@@ -268,7 +282,9 @@ const PhoneListForm = () => {
     if (!ramArray || !Array.isArray(ramArray)) return '-';
     return ramArray.join(', ');
   };
+  {/* Part 7 End - Helper Functions */}
 
+  {/* Part 8 Start - Component Render */}
   // Main component render
   return (
     <div className="min-h-screen bg-white p-4">
@@ -531,5 +547,8 @@ const PhoneListForm = () => {
     </div>
   );
 };
+{/* Part 8 End - Component Render */}
 
+{/* Part 9 Start - Export */}
 export default PhoneListForm;
+{/* Part 9 End - Export */}

@@ -1,3 +1,4 @@
+{/* Part 1 Start - Imports */}
 import { 
     doc, 
     addDoc, 
@@ -11,7 +12,9 @@ import {
   } from 'firebase/firestore';
   import { db } from '../../../firebase/config';
   import { createInventoryId, getCurrentDate } from '../utils/phoneUtils';
+{/* Part 1 End - Imports */}
       
+  {/* Part 2 Start - Update Inventory Counts Function */}
   // Update inventory counts
   export const updateInventory = async (data, isNewPhone = true) => {
     try {
@@ -69,7 +72,9 @@ import {
       return false;
     }
   };
+  {/* Part 2 End - Update Inventory Counts Function */}
   
+  {/* Part 3 Start - Add Phone to Inventory Function */}
   // Add a new phone to the inventory
   export const addPhoneToInventory = async (phoneData) => {
     try {
@@ -96,7 +101,9 @@ import {
       };
     }
   };
+  {/* Part 3 End - Add Phone to Inventory Function */}
 
+ {/* Part 4 Start - Update Phone in Inventory Function */}
  // Update an existing phone in the inventory
 export const updatePhoneInInventory = async (itemId, phoneData, originalData) => {
   try {
@@ -181,7 +188,9 @@ export const updatePhoneInInventory = async (itemId, phoneData, originalData) =>
     };
   }
 };
+{/* Part 4 End - Update Phone in Inventory Function */}
 
+{/* Part 5 Start - Check Duplicate IMEIs Function */}
 // Check for duplicate IMEIs in the database
 export const checkDuplicateImeis = async (imei1, imei2, excludeItemId = null) => {
   try {
@@ -242,3 +251,4 @@ export const checkDuplicateImeis = async (imei1, imei2, excludeItemId = null) =>
     };
   }
 };
+{/* Part 5 End - Check Duplicate IMEIs Function */}

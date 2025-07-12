@@ -1,5 +1,8 @@
+{/* Part 1 Start - Imports and Dependencies */}
 import PropTypes from 'prop-types';
+{/* Part 1 End - Imports and Dependencies */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneBasicInfo = ({ 
   selectedManufacturer, 
   selectedModel,
@@ -14,6 +17,9 @@ const PhoneBasicInfo = ({
   handleManufacturerChange,
   handleModelChange
 }) => {
+{/* Part 2 End - Component Definition */}
+
+{/* Part 3 Start - Component Render */}
   return (
     <>
       {/* Manufacturer Selection */}
@@ -95,7 +101,9 @@ const PhoneBasicInfo = ({
     </>
   );
 };
+{/* Part 3 End - Component Render */}
 
+{/* Part 4 Start - PropTypes Validation */}
 PhoneBasicInfo.propTypes = {
   selectedManufacturer: PropTypes.string.isRequired,
   selectedModel: PropTypes.string.isRequired,
@@ -110,5 +118,8 @@ PhoneBasicInfo.propTypes = {
   handleManufacturerChange: PropTypes.func.isRequired,
   handleModelChange: PropTypes.func.isRequired
 };
+{/* Part 4 End - PropTypes Validation */}
 
+{/* Part 5 Start - Export */}
 export default PhoneBasicInfo;
+{/* Part 5 End - Export */}

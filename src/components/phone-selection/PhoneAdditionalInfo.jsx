@@ -1,5 +1,8 @@
+{/* Part 1 Start - Imports and Dependencies */}
 import PropTypes from 'prop-types';
+{/* Part 1 End - Imports and Dependencies */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneAdditionalInfo = ({
   imei1,
   imei2,
@@ -15,6 +18,9 @@ const PhoneAdditionalInfo = ({
   imei1Error,
   imei2Error,
 }) => {
+{/* Part 2 End - Component Definition */}
+
+{/* Part 3 Start - Component Render */}
   return (
     <div className="pt-4 border-t border-gray-300 space-y-4">
       <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Additional Details</h3>
@@ -52,7 +58,7 @@ const PhoneAdditionalInfo = ({
         </div>
       </div>
       
-      {/* Barcode and Serial Number Fields */}
+      {/* Barcode and Serial Number */}
       <div className="flex gap-4">
         <div className="flex-1 space-y-2">
           <label className="block text-[rgb(52,69,157)] font-semibold">Barcode:</label>
@@ -72,7 +78,7 @@ const PhoneAdditionalInfo = ({
             className="w-full p-2 border rounded"
             value={serialNumber}
             onChange={handleSerialNumberChange}
-            placeholder=""
+            placeholder="Serial number (optional)"
           />
         </div>
       </div>
@@ -107,7 +113,9 @@ const PhoneAdditionalInfo = ({
     </div>
   );
 };
+{/* Part 3 End - Component Render */}
 
+{/* Part 4 Start - PropTypes Validation */}
 PhoneAdditionalInfo.propTypes = {
   imei1: PropTypes.string.isRequired,
   imei2: PropTypes.string.isRequired,
@@ -123,5 +131,8 @@ PhoneAdditionalInfo.propTypes = {
   imei1Error: PropTypes.string,
   imei2Error: PropTypes.string
 };
+{/* Part 4 End - PropTypes Validation */}
 
+{/* Part 5 Start - Export */}
 export default PhoneAdditionalInfo;
+{/* Part 5 End - Export */}

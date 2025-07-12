@@ -1,3 +1,4 @@
+{/* Part 1 Start - Imports */}
 import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
 import { useState } from 'react';
 import PropTypes from 'prop-types';
@@ -8,7 +9,9 @@ import InventoryEditForm from './InventoryEditForm';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 // Import getCurrentDate utility function
 import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const InventoryTable = ({ 
   inventoryItems, 
   handleSort, 
@@ -19,6 +22,9 @@ const InventoryTable = ({
   setInventoryItems,
   applyFilters
 }) => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - State Management */}
   const [editingItemId, setEditingItemId] = useState(null);
   const [editFormData, setEditFormData] = useState({
     manufacturer: '',
@@ -37,7 +43,11 @@ const InventoryTable = ({
   const [isDeleting, setIsDeleting] = useState(false);
   // Get global state function for editing inventory items
   const { editInventoryItem } = useGlobalState(); // NEW: Get edit function from context
+  {/* Part 3 End - State Management */}
 
+  {/* Part 4 Start - Event Handlers */}
+  
+  {/* Edit Handlers Section */}
   // NEW: Handle edit details click
   const handleEditDetailsClick = (item) => {
     editInventoryItem(item);
@@ -66,6 +76,7 @@ const InventoryTable = ({
     });
   };
 
+  {/* Delete Handlers Section */}
   // Handle delete button click
   const handleDeleteClick = (itemId) => {
     const item = allItems.find(item => item.id === itemId);
@@ -142,6 +153,7 @@ const InventoryTable = ({
     setItemToDelete(null);
   };
 
+  {/* Edit Form Handlers Section */}
   // Handle cancel edit
   const handleCancelEdit = () => {
     setEditingItemId(null);
@@ -272,7 +284,9 @@ const InventoryTable = ({
       setSavingItemId(null);
     }
   };
+  {/* Part 4 End - Event Handlers */}
   
+  {/* Part 5 Start - Sorting Logic */}
   // UPDATED: Enhanced sorting logic for new sortable columns
   const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
     // Handle numeric fields
@@ -303,7 +317,9 @@ const InventoryTable = ({
       return b[sortField]?.localeCompare(a[sortField] || '');
     }
   });
+  {/* Part 5 End - Sorting Logic */}
 
+  {/* Part 6 Start - Component Render */}
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-base">
@@ -449,7 +465,9 @@ const InventoryTable = ({
     </div>
   );
 };
+{/* Part 6 End - Component Render */}
 
+{/* Part 7 Start - PropTypes Definition */}
 InventoryTable.propTypes = {
   inventoryItems: PropTypes.array.isRequired,
   handleSort: PropTypes.func.isRequired,
@@ -460,5 +478,8 @@ InventoryTable.propTypes = {
   setInventoryItems: PropTypes.func.isRequired,
   applyFilters: PropTypes.func.isRequired
 };
+{/* Part 7 End - PropTypes Definition */}
 
+{/* Part 8 Start - Export */}
 export default InventoryTable;
+{/* Part 8 End - Export */}

@@ -1,8 +1,14 @@
+{/* Part 1 Start - Imports */}
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { X } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - State Management */}
   const [searchCriteria, setSearchCriteria] = useState({
     manufacturer: '',
     model: '',
@@ -12,9 +18,13 @@ const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
     battery: { min: '', max: '' },
     chipset: ''
   });
+  {/* Part 3 End - State Management */}
 
+  {/* Part 4 Start - Early Return */}
   if (!isOpen) return null;
+  {/* Part 4 End - Early Return */}
 
+  {/* Part 5 Start - Event Handlers */}
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -53,7 +63,9 @@ const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
       chipset: ''
     });
   };
+  {/* Part 5 End - Event Handlers */}
 
+  {/* Part 6 Start - Component Render */}
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-xl w-full">
@@ -216,12 +228,17 @@ const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
     </div>
   );
 };
+{/* Part 6 End - Component Render */}
 
+{/* Part 7 Start - PropTypes Definition */}
 PhoneAdvancedSearch.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onSearch: PropTypes.func.isRequired,
   manufacturers: PropTypes.array.isRequired
 };
+{/* Part 7 End - PropTypes Definition */}
 
+{/* Part 8 Start - Export */}
 export default PhoneAdvancedSearch;
+{/* Part 8 End - Export */}

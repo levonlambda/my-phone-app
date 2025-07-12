@@ -329,11 +329,17 @@ export default DeleteConfirmationModal;
 </file>
 
 <file path="src/components/phone-list/PhoneAdvancedSearch.jsx">
+{/* Part 1 Start - Imports */}
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { X } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - State Management */}
   const [searchCriteria, setSearchCriteria] = useState({
     manufacturer: '',
     model: '',
@@ -343,9 +349,13 @@ const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
     battery: { min: '', max: '' },
     chipset: ''
   });
+  {/* Part 3 End - State Management */}
 
+  {/* Part 4 Start - Early Return */}
   if (!isOpen) return null;
+  {/* Part 4 End - Early Return */}
 
+  {/* Part 5 Start - Event Handlers */}
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -384,7 +394,9 @@ const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
       chipset: ''
     });
   };
+  {/* Part 5 End - Event Handlers */}
 
+  {/* Part 6 Start - Component Render */}
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-xl w-full">
@@ -547,24 +559,37 @@ const PhoneAdvancedSearch = ({ isOpen, onClose, onSearch, manufacturers }) => {
     </div>
   );
 };
+{/* Part 6 End - Component Render */}
 
+{/* Part 7 Start - PropTypes Definition */}
 PhoneAdvancedSearch.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onSearch: PropTypes.func.isRequired,
   manufacturers: PropTypes.array.isRequired
 };
+{/* Part 7 End - PropTypes Definition */}
 
+{/* Part 8 Start - Export */}
 export default PhoneAdvancedSearch;
+{/* Part 8 End - Export */}
 </file>
 
 <file path="src/components/phone-list/PhoneDetailModal.jsx">
+{/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
 import { X, Monitor, Cpu, Camera, Battery, Palette } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
-  if (!isOpen || !phone) return null;
+{/* Part 2 End - Component Definition */}
 
+  {/* Part 3 Start - Early Return */}
+  if (!isOpen || !phone) return null;
+  {/* Part 3 End - Early Return */}
+
+  {/* Part 4 Start - Sub-component Definition */}
   const SpecRow = ({ label, value }) => (
     <div className="flex items-center py-0.5">
       <p className="text-[rgb(52,69,157)] w-36 text-sm">{label}:</p>
@@ -576,12 +601,16 @@ const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
     label: PropTypes.string.isRequired,
     value: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
   };
+  {/* Part 4 End - Sub-component Definition */}
 
+  {/* Part 5 Start - Helper Functions */}
   const formatArray = (arr) => {
     if (!arr || !Array.isArray(arr)) return '-';
     return arr.join(', ');
   };
+  {/* Part 5 End - Helper Functions */}
 
+  {/* Part 6 Start - Component Render */}
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -696,14 +725,19 @@ const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
     </div>
   );
 };
+{/* Part 6 End - Component Render */}
 
+{/* Part 7 Start - PropTypes Definition */}
 PhoneDetailModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   phone: PropTypes.object,
   onClose: PropTypes.func.isRequired
 };
+{/* Part 7 End - PropTypes Definition */}
 
+{/* Part 8 Start - Export */}
 export default PhoneDetailModal;
+{/* Part 8 End - Export */}
 </file>
 
 <file path="src/components/phone-selection/hooks/usePhoneOptions.js">
@@ -859,8 +893,11 @@ export default usePhoneOptions;
 </file>
 
 <file path="src/components/phone-selection/PhoneBasicInfo.jsx">
+{/* Part 1 Start - Imports and Dependencies */}
 import PropTypes from 'prop-types';
+{/* Part 1 End - Imports and Dependencies */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneBasicInfo = ({ 
   selectedManufacturer, 
   selectedModel,
@@ -875,6 +912,9 @@ const PhoneBasicInfo = ({
   handleManufacturerChange,
   handleModelChange
 }) => {
+{/* Part 2 End - Component Definition */}
+
+{/* Part 3 Start - Component Render */}
   return (
     <>
       {/* Manufacturer Selection */}
@@ -956,7 +996,9 @@ const PhoneBasicInfo = ({
     </>
   );
 };
+{/* Part 3 End - Component Render */}
 
+{/* Part 4 Start - PropTypes Validation */}
 PhoneBasicInfo.propTypes = {
   selectedManufacturer: PropTypes.string.isRequired,
   selectedModel: PropTypes.string.isRequired,
@@ -971,8 +1013,11 @@ PhoneBasicInfo.propTypes = {
   handleManufacturerChange: PropTypes.func.isRequired,
   handleModelChange: PropTypes.func.isRequired
 };
+{/* Part 4 End - PropTypes Validation */}
 
+{/* Part 5 Start - Export */}
 export default PhoneBasicInfo;
+{/* Part 5 End - Export */}
 </file>
 
 <file path="src/components/phone-selection/PhoneColorInfo.jsx">
@@ -1013,22 +1058,30 @@ export default PhoneColorInfo;
 </file>
 
 <file path="src/components/phone-selection/PhonePriceInfo.jsx">
+{/* Part 1 Start - Imports and Dependencies */}
 import PropTypes from 'prop-types';
 import { calculateMarkup, calculateProfit } from './utils/phoneUtils';
+{/* Part 1 End - Imports and Dependencies */}
 
+{/* Part 2 Start - Component Definition */}
 const PhonePriceInfo = ({
   dealersPrice,
   retailPrice,
   handleDealersPriceChange,
   handleRetailPriceChange
 }) => {
+{/* Part 2 End - Component Definition */}
+
+{/* Part 3 Start - Helper Functions */}
   // Helper function to get display values for profit calculation
   // This ensures we don't try to calculate with empty values
   const getPriceForCalculation = (price) => {
     if (!price || price === '') return '0';
     return price;
   };
-  
+{/* Part 3 End - Helper Functions */}
+
+{/* Part 4 Start - Component Render */}
   return (
     <div className="space-y-4 pt-2">
       <div className="flex gap-4">
@@ -1076,262 +1129,20 @@ const PhonePriceInfo = ({
     </div>
   );
 };
+{/* Part 4 End - Component Render */}
 
+{/* Part 5 Start - PropTypes Validation */}
 PhonePriceInfo.propTypes = {
   dealersPrice: PropTypes.string.isRequired,
   retailPrice: PropTypes.string.isRequired,
   handleDealersPriceChange: PropTypes.func.isRequired,
   handleRetailPriceChange: PropTypes.func.isRequired
 };
+{/* Part 5 End - PropTypes Validation */}
 
+{/* Part 6 Start - Export */}
 export default PhonePriceInfo;
-</file>
-
-<file path="src/components/phone-selection/services/InventoryService.js">
-import { 
-    doc, 
-    addDoc, 
-    collection, 
-    query, 
-    where, 
-    getDocs, 
-    runTransaction, 
-    increment,
-    updateDoc 
-  } from 'firebase/firestore';
-  import { db } from '../../../firebase/config';
-  import { createInventoryId, getCurrentDate } from '../utils/phoneUtils';
-      
-  // Update inventory counts
-  export const updateInventory = async (data, isNewPhone = true) => {
-    try {
-      const { manufacturer, model, ram, storage, color, status } = data;
-      
-      // Create a unique ID for this inventory item
-      const inventoryId = createInventoryId(manufacturer, model, ram, storage, color);
-      
-      // Reference to the inventory doc
-      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
-      
-      // Run as a transaction to ensure data consistency
-      await runTransaction(db, async (transaction) => {
-        const inventoryDoc = await transaction.get(inventoryRef);
-        
-        if (!inventoryDoc.exists()) {
-          // This is a new inventory item
-          transaction.set(inventoryRef, {
-            manufacturer,
-            model,
-            ram,
-            storage,
-            color,
-            total: 1,
-            onHand: status === 'On-Hand' ? 1 : 0,
-            onDisplay: status === 'On-Display' ? 1 : 0,
-            sold: status === 'Sold' ? 1 : 0,
-            reserved: status === 'Reserved' ? 1 : 0,
-            defective: status === 'Defective' ? 1 : 0,
-            lastUpdated: getCurrentDate()
-          });
-        } else {
-          // Existing inventory item
-          const inventoryData = inventoryDoc.data();
-          
-          // If it's a new phone, increment total and the appropriate status count
-          if (isNewPhone) {
-            transaction.update(inventoryRef, {
-              total: increment(1),
-              onHand: status === 'On-Hand' ? increment(1) : inventoryData.onHand,
-              onDisplay: status === 'On-Display' ? increment(1) : inventoryData.onDisplay || 0,
-              sold: status === 'Sold' ? increment(1) : inventoryData.sold,
-              reserved: status === 'Reserved' ? increment(1) : inventoryData.reserved,
-              defective: status === 'Defective' ? increment(1) : inventoryData.defective,
-              lastUpdated: getCurrentDate()
-            });
-          } 
-          // If it's a status change, we'll handle it separately
-        }
-      });
-      
-      return true;
-    } catch (error) {
-      console.error("Error updating inventory:", error);
-      return false;
-    }
-  };
-  
-  // Add a new phone to the inventory
-  export const addPhoneToInventory = async (phoneData) => {
-    try {
-      // First add the phone to the inventory tracking system
-      const inventoryUpdated = await updateInventory(phoneData, true);
-      
-      if (!inventoryUpdated) {
-        throw new Error("Failed to update inventory counts");
-      }
-      
-      // Add document to 'inventory' collection for the specific phone
-      const docRef = await addDoc(collection(db, 'inventory'), phoneData);
-      console.log("Document written with ID: ", docRef.id);
-      
-      return {
-        success: true,
-        docId: docRef.id
-      };
-    } catch (error) {
-      console.error("Error adding phone to inventory:", error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  };
-
- // Update an existing phone in the inventory
-export const updatePhoneInInventory = async (itemId, phoneData, originalData) => {
-  try {
-    console.log('Updating phone with data:', phoneData); // ADD THIS LINE
-    // First, check if the status changed
-    const statusChanged = originalData.status !== phoneData.status;
-    
-    if (statusChanged) {
-      // Update inventory counts for status change
-      const oldInventoryId = createInventoryId(
-        originalData.manufacturer,
-        originalData.model,
-        originalData.ram,
-        originalData.storage,
-        originalData.color
-      );
-      
-      const newInventoryId = createInventoryId(
-        phoneData.manufacturer,
-        phoneData.model,
-        phoneData.ram,
-        phoneData.storage,
-        phoneData.color
-      );
-      
-      // Run transaction to update counts
-      await runTransaction(db, async (transaction) => {
-        const oldInventoryRef = doc(db, 'inventory_counts', oldInventoryId);
-        const newInventoryRef = doc(db, 'inventory_counts', newInventoryId);
-        
-        // Get both documents
-        const oldInventoryDoc = await transaction.get(oldInventoryRef);
-        const newInventoryDoc = await transaction.get(newInventoryRef);
-        
-        if (oldInventoryDoc.exists()) {
-          // Decrement old status count
-          const decrementField = 
-            originalData.status === 'On-Hand' ? 'onHand' : 
-            originalData.status === 'On-Display' ? 'onDisplay' : 
-            originalData.status === 'Sold' ? 'sold' : 
-            originalData.status === 'Reserved' ? 'reserved' : 
-            'defective';
-          
-          transaction.update(oldInventoryRef, {
-            [decrementField]: increment(-1),
-            lastUpdated: getCurrentDate()
-          });
-        }
-        
-        if (newInventoryDoc.exists()) {
-          // Increment new status count
-          const incrementField = 
-            phoneData.status === 'On-Hand' ? 'onHand' : 
-            phoneData.status === 'On-Display' ? 'onDisplay' : 
-            phoneData.status === 'Sold' ? 'sold' : 
-            phoneData.status === 'Reserved' ? 'reserved' : 
-            'defective';
-          
-          transaction.update(newInventoryRef, {
-            [incrementField]: increment(1),
-            lastUpdated: getCurrentDate()
-          });
-        }
-      });
-    }
-    
-    // Update the inventory document
-    const itemRef = doc(db, 'inventory', itemId);
-    await updateDoc(itemRef, phoneData);
-
-    console.log('Phone updated successfully with ID:', itemId); // ADD THIS LINE
-    
-    return {
-      success: true,
-      docId: itemId
-    };
-  } catch (error) {
-    console.error("Error updating phone in inventory:", error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-// Check for duplicate IMEIs in the database
-export const checkDuplicateImeis = async (imei1, imei2, excludeItemId = null) => {
-  try {
-    // Only check if IMEIs are not empty
-    let hasError = false;
-    let imei1Error = '';
-    let imei2Error = '';
-    
-    // First check if IMEI1 and IMEI2 are the same
-    if (imei1 && imei2 && imei1 === imei2) {
-      imei2Error = 'IMEI 1 and IMEI 2 cannot be the same';
-      hasError = true;
-    }
-    
-    // Only query Firebase if necessary and if there are no other errors
-    if (!hasError && imei1) {
-      const imei1Query = query(
-        collection(db, 'inventory'), 
-        where("imei1", "==", imei1)
-      );
-      const imei1Snapshot = await getDocs(imei1Query);
-      
-      // Check if found document is not the current item being edited
-      const foundDocs = imei1Snapshot.docs.filter(doc => doc.id !== excludeItemId);
-      if (foundDocs.length > 0) {
-        imei1Error = 'This IMEI already exists in inventory';
-        hasError = true;
-      }
-    }
-    
-    // Only check IMEI2 if it's not empty and there are no other errors
-    if (!hasError && imei2) {
-      const imei2Query = query(
-        collection(db, 'inventory'), 
-        where("imei2", "==", imei2)
-      );
-      const imei2Snapshot = await getDocs(imei2Query);
-      
-      // Check if found document is not the current item being edited
-      const foundDocs = imei2Snapshot.docs.filter(doc => doc.id !== excludeItemId);
-      if (foundDocs.length > 0) {
-        imei2Error = 'This IMEI already exists in inventory';
-        hasError = true;
-      }
-    }
-    
-    return {
-      isValid: !hasError,
-      imei1Error,
-      imei2Error
-    };
-  } catch (error) {
-    console.error("Error checking IMEIs:", error);
-    return {
-      isValid: false,
-      imei1Error: 'Error checking IMEI',
-      imei2Error: 'Error checking IMEI'
-    };
-  }
-};
+{/* Part 6 End - Export */}
 </file>
 
 <file path="src/components/phone-selection/utils/phoneUtils.js">
@@ -1415,6 +1226,7 @@ export function getCurrentDate() {
 </file>
 
 <file path="src/components/PhoneListForm.jsx">
+{/* Part 1 Start - Imports */}
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
@@ -1423,8 +1235,13 @@ import { Smartphone, RefreshCw, Search, Filter, X, Eye, SlidersHorizontal, Edit 
 import PhoneDetailModal from './phone-list/PhoneDetailModal';
 import PhoneAdvancedSearch from './phone-list/PhoneAdvancedSearch';
 import { useGlobalState } from '../context/GlobalStateContext';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneListForm = () => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - State Management */}
   // Get global state functions
   const { editPhone } = useGlobalState();
   
@@ -1455,7 +1272,9 @@ const PhoneListForm = () => {
   // Detail modal state
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPhone, setSelectedPhone] = useState(null);
+  {/* Part 3 End - State Management */}
 
+  {/* Part 4 Start - Filter and Search Functions */}
   // Apply filters function defined before fetchPhones to avoid dependency issues
   const applyFilters = useCallback((phonesData) => {
     let filtered = [...phonesData];
@@ -1592,7 +1411,9 @@ const PhoneListForm = () => {
       setLoading(false);
     }
   }, [sortField, sortDirection, applyFilters]); // Added applyFilters dependency here
+  {/* Part 4 End - Filter and Search Functions */}
 
+  {/* Part 5 Start - Event Handlers */}
   // Handle filter change
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -1661,7 +1482,9 @@ const PhoneListForm = () => {
     editPhone(phone);
     // No need to manually change location, the context will handle this
   };
+  {/* Part 5 End - Event Handlers */}
 
+  {/* Part 6 Start - UseEffect Hooks */}
   // Initial data fetch
   useEffect(() => {
     fetchPhones();
@@ -1673,7 +1496,9 @@ const PhoneListForm = () => {
       applyFilters(phones);
     }
   }, [filters, phones, applyFilters, advancedSearchCriteria]);
+  {/* Part 6 End - UseEffect Hooks */}
 
+  {/* Part 7 Start - Helper Functions */}
   // Format storage array as string
   const formatStorage = (storageArray) => {
     if (!storageArray || !Array.isArray(storageArray)) return '-';
@@ -1685,7 +1510,9 @@ const PhoneListForm = () => {
     if (!ramArray || !Array.isArray(ramArray)) return '-';
     return ramArray.join(', ');
   };
+  {/* Part 7 End - Helper Functions */}
 
+  {/* Part 8 Start - Component Render */}
   // Main component render
   return (
     <div className="min-h-screen bg-white p-4">
@@ -1948,17 +1775,26 @@ const PhoneListForm = () => {
     </div>
   );
 };
+{/* Part 8 End - Component Render */}
 
+{/* Part 9 Start - Export */}
 export default PhoneListForm;
+{/* Part 9 End - Export */}
 </file>
 
 <file path="src/components/PhoneSpecCard.jsx">
+{/* Part 1 Start - Imports */}
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Battery, Camera, Cpu, Monitor, Palette } from 'lucide-react';
 import PropTypes from 'prop-types';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneSpecCard = () => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - Static Data */}
   const phoneData = {
     manufacturer: "Samsung",
     model: "Galaxy S25 Ultra",
@@ -1979,7 +1815,9 @@ const PhoneSpecCard = () => {
     wirelessCharging: "25W",
     colors: ["Titanium Silver Blue", "Titanium Black", "Titanium White Silver", "Titanium Gray"]
   };
+  {/* Part 3 End - Static Data */}
 
+  {/* Part 4 Start - Sub-component Definition */}
   const SpecRow = ({ label, value }) => (
     <div className="flex items-center py-0.5">
       <p className="text-[rgb(52,69,157)] w-40 text-base">{label}:</p>
@@ -1991,7 +1829,9 @@ const PhoneSpecCard = () => {
     label: PropTypes.string.isRequired,
     value: PropTypes.string.isRequired
   };
+  {/* Part 4 End - Sub-component Definition */}
 
+  {/* Part 5 Start - Component Render */}
   return (
     <div className="min-h-screen bg-white p-4">
       <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
@@ -2086,8 +1926,11 @@ const PhoneSpecCard = () => {
     </div>
   );
 };
+{/* Part 5 End - Component Render */}
 
+{/* Part 6 Start - Export */}
 export default PhoneSpecCard;
+{/* Part 6 End - Export */}
 </file>
 
 <file path="src/components/ui/badge/index.jsx">
@@ -2306,588 +2149,6 @@ export default defineConfig({
 })
 </file>
 
-<file path="src/components/inventory/InventoryFilters.jsx">
-import PropTypes from 'prop-types';
-import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../firebase/config';
-
-const InventoryFilters = ({ 
-  filters, 
-  pendingFilters, 
-  filterOptions, 
-  handleFilterChange,
-  allItems
-}) => {
-  // State for filtered options based on selections
-  const [filteredModels, setFilteredModels] = useState([]);
-  const [filteredRams, setFilteredRams] = useState([]);
-  const [filteredStorages, setFilteredStorages] = useState([]);
-  const [filteredColors, setFilteredColors] = useState([]);
-  
-  // Loading states
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [isLoadingRams, setIsLoadingRams] = useState(false);
-  const [isLoadingStorages, setIsLoadingStorages] = useState(false);
-  const [isLoadingColors, setIsLoadingColors] = useState(false);
-
-  // Load models for selected manufacturer from database
-  const loadModelsForManufacturer = async (manufacturer) => {
-    if (!manufacturer) return;
-    
-    setIsLoadingModels(true);
-    try {
-      const inventoryRef = collection(db, 'inventory');
-      const q = query(inventoryRef, where("manufacturer", "==", manufacturer));
-      const snapshot = await getDocs(q);
-      
-      // Extract unique models
-      const models = [...new Set(
-        snapshot.docs.map(doc => doc.data().model)
-      )].filter(Boolean).sort();
-      
-      setFilteredModels(models);
-    } catch (error) {
-      console.error("Error loading models:", error);
-    } finally {
-      setIsLoadingModels(false);
-    }
-  };
-
-  // Load RAM options based on manufacturer and model
-  const loadRamOptions = async (manufacturer, model) => {
-    if (!manufacturer || !model) return;
-    
-    setIsLoadingRams(true);
-    try {
-      const inventoryRef = collection(db, 'inventory');
-      const q = query(
-        inventoryRef, 
-        where("manufacturer", "==", manufacturer),
-        where("model", "==", model)
-      );
-      const snapshot = await getDocs(q);
-      
-      // Extract unique RAM options
-      const rams = [...new Set(
-        snapshot.docs.map(doc => doc.data().ram)
-      )].filter(Boolean).sort();
-      
-      setFilteredRams(rams);
-    } catch (error) {
-      console.error("Error loading RAM options:", error);
-    } finally {
-      setIsLoadingRams(false);
-    }
-  };
-
-  // Load storage options based on manufacturer, model, and RAM
-  const loadStorageOptions = async (manufacturer, model, ram) => {
-    if (!manufacturer || !model) return;
-    
-    setIsLoadingStorages(true);
-    try {
-      let q;
-      const inventoryRef = collection(db, 'inventory');
-      
-      if (ram) {
-        // If RAM is selected, include it in the query
-        q = query(
-          inventoryRef, 
-          where("manufacturer", "==", manufacturer),
-          where("model", "==", model),
-          where("ram", "==", ram)
-        );
-      } else {
-        // If RAM is not selected, just filter by manufacturer and model
-        q = query(
-          inventoryRef, 
-          where("manufacturer", "==", manufacturer),
-          where("model", "==", model)
-        );
-      }
-      
-      const snapshot = await getDocs(q);
-      
-      // Extract unique storage options
-      const storages = [...new Set(
-        snapshot.docs.map(doc => doc.data().storage)
-      )].filter(Boolean).sort();
-      
-      setFilteredStorages(storages);
-    } catch (error) {
-      console.error("Error loading storage options:", error);
-    } finally {
-      setIsLoadingStorages(false);
-    }
-  };
-
-  // Load color options based on manufacturer, model, RAM, and storage
-  const loadColorOptions = async (manufacturer, model, ram, storage) => {
-    if (!manufacturer || !model) return;
-    
-    setIsLoadingColors(true);
-    try {
-      let q;
-      const inventoryRef = collection(db, 'inventory');
-      
-      // Build query based on selected filters
-      const constraints = [
-        where("manufacturer", "==", manufacturer),
-        where("model", "==", model)
-      ];
-      
-      if (ram) {
-        constraints.push(where("ram", "==", ram));
-      }
-      
-      if (storage) {
-        constraints.push(where("storage", "==", storage));
-      }
-      
-      q = query(inventoryRef, ...constraints);
-      const snapshot = await getDocs(q);
-      
-      // Extract unique color options
-      const colors = [...new Set(
-        snapshot.docs.map(doc => doc.data().color)
-      )].filter(Boolean).sort();
-      
-      setFilteredColors(colors);
-    } catch (error) {
-      console.error("Error loading color options:", error);
-    } finally {
-      setIsLoadingColors(false);
-    }
-  };
-
-  // Update models when manufacturer changes
-  useEffect(() => {
-    if (filters.manufacturer) {
-      if (allItems && allItems.length > 0) {
-        // If allItems is populated, filter models from it
-        const modelsForManufacturer = [...new Set(
-          allItems
-            .filter(item => item.manufacturer === filters.manufacturer)
-            .map(item => item.model)
-        )].sort();
-        
-        // Only update if we found models
-        if (modelsForManufacturer.length > 0) {
-          setFilteredModels(modelsForManufacturer);
-        } else {
-          // If no models found in allItems, load from database
-          loadModelsForManufacturer(filters.manufacturer);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadModelsForManufacturer(filters.manufacturer);
-      }
-    } else {
-      // If no manufacturer is selected, show all models
-      setFilteredModels(filterOptions.models);
-    }
-  }, [filters.manufacturer, allItems, filterOptions.models]);
-
-  // Update RAM options when manufacturer and model change
-  useEffect(() => {
-    if (filters.manufacturer && filters.model) {
-      if (allItems && allItems.length > 0) {
-        // If allItems is populated, filter RAM options from it
-        const ramsForModel = [...new Set(
-          allItems
-            .filter(item => 
-              item.manufacturer === filters.manufacturer && 
-              item.model === filters.model
-            )
-            .map(item => item.ram)
-        )].sort();
-        
-        // Only update if we found RAM options
-        if (ramsForModel.length > 0) {
-          setFilteredRams(ramsForModel);
-        } else {
-          // If no RAM options found in allItems, load from database
-          loadRamOptions(filters.manufacturer, filters.model);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadRamOptions(filters.manufacturer, filters.model);
-      }
-    } else {
-      // If no manufacturer or model is selected, show all RAM options
-      setFilteredRams(filterOptions.rams);
-    }
-  }, [filters.manufacturer, filters.model, allItems, filterOptions.rams]);
-
-  // Update Storage options when manufacturer, model, and RAM change
-  useEffect(() => {
-    if (filters.manufacturer && filters.model) {
-      if (allItems && allItems.length > 0) {
-        // Filter items by current selections
-        let filteredItems = allItems.filter(item => 
-          item.manufacturer === filters.manufacturer && 
-          item.model === filters.model
-        );
-        
-        // If RAM is selected, filter by that too
-        if (filters.ram) {
-          filteredItems = filteredItems.filter(item => item.ram === filters.ram);
-        }
-        
-        // Extract unique storage options
-        const storagesForSelection = [...new Set(
-          filteredItems.map(item => item.storage)
-        )].sort();
-        
-        // Only update if we found storage options
-        if (storagesForSelection.length > 0) {
-          setFilteredStorages(storagesForSelection);
-        } else {
-          // If no storage options found in allItems, load from database
-          loadStorageOptions(filters.manufacturer, filters.model, filters.ram);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadStorageOptions(filters.manufacturer, filters.model, filters.ram);
-      }
-    } else {
-      // If no manufacturer or model is selected, show all storage options
-      setFilteredStorages(filterOptions.storages);
-    }
-  }, [filters.manufacturer, filters.model, filters.ram, allItems, filterOptions.storages]);
-
-  // Update Color options when manufacturer, model, RAM, and storage change
-  useEffect(() => {
-    if (filters.manufacturer && filters.model) {
-      if (allItems && allItems.length > 0) {
-        // Filter items by current selections
-        let filteredItems = allItems.filter(item => 
-          item.manufacturer === filters.manufacturer && 
-          item.model === filters.model
-        );
-        
-        // Apply additional filters if selected
-        if (filters.ram) {
-          filteredItems = filteredItems.filter(item => item.ram === filters.ram);
-        }
-        
-        if (filters.storage) {
-          filteredItems = filteredItems.filter(item => item.storage === filters.storage);
-        }
-        
-        // Extract unique color options
-        const colorsForSelection = [...new Set(
-          filteredItems.map(item => item.color)
-        )].sort();
-        
-        // Only update if we found color options
-        if (colorsForSelection.length > 0) {
-          setFilteredColors(colorsForSelection);
-        } else {
-          // If no color options found in allItems, load from database
-          loadColorOptions(filters.manufacturer, filters.model, filters.ram, filters.storage);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadColorOptions(filters.manufacturer, filters.model, filters.ram, filters.storage);
-      }
-    } else {
-      // If no manufacturer or model is selected, show all color options
-      setFilteredColors(filterOptions.colors);
-    }
-  }, [
-    filters.manufacturer, 
-    filters.model, 
-    filters.ram, 
-    filters.storage, 
-    allItems, 
-    filterOptions.colors
-  ]);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {/* Manufacturer filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Manufacturer
-        </label>
-        <select
-          name="manufacturer"
-          value={filters.manufacturer}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        >
-          <option value="">All Manufacturers</option>
-          {filterOptions.manufacturers.map(manufacturer => (
-            <option key={manufacturer} value={manufacturer}>
-              {manufacturer}
-            </option>
-          ))}
-        </select>
-      </div>
-      
-      {/* Model filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Model
-        </label>
-        <select
-          name="model"
-          value={filters.model}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-          disabled={!filters.manufacturer || isLoadingModels}
-        >
-          <option value="">All Models</option>
-          {isLoadingModels ? (
-            <option value="" disabled>Loading models...</option>
-          ) : (
-            filteredModels.map(model => (
-              <option key={model} value={model}>
-                {model}
-              </option>
-            ))
-          )}
-        </select>
-        {isLoadingModels && (
-          <p className="text-xs text-gray-500 mt-1">Loading models...</p>
-        )}
-        {!filters.manufacturer && (
-          <p className="text-xs text-gray-500 mt-1">Select a manufacturer first</p>
-        )}
-      </div>
-      
-      {/* Status filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Status
-        </label>
-        <select
-          name="status"
-          value={filters.status}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        >
-          <option value="">All Statuses</option>
-          {filterOptions.statuses.map(status => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
-      </div>
-      
-      {/* RAM filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          RAM
-        </label>
-        <select
-          name="ram"
-          value={filters.ram}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-          disabled={!filters.manufacturer || !filters.model || isLoadingRams}
-        >
-          <option value="">All RAM</option>
-          {isLoadingRams ? (
-            <option value="" disabled>Loading RAM options...</option>
-          ) : (
-            filteredRams.map(ram => (
-              <option key={ram} value={ram}>
-                {ram}
-              </option>
-            ))
-          )}
-        </select>
-        {isLoadingRams && (
-          <p className="text-xs text-gray-500 mt-1">Loading RAM options...</p>
-        )}
-        {(!filters.manufacturer || !filters.model) && (
-          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
-        )}
-      </div>
-      
-      {/* Storage filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Storage
-        </label>
-        <select
-          name="storage"
-          value={filters.storage}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-          disabled={!filters.manufacturer || !filters.model || isLoadingStorages}
-        >
-          <option value="">All Storage</option>
-          {isLoadingStorages ? (
-            <option value="" disabled>Loading storage options...</option>
-          ) : (
-            filteredStorages.map(storage => (
-              <option key={storage} value={storage}>
-                {storage}
-              </option>
-            ))
-          )}
-        </select>
-        {isLoadingStorages && (
-          <p className="text-xs text-gray-500 mt-1">Loading storage options...</p>
-        )}
-        {(!filters.manufacturer || !filters.model) && (
-          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
-        )}
-      </div>
-      
-      {/* Color filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Color
-        </label>
-        <select
-          name="color"
-          value={filters.color}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-          disabled={!filters.manufacturer || !filters.model || isLoadingColors}
-        >
-          <option value="">All Colors</option>
-          {isLoadingColors ? (
-            <option value="" disabled>Loading color options...</option>
-          ) : (
-            filteredColors.map(color => (
-              <option key={color} value={color}>
-                {color}
-              </option>
-            ))
-          )}
-        </select>
-        {isLoadingColors && (
-          <p className="text-xs text-gray-500 mt-1">Loading color options...</p>
-        )}
-        {(!filters.manufacturer || !filters.model) && (
-          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
-        )}
-      </div>
-      
-      {/* IMEI1 filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          IMEI1
-        </label>
-        <input
-          type="text"
-          name="imei1"
-          value={pendingFilters.imei1}
-          onChange={handleFilterChange}
-          placeholder="Search IMEI"
-          className="w-full p-2 border rounded"
-        />
-      </div>
-      
-      {/* Barcode filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Barcode
-        </label>
-        <input
-          type="text"
-          name="barcode"
-          value={pendingFilters.barcode}
-          onChange={handleFilterChange}
-          placeholder="Search barcode"
-          className="w-full p-2 border rounded"
-        />
-      </div>
-
-      {/* Serial Number filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Serial Number
-        </label>
-        <input
-          type="text"
-          name="serialNumber"
-          value={pendingFilters.serialNumber}
-          onChange={handleFilterChange}
-          placeholder="Search serial number"
-          className="w-full p-2 border rounded"
-        />
-      </div>
-
-      {/* Start Date filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Start Date
-        </label>
-        <input
-          type="date"
-          name="startDate"
-          value={pendingFilters.startDate}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        />
-      </div>
-      
-      {/* End Date filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          End Date
-        </label>
-        <input
-          type="date"
-          name="endDate"
-          value={pendingFilters.endDate}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        />
-      </div>
-      
-      {/* Price range */}
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min Price
-          </label>
-          <input
-            type="text"
-            name="minPrice"
-            value={pendingFilters.minPrice}
-            onChange={handleFilterChange}
-            placeholder="0"
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max Price
-          </label>
-          <input
-            type="text"
-            name="maxPrice"
-            value={pendingFilters.maxPrice}
-            onChange={handleFilterChange}
-            placeholder="999,999"
-            className="w-full p-2 border rounded"
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-InventoryFilters.propTypes = {
-  filters: PropTypes.object.isRequired,
-  pendingFilters: PropTypes.object.isRequired,
-  filterOptions: PropTypes.object.isRequired,
-  handleFilterChange: PropTypes.func.isRequired,
-  allItems: PropTypes.array.isRequired
-};
-
-export default InventoryFilters;
-</file>
-
 <file path="src/components/phone-selection/hooks/usePhoneCache.js">
 import { useState, useCallback } from 'react';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
@@ -2998,6 +2259,263 @@ export const usePhoneCache = () => {
 };
 
 export default usePhoneCache;
+</file>
+
+<file path="src/components/phone-selection/services/InventoryService.js">
+{/* Part 1 Start - Imports */}
+import { 
+    doc, 
+    addDoc, 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    runTransaction, 
+    increment,
+    updateDoc 
+  } from 'firebase/firestore';
+  import { db } from '../../../firebase/config';
+  import { createInventoryId, getCurrentDate } from '../utils/phoneUtils';
+{/* Part 1 End - Imports */}
+      
+  {/* Part 2 Start - Update Inventory Counts Function */}
+  // Update inventory counts
+  export const updateInventory = async (data, isNewPhone = true) => {
+    try {
+      const { manufacturer, model, ram, storage, color, status } = data;
+      
+      // Create a unique ID for this inventory item
+      const inventoryId = createInventoryId(manufacturer, model, ram, storage, color);
+      
+      // Reference to the inventory doc
+      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+      
+      // Run as a transaction to ensure data consistency
+      await runTransaction(db, async (transaction) => {
+        const inventoryDoc = await transaction.get(inventoryRef);
+        
+        if (!inventoryDoc.exists()) {
+          // This is a new inventory item
+          transaction.set(inventoryRef, {
+            manufacturer,
+            model,
+            ram,
+            storage,
+            color,
+            total: 1,
+            onHand: status === 'On-Hand' ? 1 : 0,
+            onDisplay: status === 'On-Display' ? 1 : 0,
+            sold: status === 'Sold' ? 1 : 0,
+            reserved: status === 'Reserved' ? 1 : 0,
+            defective: status === 'Defective' ? 1 : 0,
+            lastUpdated: getCurrentDate()
+          });
+        } else {
+          // Existing inventory item
+          const inventoryData = inventoryDoc.data();
+          
+          // If it's a new phone, increment total and the appropriate status count
+          if (isNewPhone) {
+            transaction.update(inventoryRef, {
+              total: increment(1),
+              onHand: status === 'On-Hand' ? increment(1) : inventoryData.onHand,
+              onDisplay: status === 'On-Display' ? increment(1) : inventoryData.onDisplay || 0,
+              sold: status === 'Sold' ? increment(1) : inventoryData.sold,
+              reserved: status === 'Reserved' ? increment(1) : inventoryData.reserved,
+              defective: status === 'Defective' ? increment(1) : inventoryData.defective,
+              lastUpdated: getCurrentDate()
+            });
+          } 
+          // If it's a status change, we'll handle it separately
+        }
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error updating inventory:", error);
+      return false;
+    }
+  };
+  {/* Part 2 End - Update Inventory Counts Function */}
+  
+  {/* Part 3 Start - Add Phone to Inventory Function */}
+  // Add a new phone to the inventory
+  export const addPhoneToInventory = async (phoneData) => {
+    try {
+      // First add the phone to the inventory tracking system
+      const inventoryUpdated = await updateInventory(phoneData, true);
+      
+      if (!inventoryUpdated) {
+        throw new Error("Failed to update inventory counts");
+      }
+      
+      // Add document to 'inventory' collection for the specific phone
+      const docRef = await addDoc(collection(db, 'inventory'), phoneData);
+      console.log("Document written with ID: ", docRef.id);
+      
+      return {
+        success: true,
+        docId: docRef.id
+      };
+    } catch (error) {
+      console.error("Error adding phone to inventory:", error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  };
+  {/* Part 3 End - Add Phone to Inventory Function */}
+
+ {/* Part 4 Start - Update Phone in Inventory Function */}
+ // Update an existing phone in the inventory
+export const updatePhoneInInventory = async (itemId, phoneData, originalData) => {
+  try {
+    console.log('Updating phone with data:', phoneData); // ADD THIS LINE
+    // First, check if the status changed
+    const statusChanged = originalData.status !== phoneData.status;
+    
+    if (statusChanged) {
+      // Update inventory counts for status change
+      const oldInventoryId = createInventoryId(
+        originalData.manufacturer,
+        originalData.model,
+        originalData.ram,
+        originalData.storage,
+        originalData.color
+      );
+      
+      const newInventoryId = createInventoryId(
+        phoneData.manufacturer,
+        phoneData.model,
+        phoneData.ram,
+        phoneData.storage,
+        phoneData.color
+      );
+      
+      // Run transaction to update counts
+      await runTransaction(db, async (transaction) => {
+        const oldInventoryRef = doc(db, 'inventory_counts', oldInventoryId);
+        const newInventoryRef = doc(db, 'inventory_counts', newInventoryId);
+        
+        // Get both documents
+        const oldInventoryDoc = await transaction.get(oldInventoryRef);
+        const newInventoryDoc = await transaction.get(newInventoryRef);
+        
+        if (oldInventoryDoc.exists()) {
+          // Decrement old status count
+          const decrementField = 
+            originalData.status === 'On-Hand' ? 'onHand' : 
+            originalData.status === 'On-Display' ? 'onDisplay' : 
+            originalData.status === 'Sold' ? 'sold' : 
+            originalData.status === 'Reserved' ? 'reserved' : 
+            'defective';
+          
+          transaction.update(oldInventoryRef, {
+            [decrementField]: increment(-1),
+            lastUpdated: getCurrentDate()
+          });
+        }
+        
+        if (newInventoryDoc.exists()) {
+          // Increment new status count
+          const incrementField = 
+            phoneData.status === 'On-Hand' ? 'onHand' : 
+            phoneData.status === 'On-Display' ? 'onDisplay' : 
+            phoneData.status === 'Sold' ? 'sold' : 
+            phoneData.status === 'Reserved' ? 'reserved' : 
+            'defective';
+          
+          transaction.update(newInventoryRef, {
+            [incrementField]: increment(1),
+            lastUpdated: getCurrentDate()
+          });
+        }
+      });
+    }
+    
+    // Update the inventory document
+    const itemRef = doc(db, 'inventory', itemId);
+    await updateDoc(itemRef, phoneData);
+
+    console.log('Phone updated successfully with ID:', itemId); // ADD THIS LINE
+    
+    return {
+      success: true,
+      docId: itemId
+    };
+  } catch (error) {
+    console.error("Error updating phone in inventory:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+{/* Part 4 End - Update Phone in Inventory Function */}
+
+{/* Part 5 Start - Check Duplicate IMEIs Function */}
+// Check for duplicate IMEIs in the database
+export const checkDuplicateImeis = async (imei1, imei2, excludeItemId = null) => {
+  try {
+    // Only check if IMEIs are not empty
+    let hasError = false;
+    let imei1Error = '';
+    let imei2Error = '';
+    
+    // First check if IMEI1 and IMEI2 are the same
+    if (imei1 && imei2 && imei1 === imei2) {
+      imei2Error = 'IMEI 1 and IMEI 2 cannot be the same';
+      hasError = true;
+    }
+    
+    // Only query Firebase if necessary and if there are no other errors
+    if (!hasError && imei1) {
+      const imei1Query = query(
+        collection(db, 'inventory'), 
+        where("imei1", "==", imei1)
+      );
+      const imei1Snapshot = await getDocs(imei1Query);
+      
+      // Check if found document is not the current item being edited
+      const foundDocs = imei1Snapshot.docs.filter(doc => doc.id !== excludeItemId);
+      if (foundDocs.length > 0) {
+        imei1Error = 'This IMEI already exists in inventory';
+        hasError = true;
+      }
+    }
+    
+    // Only check IMEI2 if it's not empty and there are no other errors
+    if (!hasError && imei2) {
+      const imei2Query = query(
+        collection(db, 'inventory'), 
+        where("imei2", "==", imei2)
+      );
+      const imei2Snapshot = await getDocs(imei2Query);
+      
+      // Check if found document is not the current item being edited
+      const foundDocs = imei2Snapshot.docs.filter(doc => doc.id !== excludeItemId);
+      if (foundDocs.length > 0) {
+        imei2Error = 'This IMEI already exists in inventory';
+        hasError = true;
+      }
+    }
+    
+    return {
+      isValid: !hasError,
+      imei1Error,
+      imei2Error
+    };
+  } catch (error) {
+    console.error("Error checking IMEIs:", error);
+    return {
+      isValid: false,
+      imei1Error: 'Error checking IMEI',
+      imei2Error: 'Error checking IMEI'
+    };
+  }
+};
+{/* Part 5 End - Check Duplicate IMEIs Function */}
 </file>
 
 <file path="src/components/PhoneSpecForm.jsx">
@@ -4790,9 +4308,611 @@ export default PriceManagementForm;
 {/* Part 9 End - Expanded Color Rows and Footer */}
 </file>
 
-<file path="src/components/phone-selection/PhoneAdditionalInfo.jsx">
+<file path="src/components/inventory/InventoryFilters.jsx">
+{/* Part 1 Start - Imports and Dependencies */}
 import PropTypes from 'prop-types';
+import { useEffect, useState } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+{/* Part 1 End - Imports and Dependencies */}
 
+{/* Part 2 Start - Component Definition */}
+const InventoryFilters = ({ 
+  filters, 
+  pendingFilters, 
+  filterOptions, 
+  handleFilterChange,
+  allItems
+}) => {
+{/* Part 2 End - Component Definition */}
+
+{/* Part 3 Start - State Definitions */}
+  // State for filtered options based on selections
+  const [filteredModels, setFilteredModels] = useState([]);
+  const [filteredRams, setFilteredRams] = useState([]);
+  const [filteredStorages, setFilteredStorages] = useState([]);
+  const [filteredColors, setFilteredColors] = useState([]);
+  
+  // Loading states
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isLoadingRams, setIsLoadingRams] = useState(false);
+  const [isLoadingStorages, setIsLoadingStorages] = useState(false);
+  const [isLoadingColors, setIsLoadingColors] = useState(false);
+{/* Part 3 End - State Definitions */}
+
+{/* Part 4 Start - Data Loading Functions */}
+  // Load models for selected manufacturer from database
+  const loadModelsForManufacturer = async (manufacturer) => {
+    if (!manufacturer) return;
+    
+    setIsLoadingModels(true);
+    try {
+      const inventoryRef = collection(db, 'inventory');
+      const q = query(inventoryRef, where("manufacturer", "==", manufacturer));
+      const snapshot = await getDocs(q);
+      
+      // Extract unique models
+      const models = [...new Set(
+        snapshot.docs.map(doc => doc.data().model)
+      )].filter(Boolean).sort();
+      
+      setFilteredModels(models);
+    } catch (error) {
+      console.error("Error loading models:", error);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  // Load RAM options based on manufacturer and model
+  const loadRamOptions = async (manufacturer, model) => {
+    if (!manufacturer || !model) return;
+    
+    setIsLoadingRams(true);
+    try {
+      const inventoryRef = collection(db, 'inventory');
+      const q = query(
+        inventoryRef, 
+        where("manufacturer", "==", manufacturer),
+        where("model", "==", model)
+      );
+      const snapshot = await getDocs(q);
+      
+      // Extract unique RAM options
+      const rams = [...new Set(
+        snapshot.docs.map(doc => doc.data().ram)
+      )].filter(Boolean).sort();
+      
+      setFilteredRams(rams);
+    } catch (error) {
+      console.error("Error loading RAM options:", error);
+    } finally {
+      setIsLoadingRams(false);
+    }
+  };
+
+  // Load storage options based on manufacturer, model, and RAM
+  const loadStorageOptions = async (manufacturer, model, ram) => {
+    if (!manufacturer || !model) return;
+    
+    setIsLoadingStorages(true);
+    try {
+      let q;
+      const inventoryRef = collection(db, 'inventory');
+      
+      if (ram) {
+        // If RAM is selected, include it in the query
+        q = query(
+          inventoryRef, 
+          where("manufacturer", "==", manufacturer),
+          where("model", "==", model),
+          where("ram", "==", ram)
+        );
+      } else {
+        // If RAM is not selected, just filter by manufacturer and model
+        q = query(
+          inventoryRef, 
+          where("manufacturer", "==", manufacturer),
+          where("model", "==", model)
+        );
+      }
+      
+      const snapshot = await getDocs(q);
+      
+      // Extract unique storage options
+      const storages = [...new Set(
+        snapshot.docs.map(doc => doc.data().storage)
+      )].filter(Boolean).sort();
+      
+      setFilteredStorages(storages);
+    } catch (error) {
+      console.error("Error loading storage options:", error);
+    } finally {
+      setIsLoadingStorages(false);
+    }
+  };
+
+  // Load color options based on manufacturer, model, RAM, and storage
+  const loadColorOptions = async (manufacturer, model, ram, storage) => {
+    if (!manufacturer || !model) return;
+    
+    setIsLoadingColors(true);
+    try {
+      let q;
+      const inventoryRef = collection(db, 'inventory');
+      
+      // Build query based on selected filters
+      const constraints = [
+        where("manufacturer", "==", manufacturer),
+        where("model", "==", model)
+      ];
+      
+      if (ram) {
+        constraints.push(where("ram", "==", ram));
+      }
+      
+      if (storage) {
+        constraints.push(where("storage", "==", storage));
+      }
+      
+      q = query(inventoryRef, ...constraints);
+      const snapshot = await getDocs(q);
+      
+      // Extract unique color options
+      const colors = [...new Set(
+        snapshot.docs.map(doc => doc.data().color)
+      )].filter(Boolean).sort();
+      
+      setFilteredColors(colors);
+    } catch (error) {
+      console.error("Error loading color options:", error);
+    } finally {
+      setIsLoadingColors(false);
+    }
+  };
+{/* Part 4 End - Data Loading Functions */}
+
+{/* Part 5 Start - Effect Hooks */}
+  // Update models when manufacturer changes
+  useEffect(() => {
+    if (filters.manufacturer) {
+      if (allItems && allItems.length > 0) {
+        // If allItems is populated, filter models from it
+        const modelsForManufacturer = [...new Set(
+          allItems
+            .filter(item => item.manufacturer === filters.manufacturer)
+            .map(item => item.model)
+        )].sort();
+        
+        // Only update if we found models
+        if (modelsForManufacturer.length > 0) {
+          setFilteredModels(modelsForManufacturer);
+        } else {
+          // If no models found in allItems, load from database
+          loadModelsForManufacturer(filters.manufacturer);
+        }
+      } else {
+        // If allItems is not available, load from database
+        loadModelsForManufacturer(filters.manufacturer);
+      }
+    } else {
+      // If no manufacturer is selected, show all models
+      setFilteredModels(filterOptions.models);
+    }
+  }, [filters.manufacturer, allItems, filterOptions.models]);
+
+  // Update RAM options when manufacturer and model change
+  useEffect(() => {
+    if (filters.manufacturer && filters.model) {
+      if (allItems && allItems.length > 0) {
+        // If allItems is populated, filter RAM options from it
+        const ramsForModel = [...new Set(
+          allItems
+            .filter(item => 
+              item.manufacturer === filters.manufacturer && 
+              item.model === filters.model
+            )
+            .map(item => item.ram)
+        )].sort();
+        
+        // Only update if we found RAM options
+        if (ramsForModel.length > 0) {
+          setFilteredRams(ramsForModel);
+        } else {
+          // If no RAM options found in allItems, load from database
+          loadRamOptions(filters.manufacturer, filters.model);
+        }
+      } else {
+        // If allItems is not available, load from database
+        loadRamOptions(filters.manufacturer, filters.model);
+      }
+    } else {
+      // If no manufacturer or model is selected, show all RAM options
+      setFilteredRams(filterOptions.rams);
+    }
+  }, [filters.manufacturer, filters.model, allItems, filterOptions.rams]);
+
+  // Update Storage options when manufacturer, model, and RAM change
+  useEffect(() => {
+    if (filters.manufacturer && filters.model) {
+      if (allItems && allItems.length > 0) {
+        // Filter items by current selections
+        let filteredItems = allItems.filter(item => 
+          item.manufacturer === filters.manufacturer && 
+          item.model === filters.model
+        );
+        
+        // If RAM is selected, filter by that too
+        if (filters.ram) {
+          filteredItems = filteredItems.filter(item => item.ram === filters.ram);
+        }
+        
+        // Extract unique storage options
+        const storagesForSelection = [...new Set(
+          filteredItems.map(item => item.storage)
+        )].sort();
+        
+        // Only update if we found storage options
+        if (storagesForSelection.length > 0) {
+          setFilteredStorages(storagesForSelection);
+        } else {
+          // If no storage options found in allItems, load from database
+          loadStorageOptions(filters.manufacturer, filters.model, filters.ram);
+        }
+      } else {
+        // If allItems is not available, load from database
+        loadStorageOptions(filters.manufacturer, filters.model, filters.ram);
+      }
+    } else {
+      // If no manufacturer or model is selected, show all storage options
+      setFilteredStorages(filterOptions.storages);
+    }
+  }, [filters.manufacturer, filters.model, filters.ram, allItems, filterOptions.storages]);
+
+  // Update Color options when manufacturer, model, RAM, and storage change
+  useEffect(() => {
+    if (filters.manufacturer && filters.model) {
+      if (allItems && allItems.length > 0) {
+        // Filter items by current selections
+        let filteredItems = allItems.filter(item => 
+          item.manufacturer === filters.manufacturer && 
+          item.model === filters.model
+        );
+        
+        // Apply additional filters if selected
+        if (filters.ram) {
+          filteredItems = filteredItems.filter(item => item.ram === filters.ram);
+        }
+        
+        if (filters.storage) {
+          filteredItems = filteredItems.filter(item => item.storage === filters.storage);
+        }
+        
+        // Extract unique color options
+        const colorsForSelection = [...new Set(
+          filteredItems.map(item => item.color)
+        )].sort();
+        
+        // Only update if we found color options
+        if (colorsForSelection.length > 0) {
+          setFilteredColors(colorsForSelection);
+        } else {
+          // If no color options found in allItems, load from database
+          loadColorOptions(filters.manufacturer, filters.model, filters.ram, filters.storage);
+        }
+      } else {
+        // If allItems is not available, load from database
+        loadColorOptions(filters.manufacturer, filters.model, filters.ram, filters.storage);
+      }
+    } else {
+      // If no manufacturer or model is selected, show all color options
+      setFilteredColors(filterOptions.colors);
+    }
+  }, [
+    filters.manufacturer, 
+    filters.model, 
+    filters.ram, 
+    filters.storage, 
+    allItems, 
+    filterOptions.colors
+  ]);
+{/* Part 5 End - Effect Hooks */}
+
+{/* Part 6 Start - Component Render */}
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Manufacturer filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Manufacturer
+        </label>
+        <select
+          name="manufacturer"
+          value={filters.manufacturer}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+        >
+          <option value="">All Manufacturers</option>
+          {filterOptions.manufacturers.map(manufacturer => (
+            <option key={manufacturer} value={manufacturer}>
+              {manufacturer}
+            </option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Model filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Model
+        </label>
+        <select
+          name="model"
+          value={filters.model}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+          disabled={!filters.manufacturer || isLoadingModels}
+        >
+          <option value="">All Models</option>
+          {isLoadingModels ? (
+            <option value="" disabled>Loading models...</option>
+          ) : (
+            filteredModels.map(model => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))
+          )}
+        </select>
+        {isLoadingModels && (
+          <p className="text-xs text-gray-500 mt-1">Loading models...</p>
+        )}
+        {!filters.manufacturer && (
+          <p className="text-xs text-gray-500 mt-1">Select a manufacturer first</p>
+        )}
+      </div>
+      
+      {/* Status filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Status
+        </label>
+        <select
+          name="status"
+          value={filters.status}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+        >
+          <option value="">All Statuses</option>
+          {filterOptions.statuses.map(status => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+      </div>
+      
+      {/* RAM filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          RAM
+        </label>
+        <select
+          name="ram"
+          value={filters.ram}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+          disabled={!filters.manufacturer || !filters.model || isLoadingRams}
+        >
+          <option value="">All RAM</option>
+          {isLoadingRams ? (
+            <option value="" disabled>Loading RAM options...</option>
+          ) : (
+            filteredRams.map(ram => (
+              <option key={ram} value={ram}>
+                {ram}
+              </option>
+            ))
+          )}
+        </select>
+        {isLoadingRams && (
+          <p className="text-xs text-gray-500 mt-1">Loading RAM options...</p>
+        )}
+        {(!filters.manufacturer || !filters.model) && (
+          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
+        )}
+      </div>
+      
+      {/* Storage filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Storage
+        </label>
+        <select
+          name="storage"
+          value={filters.storage}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+          disabled={!filters.manufacturer || !filters.model || isLoadingStorages}
+        >
+          <option value="">All Storage</option>
+          {isLoadingStorages ? (
+            <option value="" disabled>Loading storage options...</option>
+          ) : (
+            filteredStorages.map(storage => (
+              <option key={storage} value={storage}>
+                {storage}
+              </option>
+            ))
+          )}
+        </select>
+        {isLoadingStorages && (
+          <p className="text-xs text-gray-500 mt-1">Loading storage options...</p>
+        )}
+        {(!filters.manufacturer || !filters.model) && (
+          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
+        )}
+      </div>
+      
+      {/* Color filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Color
+        </label>
+        <select
+          name="color"
+          value={filters.color}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+          disabled={!filters.manufacturer || !filters.model || isLoadingColors}
+        >
+          <option value="">All Colors</option>
+          {isLoadingColors ? (
+            <option value="" disabled>Loading color options...</option>
+          ) : (
+            filteredColors.map(color => (
+              <option key={color} value={color}>
+                {color}
+              </option>
+            ))
+          )}
+        </select>
+        {isLoadingColors && (
+          <p className="text-xs text-gray-500 mt-1">Loading color options...</p>
+        )}
+        {(!filters.manufacturer || !filters.model) && (
+          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
+        )}
+      </div>
+      
+      {/* IMEI1 filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          IMEI1
+        </label>
+        <input
+          type="text"
+          name="imei1"
+          value={pendingFilters.imei1}
+          onChange={handleFilterChange}
+          placeholder="Search IMEI"
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      
+      {/* Barcode filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Barcode
+        </label>
+        <input
+          type="text"
+          name="barcode"
+          value={pendingFilters.barcode}
+          onChange={handleFilterChange}
+          placeholder="Search barcode"
+          className="w-full p-2 border rounded"
+        />
+      </div>
+
+      {/* Serial Number filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Serial Number
+        </label>
+        <input
+          type="text"
+          name="serialNumber"
+          value={pendingFilters.serialNumber}
+          onChange={handleFilterChange}
+          placeholder="Search serial number"
+          className="w-full p-2 border rounded"
+        />
+      </div>
+
+      {/* Start Date filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Start Date
+        </label>
+        <input
+          type="date"
+          name="startDate"
+          value={pendingFilters.startDate}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      
+      {/* End Date filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          End Date
+        </label>
+        <input
+          type="date"
+          name="endDate"
+          value={pendingFilters.endDate}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      
+      {/* Price range */}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Min Price
+          </label>
+          <input
+            type="text"
+            name="minPrice"
+            value={pendingFilters.minPrice}
+            onChange={handleFilterChange}
+            placeholder="0"
+            className="w-full p-2 border rounded"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Max Price
+          </label>
+          <input
+            type="text"
+            name="maxPrice"
+            value={pendingFilters.maxPrice}
+            onChange={handleFilterChange}
+            placeholder="999,999"
+            className="w-full p-2 border rounded"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+{/* Part 6 End - Component Render */}
+
+{/* Part 7 Start - PropTypes Validation */}
+InventoryFilters.propTypes = {
+  filters: PropTypes.object.isRequired,
+  pendingFilters: PropTypes.object.isRequired,
+  filterOptions: PropTypes.object.isRequired,
+  handleFilterChange: PropTypes.func.isRequired,
+  allItems: PropTypes.array.isRequired
+};
+{/* Part 7 End - PropTypes Validation */}
+
+{/* Part 8 Start - Export */}
+export default InventoryFilters;
+{/* Part 8 End - Export */}
+</file>
+
+<file path="src/components/phone-selection/PhoneAdditionalInfo.jsx">
+{/* Part 1 Start - Imports and Dependencies */}
+import PropTypes from 'prop-types';
+{/* Part 1 End - Imports and Dependencies */}
+
+{/* Part 2 Start - Component Definition */}
 const PhoneAdditionalInfo = ({
   imei1,
   imei2,
@@ -4808,6 +4928,9 @@ const PhoneAdditionalInfo = ({
   imei1Error,
   imei2Error,
 }) => {
+{/* Part 2 End - Component Definition */}
+
+{/* Part 3 Start - Component Render */}
   return (
     <div className="pt-4 border-t border-gray-300 space-y-4">
       <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Additional Details</h3>
@@ -4845,7 +4968,7 @@ const PhoneAdditionalInfo = ({
         </div>
       </div>
       
-      {/* Barcode and Serial Number Fields */}
+      {/* Barcode and Serial Number */}
       <div className="flex gap-4">
         <div className="flex-1 space-y-2">
           <label className="block text-[rgb(52,69,157)] font-semibold">Barcode:</label>
@@ -4865,7 +4988,7 @@ const PhoneAdditionalInfo = ({
             className="w-full p-2 border rounded"
             value={serialNumber}
             onChange={handleSerialNumberChange}
-            placeholder=""
+            placeholder="Serial number (optional)"
           />
         </div>
       </div>
@@ -4900,7 +5023,9 @@ const PhoneAdditionalInfo = ({
     </div>
   );
 };
+{/* Part 3 End - Component Render */}
 
+{/* Part 4 Start - PropTypes Validation */}
 PhoneAdditionalInfo.propTypes = {
   imei1: PropTypes.string.isRequired,
   imei2: PropTypes.string.isRequired,
@@ -4916,8 +5041,11 @@ PhoneAdditionalInfo.propTypes = {
   imei1Error: PropTypes.string,
   imei2Error: PropTypes.string
 };
+{/* Part 4 End - PropTypes Validation */}
 
+{/* Part 5 Start - Export */}
 export default PhoneAdditionalInfo;
+{/* Part 5 End - Export */}
 </file>
 
 <file path="src/components/SupplierManagementForm.jsx">
@@ -5846,9 +5974,12 @@ export default SupplierManagementForm;
 </file>
 
 <file path="src/components/inventory/InventoryEditForm.jsx">
+{/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
 import { RefreshCw, Save, XCircle } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const InventoryEditForm = ({ 
   editFormData, 
   handleEditInputChange, 
@@ -5857,12 +5988,17 @@ const InventoryEditForm = ({
   itemId, 
   savingItemId 
 }) => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - Helper Functions */}
   // NEW: Function to format price with currency - read-only display
   const formatPrice = (price) => {
     if (!price && price !== 0) return '-';
     return `₱${price.toLocaleString()}`;
   };
+  {/* Part 3 End - Helper Functions */}
 
+  {/* Part 4 Start - Component Render */}
   return (
     <tr className="hover:bg-gray-50">
       <td className="border px-2 py-3 whitespace-nowrap">
@@ -5977,7 +6113,9 @@ const InventoryEditForm = ({
     </tr>
   );
 };
+{/* Part 4 End - Component Render */}
 
+{/* Part 5 Start - PropTypes Definition */}
 InventoryEditForm.propTypes = {
   editFormData: PropTypes.object.isRequired,
   handleEditInputChange: PropTypes.func.isRequired,
@@ -5986,940 +6124,11 @@ InventoryEditForm.propTypes = {
   itemId: PropTypes.string.isRequired,
   savingItemId: PropTypes.string
 };
+{/* Part 5 End - PropTypes Definition */}
 
+{/* Part 6 Start - Export */}
 export default InventoryEditForm;
-</file>
-
-<file path="src/components/inventory/InventoryRow.jsx">
-import PropTypes from 'prop-types';
-import { Edit, Trash2, FileEdit } from 'lucide-react';
-
-const InventoryRow = ({
-  item,
-  handleEditClick,
-  handleDeleteClick,
-  handleEditDetailsClick // NEW: Add handler for edit details
-}) => {
-  // Helper function to get status display
-  const getStatusDisplay = (status) => {
-    const statusMap = {
-      'On-Hand': 'Stock',
-      'On-Display': 'On-Display',
-      'Sold': 'Sold',
-      'Reserved': 'Reserved',
-      'Defective': 'Defective'
-    };
-    return statusMap[status] || status;
-  };
-  
-  // Format price with peso sign and commas
-  const formatPrice = (price) => {
-    return `₱${(price || 0).toLocaleString()}`;
-  };
-  
-  return (
-    <tr className="hover:bg-gray-50">
-      <td className="border px-2 py-3 whitespace-nowrap text-sm font-medium">{item.manufacturer}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.model}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.ram}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.storage}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.color}</td>
-      <td className="border px-2 py-3 whitespace-nowrap font-mono text-xs">{item.imei1}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-xs font-mono uppercase">{item.barcode || '-'}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-right">
-        <span className="text-gray-600 font-medium">
-          {formatPrice(item.retailPrice)}
-        </span>
-      </td>
-      <td className="border px-2 py-3 whitespace-nowrap text-xs text-gray-500">
-        {item.lastUpdated || '-'}
-      </td>
-      <td className="border px-2 py-3 text-center whitespace-nowrap">
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-          item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800' :
-          item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800' :
-          item.status === 'Sold' ? 'bg-purple-100 text-purple-800' :
-          item.status === 'Reserved' ? 'bg-orange-100 text-orange-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {getStatusDisplay(item.status)}
-        </span>
-      </td>
-      <td className="border px-2 py-3 text-center whitespace-nowrap">
-        <div className="flex justify-center space-x-2">
-          <button
-            onClick={() => handleEditClick(item)}
-            className="p-1 text-blue-600 hover:text-blue-800"
-            title="Quick edit"
-          >
-            <Edit className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => handleEditDetailsClick(item)}
-            className="p-1 text-green-600 hover:text-green-800"
-            title="Edit full details"
-          >
-            <FileEdit className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => handleDeleteClick(item.id)}
-            className="p-1 text-red-600 hover:text-red-800"
-            title="Delete item"
-          >
-            <Trash2 className="h-5 w-5" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-};
-
-InventoryRow.propTypes = {
-  item: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    manufacturer: PropTypes.string.isRequired,
-    model: PropTypes.string.isRequired,
-    ram: PropTypes.string.isRequired,
-    storage: PropTypes.string.isRequired,
-    color: PropTypes.string.isRequired,
-    imei1: PropTypes.string.isRequired,
-    barcode: PropTypes.string,
-    retailPrice: PropTypes.number, // NEW: Added retailPrice prop
-    status: PropTypes.string.isRequired,
-    lastUpdated: PropTypes.string
-  }).isRequired,
-  handleEditClick: PropTypes.func.isRequired,
-  handleDeleteClick: PropTypes.func.isRequired,
-  handleEditDetailsClick: PropTypes.func.isRequired // NEW: Add prop type
-};
-
-export default InventoryRow;
-</file>
-
-<file path="src/components/InventoryListForm.jsx">
-{/* Part 1 Start - Imports and Initial State */}
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { Smartphone, RefreshCw, Filter, X, Search } from 'lucide-react';
-import InventoryTable from './inventory/InventoryTable';
-import InventoryFilters from './inventory/InventoryFilters';
-
-const InventoryListForm = () => {
-  // State for inventory data
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const [allItems, setAllItems] = useState([]); // Store all unfiltered items
-  const [loading, setLoading] = useState(false); // Changed to false by default
-  const [error, setError] = useState(null);
-  const [sortField, setSortField] = useState('manufacturer');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [initialLoad, setInitialLoad] = useState(true); // Track if data has been loaded
-  
-  // State for filters - UPDATED: Added startDate and endDate
-  const [filters, setFilters] = useState({
-    manufacturer: '',
-    model: '',
-    ram: '',
-    storage: '',
-    status: '',
-    minPrice: '',
-    maxPrice: '',
-    color: '',
-    imei1: '',
-    barcode: '',
-    serialNumber: '', // ADD THIS LINE
-    startDate: '',
-    endDate: ''
-  });
-  
-  // Separate state for pending filter changes (before debounce) - UPDATED: Added date fields
-  const [pendingFilters, setPendingFilters] = useState({
-    minPrice: '',
-    maxPrice: '',
-    imei1: '',
-    barcode: '',
-    serialNumber: '', // ADD THIS LINE
-    startDate: '',
-    endDate: ''
-  });
-  
-  // Filter options lists - Updated to use 'Stock' instead of 'On-Hand'
-  const [filterOptions, setFilterOptions] = useState({
-    manufacturers: [],
-    models: [],
-    rams: [],
-    storages: [],
-    colors: [],
-    statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
-  });
-  
-  // Show/hide filters
-  const [showFilters, setShowFilters] = useState(true); // Default to showing filters
-  
-  // Debounce timer ref
-  const debounceTimerRef = useRef(null);
-{/* Part 1 End - Imports and Initial State */}
-
-{/* Part 2 Start - Helper Functions and Effects */}
-  // Format number with commas
-  const formatNumberWithCommas = (value) => {
-    if (!value && value !== 0) return '';
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
-  
-  // Parse price value for filters
-  const parsePrice = (value) => {
-    if (!value) return '';
-    return value.replace(/,/g, '');
-  };
-
-  // Sync filters to pendingFilters when filters change - UPDATED: Added date fields
-  useEffect(() => {
-    setPendingFilters(prevPending => ({
-      ...prevPending,
-      minPrice: filters.minPrice,
-      maxPrice: filters.maxPrice,
-      imei1: filters.imei1,
-      barcode: filters.barcode,
-      serialNumber: filters.serialNumber,
-      startDate: filters.startDate,
-      endDate: filters.endDate
-    }));
-  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.serialNumber, filters.startDate, filters.endDate]);
-
-  // Load manufacturer list on component mount
-  useEffect(() => {
-    async function loadManufacturers() {
-      try {
-        const inventoryRef = collection(db, 'inventory');
-        const snapshot = await getDocs(inventoryRef);
-        
-        const manufacturers = [...new Set(
-          snapshot.docs.map(doc => doc.data().manufacturer)
-        )].filter(Boolean).sort();
-        
-        setFilterOptions(prev => ({
-          ...prev,
-          manufacturers
-        }));
-      } catch (error) {
-        console.error("Error loading manufacturers:", error);
-      }
-    }
-    
-    loadManufacturers();
-  }, []);
-{/* Part 2 End - Helper Functions and Effects */}
-
-{/* Part 3 Start - Filter Logic and Handlers */}
-  // Apply filters to the data - UPDATED: Fixed date filtering logic
-  const applyFilters = useCallback((items) => {
-    return items.filter(item => {
-      // Apply manufacturer filter
-      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) {
-        return false;
-      }
-      
-      // Apply model filter
-      if (filters.model && item.model !== filters.model) {
-        return false;
-      }
-      
-      // Apply RAM filter
-      if (filters.ram && item.ram !== filters.ram) {
-        return false;
-      }
-      
-      // Apply storage filter
-      if (filters.storage && item.storage !== filters.storage) {
-        return false;
-      }
-      
-      // Apply status filter - handle both 'Stock' and 'On-Hand'
-      if (filters.status) {
-        const filterStatus = filters.status === 'Stock' ? 'On-Hand' : filters.status;
-        if (item.status !== filterStatus) {
-          return false;
-        }
-      }
-      
-      // Apply color filter
-      if (filters.color && item.color !== filters.color) {
-        return false;
-      }
-      
-      // Apply IMEI1 filter (partial match)
-      if (filters.imei1 && !item.imei1.includes(filters.imei1)) {
-        return false;
-      }
-      
-      // Apply barcode filter (partial match)
-      if (filters.barcode && item.barcode && !item.barcode.includes(filters.barcode)) {
-        return false;
-      }
-      
-      // Apply serial number filter (partial match)
-      if (filters.serialNumber) {
-        // If filter is set, item must have a serial number AND it must include the search term
-        if (!item.serialNumber || !item.serialNumber.includes(filters.serialNumber)) {
-          return false;
-        }
-      }
-      
-      // Apply min price filter (using retail price)
-      if (filters.minPrice) {
-        const minPrice = parseFloat(parsePrice(filters.minPrice));
-        if (!isNaN(minPrice) && item.retailPrice < minPrice) {
-          return false;
-        }
-      }
-      
-      // Apply max price filter (using retail price)
-      if (filters.maxPrice) {
-        const maxPrice = parseFloat(parsePrice(filters.maxPrice));
-        if (!isNaN(maxPrice) && item.retailPrice > maxPrice) {
-          return false;
-        }
-      }
-
-      // FIXED: Apply start date filter (using lastUpdated field) - Now properly inclusive
-      if (filters.startDate) {
-        const startDate = new Date(filters.startDate);
-        startDate.setHours(0, 0, 0, 0); // Set to start of day
-        
-        if (item.lastUpdated) {
-          // Parse the item date (which is in MM/DD/YYYY format)
-          const itemDate = new Date(item.lastUpdated);
-          itemDate.setHours(0, 0, 0, 0); // Set to start of day
-          
-          // Check if item date is before start date (exclusive)
-          if (itemDate < startDate) {
-            return false;
-          }
-        }
-      }
-
-      // FIXED: Apply end date filter (using lastUpdated field) - Now properly inclusive
-      if (filters.endDate) {
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(23, 59, 59, 999); // Set to end of day
-        
-        if (item.lastUpdated) {
-          // Parse the item date (which is in MM/DD/YYYY format)
-          const itemDate = new Date(item.lastUpdated);
-          
-          // Check if item date is after end date (exclusive)
-          if (itemDate > endDate) {
-            return false;
-          }
-        }
-      }
-      
-      // If it passed all filters, include it
-      return true;
-    });
-  }, [filters]);
-
-  // Apply filters when they change AFTER initial data load - MOVED HERE: After applyFilters declaration
-  useEffect(() => {
-    if (!initialLoad && allItems.length > 0) {
-      const filtered = applyFilters(allItems);
-      setInventoryItems(filtered);
-    }
-  }, [filters, allItems, applyFilters, initialLoad]);
-
-  // Load filter options from data
-  const loadFilterOptions = useCallback((data) => {
-    const manufacturers = [...new Set(data.map(item => item.manufacturer))].sort();
-    const models = [...new Set(data.map(item => item.model))].sort();
-    const rams = [...new Set(data.map(item => item.ram))].sort();
-    const storages = [...new Set(data.map(item => item.storage))].sort();
-   
-    // For colors, filter based on manufacturer and model if selected
-    let filteredData = data;
-    if (filters.manufacturer) {
-      filteredData = filteredData.filter(item => item.manufacturer === filters.manufacturer);
-    }
-    if (filters.model) {
-      filteredData = filteredData.filter(item => item.model === filters.model);
-    }
-    
-    const colors = [...new Set(filteredData.map(item => item.color))].sort();
-    
-    setFilterOptions({
-      manufacturers,
-      models,
-      rams,
-      storages,
-      colors,
-      statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
-    });
-  }, [filters.manufacturer, filters.model]);
-
-  // Handle filter change - UPDATED: Added date field handling
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    
-    // For debounced text inputs (price fields, imei, barcode, dates)
-    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'startDate' || name === 'endDate') {
-      // For price fields, handle numeric input
-      if (name === 'minPrice' || name === 'maxPrice') {
-        // Allow only numbers and commas
-        const sanitizedValue = value.replace(/[^\d,]/g, '');
-        const formattedValue = formatNumberWithCommas(sanitizedValue);
-        
-        // Update pending value first (for display)
-        setPendingFilters(prev => ({
-          ...prev,
-          [name]: formattedValue
-        }));
-        
-        // Clear any existing timer
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-        
-        // Set a new timer to update the actual filter after delay
-        debounceTimerRef.current = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            [name]: formattedValue
-          }));
-        }, 800); // 800ms delay
-      } else if (name === 'startDate' || name === 'endDate') {
-        // NEW: Handle date fields with debounce
-        setPendingFilters(prev => ({
-          ...prev,
-          [name]: value
-        }));
-        
-        // Clear any existing timer
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-        
-        // Set a new timer to update the actual filter after delay
-        debounceTimerRef.current = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            [name]: value
-          }));
-        }, 500); // 500ms delay for dates
-      } else {
-        // For text search fields (IMEI, barcode, serial number)
-        setPendingFilters(prev => ({
-          ...prev,
-          [name]: value
-        }));
-        
-        // Clear any existing timer
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-        
-        // Set a new timer to update the actual filter after delay
-        debounceTimerRef.current = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            [name]: value
-          }));
-        }, 500); // 500ms delay
-      }
-    } else {
-      // For dropdown selects (instant filtering)
-      setFilters(prev => ({
-        ...prev,
-        [name]: value
-      }));
-      
-      // Reset color when manufacturer or model changes
-      if (name === 'manufacturer' || name === 'model') {
-        setFilters(prev => ({
-          ...prev,
-          color: '',
-          [name]: value
-        }));
-      }
-    }
-  };
-
-  // Clear all filters - UPDATED: Added date fields
-  const clearFilters = () => {
-    // Clear both actual filters and pending filters
-    setFilters({
-      manufacturer: '',
-      model: '',
-      ram: '',
-      storage: '',
-      status: '',
-      minPrice: '',
-      maxPrice: '',
-      color: '',
-      imei1: '',
-      barcode: '',
-      startDate: '',
-      endDate: ''
-    });
-    
-    setPendingFilters({
-      minPrice: '',
-      maxPrice: '',
-      imei1: '',
-      barcode: '',
-      serialNumber: '',
-      startDate: '',
-      endDate: ''
-    });
-    
-    // Clear any active debounce timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-  };
-{/* Part 3 End - Filter Logic and Handlers */}
-
-{/* Part 4 Start - Data Fetching Functions */}
-  // Fetch inventory data - modified to handle search constraints
-  const fetchInventoryData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const inventoryRef = collection(db, 'inventory');
-      
-      // Build query constraints
-      let queryConstraints = [orderBy(sortField, sortDirection)];
-      
-      // Add filter constraints if specified
-      if (filters.manufacturer) {
-        queryConstraints.push(where("manufacturer", "==", filters.manufacturer));
-      }
-      
-      if (filters.model) {
-        queryConstraints.push(where("model", "==", filters.model));
-      }
-      
-      // Note: Firebase can only perform inequalities on a single field
-      // For more complex filtering, we'll do it client-side
-      
-      // Create query with constraints
-      const q = query(inventoryRef, ...queryConstraints);
-      const snapshot = await getDocs(q);
-      
-      const items = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        items.push({
-          id: doc.id,
-          manufacturer: data.manufacturer || '',
-          model: data.model || '',
-          ram: data.ram || '',
-          storage: data.storage || '',
-          color: data.color || '',
-          dealersPrice: data.dealersPrice || 0,
-          retailPrice: data.retailPrice || 0,
-          imei1: data.imei1 || '',
-          imei2: data.imei2 || '',  // Also add imei2 while we're at it
-          barcode: data.barcode || '',
-          serialNumber: data.serialNumber || '', // ADD THIS LINE
-          status: data.status || 'On-Hand',
-          dateAdded: data.dateAdded || '',
-          lastUpdated: data.lastUpdated || ''
-        });
-      });
-      
-      // Store all items
-      setAllItems(items);
-      
-      // Load filter options from the fetched data
-      loadFilterOptions(items);
-      
-      // Apply all filters client-side
-      const filteredItems = applyFilters(items);
-      setInventoryItems(filteredItems);
-      setInitialLoad(false);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching inventory data:", error);
-      setError(`Error fetching inventory: ${error.message}`);
-      setLoading(false);
-    }
-  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters]);
-{/* Part 4 End - Data Fetching Functions */}
-
-{/* Part 5 Start - Event Handlers */}
-  // Handle the search button click
-  const handleSearch = () => {
-    fetchInventoryData();
-  };
-
-  // Handle sort change
-  const handleSort = (field) => {
-    if (field === sortField) {
-      // Toggle direction if same field
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Set new field and default to asc
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-{/* Part 5 End - Event Handlers */}
-
-{/* Part 6 Start - Main Component JSX */}
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Smartphone className="h-6 w-6 text-white" />
-            <CardTitle className="text-2xl text-white">Inventory List</CardTitle>
-            {!initialLoad && (
-              <span className="text-white/80 text-sm">
-                ({inventoryItems.length} items)
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1 ${showFilters ? 
-                'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
-            >
-              <Filter className="h-5 w-5 mr-1" />
-              <span>Filters</span>
-            </button>
-            <button
-              onClick={handleSearch}
-              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
-            >
-              <Search className="h-5 w-5 mr-1" />
-              <span>Search</span>
-            </button>
-            <button
-              onClick={() => fetchInventoryData()}
-              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
-            >
-              <RefreshCw className="h-5 w-5 mr-1" />
-              <span>Refresh</span>
-            </button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-4">
-          {/* Filters panel */}
-          {showFilters && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
-                <button 
-                  onClick={clearFilters}
-                  className="text-gray-500 hover:text-red-500 flex items-center"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Clear Filters
-                </button>
-              </div>
-              
-              <InventoryFilters 
-                filters={filters}
-                pendingFilters={pendingFilters}
-                filterOptions={filterOptions}
-                handleFilterChange={handleFilterChange}
-                allItems={allItems}
-              />
-            </div>
-          )}
-          {/* Inventory Summary Section */}
-          {!initialLoad && inventoryItems.length > 0 && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Inventory Summary</h3>
-              </div>
-              
-              <div className="flex flex-col md:flex-row gap-4">
-                {/* Item Count - 25% */}
-                <div className="w-full md:w-[25%] bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 font-medium">Item Count</p>
-                      <p className="text-xs text-gray-500">Total inventory items</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-blue-600">
-                        {inventoryItems.length.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {inventoryItems.length === 1 ? 'item' : 'items'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Total Value - 30% */}
-                <div className="w-full md:w-[30%] bg-white rounded-lg p-4 border border-green-100 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 font-medium">Total Value</p>
-                      <p className="text-xs text-gray-500">Combined retail price</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-green-600">
-                        ₱{(() => {
-                          const totalValue = inventoryItems.reduce((total, item) => {
-                            return total + (item.retailPrice || 0);
-                          }, 0);
-                          return totalValue.toLocaleString('en-US', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
-                          });
-                        })()}
-                      </p>
-                      <p className="text-xs text-gray-500">retail value</p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Status Breakdown - 45% */}
-                <div className="w-full md:w-[45%] bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
-                  <div className="flex items-start">
-                    <div className="mr-4">
-                      <p className="text-sm text-gray-600 font-medium">Status Breakdown</p>
-                      <p className="text-xs text-gray-500">Items by status</p>
-                    </div>
-                    <div className="flex flex-wrap gap-3 items-center">
-                      {(() => {
-                        const statusCounts = inventoryItems.reduce((counts, item) => {
-                          const status = item.status || 'Unknown';
-                          counts[status] = (counts[status] || 0) + 1;
-                          return counts;
-                        }, {});
-                        
-                        // Define order and display names
-                        const statusOrder = [
-                          { key: 'On-Hand', display: 'Stock' },
-                          { key: 'On-Display', display: 'Display' },
-                          { key: 'Sold', display: 'Sold' },
-                          { key: 'Reserved', display: 'Reserved' },
-                          { key: 'Defective', display: 'Defective' }
-                        ];
-                        
-                        return statusOrder
-                          .filter(status => statusCounts[status.key] > 0)
-                          .map((status) => (
-                            <div key={status.key} className="flex items-center">
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                status.key === 'On-Hand' ? 'bg-blue-100 text-blue-700' :
-                                status.key === 'On-Display' ? 'bg-yellow-100 text-yellow-700' :
-                                status.key === 'Sold' ? 'bg-purple-100 text-purple-700' :
-                                status.key === 'Reserved' ? 'bg-orange-100 text-orange-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>
-                                {status.display}
-                              </span>
-                              <span className="font-semibold text-gray-700 ml-1">
-                                {statusCounts[status.key]}
-                              </span>
-                            </div>
-                          ));
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            {initialLoad ? (
-              <div className="text-center py-12">
-                <p className="text-lg mb-4">Use the search button to load inventory items</p>
-                <p className="text-sm text-gray-500 mb-6">You can apply filters before searching or search all items</p>
-                <button
-                  onClick={handleSearch}
-                  className="bg-[rgb(52,69,157)] text-white px-6 py-2 rounded-md flex items-center mx-auto"
-                >
-                  <Search className="h-5 w-5 mr-2" />
-                  Search All Inventory
-                </button>
-              </div>
-            ) : inventoryItems.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-lg text-gray-500">No inventory items match your filters</p>
-                <button
-                  onClick={clearFilters}
-                  className="mt-4 text-blue-600 hover:text-blue-800 underline"
-                >
-                  Clear all filters
-                </button>
-              </div>
-            ) : (
-              <InventoryTable 
-                inventoryItems={inventoryItems}
-                allItems={allItems}
-                setAllItems={setAllItems}
-                setInventoryItems={setInventoryItems}
-                loading={loading}
-                error={error}
-                sortField={sortField}
-                sortDirection={sortDirection}
-                handleSort={handleSort}
-                applyFilters={applyFilters}
-              />
-            )}
-          </div>
-          <div className="overflow-x-auto"></div>
-          {/* Show loading state */}
-          {loading && (
-            <div className="text-center py-4">
-              <RefreshCw className="h-6 w-6 animate-spin mx-auto text-[rgb(52,69,157)]" />
-              <p className="text-gray-600 mt-2">Loading inventory items...</p>
-            </div>
-          )}
-          
-          {/* Show error state */}
-          {error && (
-            <div className="text-center py-4 text-red-600">
-              <p>{error}</p>
-              <button
-                onClick={() => {
-                  setError(null);
-                  fetchInventoryData();
-                }}
-                className="mt-2 text-blue-600 hover:text-blue-800 underline"
-              >
-                Try again
-              </button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-export default InventoryListForm;
-{/* Part 6 End - Main Component JSX */}
-</file>
-
-<file path="src/context/GlobalStateContext.jsx">
-{/* Part 1 Start - Imports and Context Creation */}
-// src/context/GlobalStateContext.jsx
-import PropTypes from 'prop-types';
-import { createContext, useState, useContext } from 'react';
-
-// Create context
-export const GlobalStateContext = createContext();
-
-// Custom hook for easier context usage
-export const useGlobalState = () => useContext(GlobalStateContext);
-{/* Part 1 End - Imports and Context Creation */}
-
-{/* Part 2 Start - GlobalStateProvider Component */}
-// Create provider
-export const GlobalStateProvider = ({ children }) => {
-  // ====== STATE DEFINITIONS ======
-  const [phoneToEdit, setPhoneToEdit] = useState(null);
-  const [procurementToEdit, setProcurementToEdit] = useState(null);
-  const [inventoryItemToEdit, setInventoryItemToEdit] = useState(null); // NEW: State for inventory editing
-  const [activeComponent, setActiveComponent] = useState('summary');
-  const [isViewingProcurement, setIsViewingProcurement] = useState(false); // Track view vs edit mode
-  const [procurementMode, setProcurementMode] = useState(''); // NEW: Track procurement mode ('view', 'edit', 'payment')
-  
-  // ====== PHONE EDITING FUNCTIONS ======
-  // Function to set a phone for editing and switch to form
-  const editPhone = (phone) => {
-    setPhoneToEdit(phone);
-    setActiveComponent('form');
-  };
-  
-  // Function to clear the selected phone
-  const clearPhoneToEdit = () => {
-    setPhoneToEdit(null);
-  };
-  
-  // ====== INVENTORY EDITING FUNCTIONS - NEW ======
-  // Function to set an inventory item for editing and switch to selection form
-  const editInventoryItem = (item) => {
-    setInventoryItemToEdit(item);
-    setActiveComponent('selection');
-  };
-  
-  // Function to clear the selected inventory item
-  const clearInventoryItemToEdit = () => {
-    setInventoryItemToEdit(null);
-  };
-  
-  // ====== PROCUREMENT EDITING FUNCTIONS ======
-  // Function to set a procurement for editing and switch to procurement form
-  const editProcurement = (procurement) => {
-    setProcurementToEdit(procurement);
-    setIsViewingProcurement(false); // Set to edit mode
-    setProcurementMode('edit'); // NEW: Set mode to edit
-    setActiveComponent('procurement');
-  };
-  
-  // Function to set a procurement for viewing (read-only)
-  const viewProcurement = (procurement) => {
-    setProcurementToEdit(procurement);
-    setIsViewingProcurement(true); // Set to view mode
-    setProcurementMode('view'); // NEW: Set mode to view
-    setActiveComponent('procurement');
-  };
-  
-  // NEW: Function to set a procurement for payment entry
-  const paymentProcurement = (procurement) => {
-    setProcurementToEdit(procurement);
-    setIsViewingProcurement(false); // Not in pure view mode
-    setProcurementMode('payment'); // Set mode to payment
-    setActiveComponent('procurement');
-  };
-  
-  // Function to clear the selected procurement
-  const clearProcurementToEdit = () => {
-    setProcurementToEdit(null);
-    setIsViewingProcurement(false); // Reset view mode
-    setProcurementMode(''); // NEW: Reset mode
-  };
-  
-  // ====== CONTEXT VALUE OBJECT ======
-  // Create a value object with all the state and functions
-  const contextValue = {
-    phoneToEdit,
-    editPhone,
-    clearPhoneToEdit,
-    inventoryItemToEdit, // NEW: Add inventory item state
-    editInventoryItem, // NEW: Add inventory edit function
-    clearInventoryItemToEdit, // NEW: Add inventory clear function
-    procurementToEdit,
-    editProcurement,
-    viewProcurement,
-    paymentProcurement, // NEW: Add payment function
-    clearProcurementToEdit,
-    isViewingProcurement,
-    procurementMode, // NEW: Add procurement mode state
-    activeComponent,
-    setActiveComponent
-  };
-  
-  return (
-    <GlobalStateContext.Provider value={contextValue}>
-      {children}
-    </GlobalStateContext.Provider>
-  );
-};
-
-// Add prop types for validation
-GlobalStateProvider.propTypes = {
-  children: PropTypes.node.isRequired
-};
-{/* Part 2 End - GlobalStateProvider Component */}
-
-{/* Part 3 Start - Export Default Hook */}
-// Also provide a default export for the hook for backward compatibility
-export default useGlobalState;
-{/* Part 3 End - Export Default Hook */}
+{/* Part 6 End - Export */}
 </file>
 
 <file path="src/services/supplierService.js">
@@ -8097,471 +7306,830 @@ function App() {
 export default App;
 </file>
 
-<file path="src/components/inventory/InventoryTable.jsx">
-import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
-import { useState } from 'react';
+<file path="src/components/inventory/InventoryRow.jsx">
+{/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
-import { doc, updateDoc, runTransaction, increment, deleteDoc } from 'firebase/firestore';
-import { db } from '../../firebase/config';
-import InventoryRow from './InventoryRow';
-import InventoryEditForm from './InventoryEditForm';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
-// Import getCurrentDate utility function
-import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
+import { Edit, Trash2, FileEdit } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
-const InventoryTable = ({ 
-  inventoryItems, 
-  handleSort, 
-  sortField, 
-  sortDirection, 
-  allItems,
-  setAllItems,
-  setInventoryItems,
-  applyFilters
+{/* Part 2 Start - Component Definition */}
+const InventoryRow = ({
+  item,
+  handleEditClick,
+  handleDeleteClick,
+  handleEditDetailsClick // NEW: Add handler for edit details
 }) => {
-  const [editingItemId, setEditingItemId] = useState(null);
-  const [editFormData, setEditFormData] = useState({
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - Helper Functions */}
+  // Helper function to get status display
+  const getStatusDisplay = (status) => {
+    const statusMap = {
+      'On-Hand': 'Stock',
+      'On-Display': 'On-Display',
+      'Sold': 'Sold',
+      'Reserved': 'Reserved',
+      'Defective': 'Defective'
+    };
+    return statusMap[status] || status;
+  };
+  
+  // Format price with peso sign and commas
+  const formatPrice = (price) => {
+    return `₱${(price || 0).toLocaleString()}`;
+  };
+  {/* Part 3 End - Helper Functions */}
+  
+  {/* Part 4 Start - Component Render */}
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="border px-2 py-3 whitespace-nowrap text-sm font-medium">{item.manufacturer}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.model}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.ram}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.storage}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.color}</td>
+      <td className="border px-2 py-3 whitespace-nowrap font-mono text-xs">{item.imei1}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-xs font-mono uppercase">{item.barcode || '-'}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-right">
+        <span className="text-gray-600 font-medium">
+          {formatPrice(item.retailPrice)}
+        </span>
+      </td>
+      <td className="border px-2 py-3 whitespace-nowrap text-xs text-gray-500">
+        {item.lastUpdated || '-'}
+      </td>
+      <td className="border px-2 py-3 text-center whitespace-nowrap">
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+          item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800' :
+          item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800' :
+          item.status === 'Sold' ? 'bg-purple-100 text-purple-800' :
+          item.status === 'Reserved' ? 'bg-orange-100 text-orange-800' :
+          'bg-gray-100 text-gray-800'
+        }`}>
+          {getStatusDisplay(item.status)}
+        </span>
+      </td>
+      <td className="border px-2 py-3 text-center whitespace-nowrap">
+        <div className="flex justify-center space-x-2">
+          <button
+            onClick={() => handleEditClick(item)}
+            className="p-1 text-blue-600 hover:text-blue-800"
+            title="Quick edit"
+          >
+            <Edit className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => handleEditDetailsClick(item)}
+            className="p-1 text-green-600 hover:text-green-800"
+            title="Edit full details"
+          >
+            <FileEdit className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => handleDeleteClick(item.id)}
+            className="p-1 text-red-600 hover:text-red-800"
+            title="Delete item"
+          >
+            <Trash2 className="h-5 w-5" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+};
+{/* Part 4 End - Component Render */}
+
+{/* Part 5 Start - PropTypes Definition */}
+InventoryRow.propTypes = {
+  item: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    manufacturer: PropTypes.string.isRequired,
+    model: PropTypes.string.isRequired,
+    ram: PropTypes.string.isRequired,
+    storage: PropTypes.string.isRequired,
+    color: PropTypes.string.isRequired,
+    imei1: PropTypes.string.isRequired,
+    barcode: PropTypes.string,
+    retailPrice: PropTypes.number, // NEW: Added retailPrice prop
+    status: PropTypes.string.isRequired,
+    lastUpdated: PropTypes.string
+  }).isRequired,
+  handleEditClick: PropTypes.func.isRequired,
+  handleDeleteClick: PropTypes.func.isRequired,
+  handleEditDetailsClick: PropTypes.func.isRequired // NEW: Add prop type
+};
+{/* Part 5 End - PropTypes Definition */}
+
+{/* Part 6 Start - Export */}
+export default InventoryRow;
+{/* Part 6 End - Export */}
+</file>
+
+<file path="src/components/InventoryListForm.jsx">
+{/* Part 1 Start - Imports and Initial State */}
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { Smartphone, RefreshCw, Filter, X, Search } from 'lucide-react';
+import InventoryTable from './inventory/InventoryTable';
+import InventoryFilters from './inventory/InventoryFilters';
+
+const InventoryListForm = () => {
+  // State for inventory data
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [allItems, setAllItems] = useState([]); // Store all unfiltered items
+  const [loading, setLoading] = useState(false); // Changed to false by default
+  const [error, setError] = useState(null);
+  const [sortField, setSortField] = useState('manufacturer');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [initialLoad, setInitialLoad] = useState(true); // Track if data has been loaded
+  
+  // State for filters - UPDATED: Added startDate and endDate
+  const [filters, setFilters] = useState({
     manufacturer: '',
     model: '',
     ram: '',
     storage: '',
+    status: '',
+    minPrice: '',
+    maxPrice: '',
     color: '',
     imei1: '',
     barcode: '',
-    status: '',
-    retailPrice: 0 // NEW: Added retailPrice to initial state
+    serialNumber: '', // ADD THIS LINE
+    startDate: '',
+    endDate: ''
   });
-  const [savingItemId, setSavingItemId] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  // Get global state function for editing inventory items
-  const { editInventoryItem } = useGlobalState(); // NEW: Get edit function from context
+  
+  // Separate state for pending filter changes (before debounce) - UPDATED: Added date fields
+  const [pendingFilters, setPendingFilters] = useState({
+    minPrice: '',
+    maxPrice: '',
+    imei1: '',
+    barcode: '',
+    serialNumber: '', // ADD THIS LINE
+    startDate: '',
+    endDate: ''
+  });
+  
+  // Filter options lists - Updated to use 'Stock' instead of 'On-Hand'
+  const [filterOptions, setFilterOptions] = useState({
+    manufacturers: [],
+    models: [],
+    rams: [],
+    storages: [],
+    colors: [],
+    statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
+  });
+  
+  // Show/hide filters
+  const [showFilters, setShowFilters] = useState(true); // Default to showing filters
+  
+  // Debounce timer ref
+  const debounceTimerRef = useRef(null);
+{/* Part 1 End - Imports and Initial State */}
 
-  // NEW: Handle edit details click
-  const handleEditDetailsClick = (item) => {
-    editInventoryItem(item);
+{/* Part 2 Start - Helper Functions and Effects */}
+  // Format number with commas
+  const formatNumberWithCommas = (value) => {
+    if (!value && value !== 0) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
-  // Handle edit button click
-  const handleEditClick = (item) => {
-    // If we're already editing, cancel it first
-    if (editingItemId) {
-      setEditingItemId(null);
-    }
-    
-    // Set the item to edit
-    setEditingItemId(item.id);
-    
-    // Populate form with item data
-    setEditFormData({
-      manufacturer: item.manufacturer,
-      model: item.model,
-      ram: item.ram,
-      storage: item.storage,
-      color: item.color,
-      imei1: item.imei1,
-      barcode: item.barcode || '',
-      status: item.status,
-      retailPrice: item.retailPrice // NEW: Added retailPrice to edit form data
-    });
-  };
-
-  // Handle delete button click
-  const handleDeleteClick = (itemId) => {
-    const item = allItems.find(item => item.id === itemId);
-    if (item) {
-      setItemToDelete(item);
-      setIsDeleteModalOpen(true);
-    }
+  
+  // Parse price value for filters
+  const parsePrice = (value) => {
+    if (!value) return '';
+    return value.replace(/,/g, '');
   };
 
-  // Handle delete confirmation - PRESERVED: Original working delete logic
-  const handleDeleteConfirm = async () => {
-    if (!itemToDelete) return;
-    
-    setIsDeleting(true);
-    
-    try {
-      // Get a reference to the document
-      const itemRef = doc(db, 'inventory', itemToDelete.id);
-      
-      // Delete the document
-      await deleteDoc(itemRef);
-      
-      // Update inventory counts
-      const inventoryId = `${itemToDelete.manufacturer}_${itemToDelete.model}_${itemToDelete.ram}_${itemToDelete.storage}_${itemToDelete.color}`.replace(/\s+/g, '_').toLowerCase();
-      
-      // Reference to the inventory count doc
-      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
-      
-      // Update inventory counts based on the item's status
-      await runTransaction(db, async (transaction) => {
-        const inventoryDoc = await transaction.get(inventoryRef);
+  // Sync filters to pendingFilters when filters change - UPDATED: Added date fields
+  useEffect(() => {
+    setPendingFilters(prevPending => ({
+      ...prevPending,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+      imei1: filters.imei1,
+      barcode: filters.barcode,
+      serialNumber: filters.serialNumber,
+      startDate: filters.startDate,
+      endDate: filters.endDate
+    }));
+  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.serialNumber, filters.startDate, filters.endDate]);
+
+  // Load manufacturer list on component mount
+  useEffect(() => {
+    async function loadManufacturers() {
+      try {
+        const inventoryRef = collection(db, 'inventory');
+        const snapshot = await getDocs(inventoryRef);
         
-        if (inventoryDoc.exists()) {
-          // Determine which field to decrement based on status
-          const decrementField = 
-            itemToDelete.status === 'On-Hand' ? 'onHand' : 
-            itemToDelete.status === 'On-Display' ? 'onDisplay' : 
-            itemToDelete.status === 'Sold' ? 'sold' : 
-            itemToDelete.status === 'Reserved' ? 'reserved' : 
-            'defective';
-          
-          // Decrement total and status count
-          transaction.update(inventoryRef, {
-            total: increment(-1),
-            [decrementField]: increment(-1),
-            lastUpdated: new Date().toLocaleDateString()
-          });
+        const manufacturers = [...new Set(
+          snapshot.docs.map(doc => doc.data().manufacturer)
+        )].filter(Boolean).sort();
+        
+        setFilterOptions(prev => ({
+          ...prev,
+          manufacturers
+        }));
+      } catch (error) {
+        console.error("Error loading manufacturers:", error);
+      }
+    }
+    
+    loadManufacturers();
+  }, []);
+{/* Part 2 End - Helper Functions and Effects */}
+
+{/* Part 3 Start - Filter Logic and Handlers */}
+  // Apply filters to the data - UPDATED: Fixed date filtering logic
+  const applyFilters = useCallback((items) => {
+    return items.filter(item => {
+      // Apply manufacturer filter
+      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) {
+        return false;
+      }
+      
+      // Apply model filter
+      if (filters.model && item.model !== filters.model) {
+        return false;
+      }
+      
+      // Apply RAM filter
+      if (filters.ram && item.ram !== filters.ram) {
+        return false;
+      }
+      
+      // Apply storage filter
+      if (filters.storage && item.storage !== filters.storage) {
+        return false;
+      }
+      
+      // Apply status filter - handle both 'Stock' and 'On-Hand'
+      if (filters.status) {
+        const filterStatus = filters.status === 'Stock' ? 'On-Hand' : filters.status;
+        if (item.status !== filterStatus) {
+          return false;
         }
-      });
+      }
       
-      // Update local state by removing the deleted item
-      const updatedItems = allItems.filter(item => item.id !== itemToDelete.id);
-      setAllItems(updatedItems);
+      // Apply color filter
+      if (filters.color && item.color !== filters.color) {
+        return false;
+      }
       
-      // Re-apply filters
-      const filteredItems = applyFilters(updatedItems);
-      setInventoryItems(filteredItems);
+      // Apply IMEI1 filter (partial match)
+      if (filters.imei1 && !item.imei1.includes(filters.imei1)) {
+        return false;
+      }
       
-      // Close the modal and reset state
-      setIsDeleteModalOpen(false);
-      setItemToDelete(null);
-      setIsDeleting(false);
+      // Apply barcode filter (partial match)
+      if (filters.barcode && item.barcode && !item.barcode.includes(filters.barcode)) {
+        return false;
+      }
       
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      alert(`Error deleting item: ${error.message}`);
-      setIsDeleting(false);
+      // Apply serial number filter (partial match)
+      if (filters.serialNumber) {
+        // If filter is set, item must have a serial number AND it must include the search term
+        if (!item.serialNumber || !item.serialNumber.includes(filters.serialNumber)) {
+          return false;
+        }
+      }
+      
+      // Apply min price filter (using retail price)
+      if (filters.minPrice) {
+        const minPrice = parseFloat(parsePrice(filters.minPrice));
+        if (!isNaN(minPrice) && item.retailPrice < minPrice) {
+          return false;
+        }
+      }
+      
+      // Apply max price filter (using retail price)
+      if (filters.maxPrice) {
+        const maxPrice = parseFloat(parsePrice(filters.maxPrice));
+        if (!isNaN(maxPrice) && item.retailPrice > maxPrice) {
+          return false;
+        }
+      }
+
+      // FIXED: Apply start date filter (using lastUpdated field) - Now properly inclusive
+      if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0); // Set to start of day
+        
+        if (item.lastUpdated) {
+          // Parse the item date (which is in MM/DD/YYYY format)
+          const itemDate = new Date(item.lastUpdated);
+          itemDate.setHours(0, 0, 0, 0); // Set to start of day
+          
+          // Check if item date is before start date (exclusive)
+          if (itemDate < startDate) {
+            return false;
+          }
+        }
+      }
+
+      // FIXED: Apply end date filter (using lastUpdated field) - Now properly inclusive
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999); // Set to end of day
+        
+        if (item.lastUpdated) {
+          // Parse the item date (which is in MM/DD/YYYY format)
+          const itemDate = new Date(item.lastUpdated);
+          
+          // Check if item date is after end date (exclusive)
+          if (itemDate > endDate) {
+            return false;
+          }
+        }
+      }
+      
+      // If it passed all filters, include it
+      return true;
+    });
+  }, [filters]);
+
+  // Apply filters when they change AFTER initial data load - MOVED HERE: After applyFilters declaration
+  useEffect(() => {
+    if (!initialLoad && allItems.length > 0) {
+      const filtered = applyFilters(allItems);
+      setInventoryItems(filtered);
+    }
+  }, [filters, allItems, applyFilters, initialLoad]);
+
+  // Load filter options from data
+  const loadFilterOptions = useCallback((data) => {
+    const manufacturers = [...new Set(data.map(item => item.manufacturer))].sort();
+    const models = [...new Set(data.map(item => item.model))].sort();
+    const rams = [...new Set(data.map(item => item.ram))].sort();
+    const storages = [...new Set(data.map(item => item.storage))].sort();
+   
+    // For colors, filter based on manufacturer and model if selected
+    let filteredData = data;
+    if (filters.manufacturer) {
+      filteredData = filteredData.filter(item => item.manufacturer === filters.manufacturer);
+    }
+    if (filters.model) {
+      filteredData = filteredData.filter(item => item.model === filters.model);
+    }
+    
+    const colors = [...new Set(filteredData.map(item => item.color))].sort();
+    
+    setFilterOptions({
+      manufacturers,
+      models,
+      rams,
+      storages,
+      colors,
+      statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
+    });
+  }, [filters.manufacturer, filters.model]);
+
+  // Handle filter change - UPDATED: Added date field handling
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    
+    // For debounced text inputs (price fields, imei, barcode, dates)
+    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'startDate' || name === 'endDate') {
+      // For price fields, handle numeric input
+      if (name === 'minPrice' || name === 'maxPrice') {
+        // Allow only numbers and commas
+        const sanitizedValue = value.replace(/[^\d,]/g, '');
+        const formattedValue = formatNumberWithCommas(sanitizedValue);
+        
+        // Update pending value first (for display)
+        setPendingFilters(prev => ({
+          ...prev,
+          [name]: formattedValue
+        }));
+        
+        // Clear any existing timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        
+        // Set a new timer to update the actual filter after delay
+        debounceTimerRef.current = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            [name]: formattedValue
+          }));
+        }, 800); // 800ms delay
+      } else if (name === 'startDate' || name === 'endDate') {
+        // NEW: Handle date fields with debounce
+        setPendingFilters(prev => ({
+          ...prev,
+          [name]: value
+        }));
+        
+        // Clear any existing timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        
+        // Set a new timer to update the actual filter after delay
+        debounceTimerRef.current = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            [name]: value
+          }));
+        }, 500); // 500ms delay for dates
+      } else {
+        // For text search fields (IMEI, barcode, serial number)
+        setPendingFilters(prev => ({
+          ...prev,
+          [name]: value
+        }));
+        
+        // Clear any existing timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        
+        // Set a new timer to update the actual filter after delay
+        debounceTimerRef.current = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            [name]: value
+          }));
+        }, 500); // 500ms delay
+      }
+    } else {
+      // For dropdown selects (instant filtering)
+      setFilters(prev => ({
+        ...prev,
+        [name]: value
+      }));
+      
+      // Reset color when manufacturer or model changes
+      if (name === 'manufacturer' || name === 'model') {
+        setFilters(prev => ({
+          ...prev,
+          color: '',
+          [name]: value
+        }));
+      }
     }
   };
 
-  // Handle cancel delete
-  const handleDeleteCancel = () => {
-    setIsDeleteModalOpen(false);
-    setItemToDelete(null);
-  };
-
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditingItemId(null);
-    setEditFormData({
+  // Clear all filters - UPDATED: Added date fields
+  const clearFilters = () => {
+    // Clear both actual filters and pending filters
+    setFilters({
       manufacturer: '',
       model: '',
       ram: '',
       storage: '',
+      status: '',
+      minPrice: '',
+      maxPrice: '',
       color: '',
       imei1: '',
       barcode: '',
-      status: '',
-      retailPrice: 0 // NEW: Added retailPrice to reset state
+      startDate: '',
+      endDate: ''
     });
-  };
-
-  // Handle edit form input changes
-  const handleEditInputChange = (e) => {
-    const { name, value } = e.target;
     
-    setEditFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setPendingFilters({
+      minPrice: '',
+      maxPrice: '',
+      imei1: '',
+      barcode: '',
+      serialNumber: '',
+      startDate: '',
+      endDate: ''
+    });
+    
+    // Clear any active debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
   };
+{/* Part 3 End - Filter Logic and Handlers */}
 
-  // Handle save edits - includes lastUpdated
-  const handleSaveEdit = async (id) => {
-    setSavingItemId(id);
+{/* Part 4 Start - Data Fetching Functions */}
+  // Fetch inventory data - modified to handle search constraints
+  const fetchInventoryData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     
     try {
-      // Create an update object with the edited fields
-      const updateData = {
-        manufacturer: editFormData.manufacturer,
-        model: editFormData.model,
-        ram: editFormData.ram,
-        storage: editFormData.storage,
-        color: editFormData.color,
-        imei1: editFormData.imei1,
-        barcode: editFormData.barcode,
-        status: editFormData.status,
-        lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
-      };
+      const inventoryRef = collection(db, 'inventory');
       
-      // Get a reference to the document
-      const itemRef = doc(db, 'inventory', id);
+      // Build query constraints
+      let queryConstraints = [orderBy(sortField, sortDirection)];
       
-      // Update the document
-      await updateDoc(itemRef, updateData);
-      
-      // If the status was changed, update the inventory counts
-      const originalItem = allItems.find(item => item.id === id);
-      if (originalItem && originalItem.status !== editFormData.status) {
-        // Create a unique ID for this inventory item type
-        const inventoryId = `${editFormData.manufacturer}_${editFormData.model}_${editFormData.ram}_${editFormData.storage}_${editFormData.color}`.replace(/\s+/g, '_').toLowerCase();
-        
-        // Reference to the inventory count doc
-        const inventoryRef = doc(db, 'inventory_counts', inventoryId);
-        
-        // Run as a transaction to ensure data consistency
-        await runTransaction(db, async (transaction) => {
-          const inventoryDoc = await transaction.get(inventoryRef);
-          
-          if (inventoryDoc.exists()) {
-            // Decrement the old status count
-            const decrementField = 
-              originalItem.status === 'On-Hand' ? 'onHand' : 
-              originalItem.status === 'On-Display' ? 'onDisplay' : 
-              originalItem.status === 'Sold' ? 'sold' : 
-              originalItem.status === 'Reserved' ? 'reserved' : 
-              'defective';
-            
-            // Increment the new status count
-            const incrementField = 
-              editFormData.status === 'On-Hand' ? 'onHand' : 
-              editFormData.status === 'On-Display' ? 'onDisplay' : 
-              editFormData.status === 'Sold' ? 'sold' : 
-              editFormData.status === 'Reserved' ? 'reserved' : 
-              'defective';
-            
-            // Update counters
-            transaction.update(inventoryRef, {
-              [decrementField]: increment(-1),
-              [incrementField]: increment(1),
-              lastUpdated: new Date().toLocaleDateString()
-            });
-          }
-        });
+      // Add filter constraints if specified
+      if (filters.manufacturer) {
+        queryConstraints.push(where("manufacturer", "==", filters.manufacturer));
       }
       
-      // Update local state - includes lastUpdated
-      setAllItems(prevItems => 
-        prevItems.map(item => 
-          item.id === id 
-            ? { 
-                ...item, 
-                ...updateData,
-                // Keep original prices since we're not editing them
-                dealersPrice: item.dealersPrice,
-                retailPrice: item.retailPrice
-              } 
-            : item
-        )
-      );
+      if (filters.model) {
+        queryConstraints.push(where("model", "==", filters.model));
+      }
       
-      // Reset editing state
-      setEditingItemId(null);
-      setSavingItemId(null);
+      // Note: Firebase can only perform inequalities on a single field
+      // For more complex filtering, we'll do it client-side
       
-      // Re-apply filters to update the displayed inventory items - includes lastUpdated
-      const updatedItems = allItems.map(item => 
-        item.id === id 
-          ? { 
-              ...item, 
-              ...updateData,
-              // Keep original prices since we're not editing them
-              dealersPrice: item.dealersPrice,
-              retailPrice: item.retailPrice
-            } 
-          : item
-      );
-      const filteredItems = applyFilters(updatedItems);
+      // Create query with constraints
+      const q = query(inventoryRef, ...queryConstraints);
+      const snapshot = await getDocs(q);
+      
+      const items = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        items.push({
+          id: doc.id,
+          manufacturer: data.manufacturer || '',
+          model: data.model || '',
+          ram: data.ram || '',
+          storage: data.storage || '',
+          color: data.color || '',
+          dealersPrice: data.dealersPrice || 0,
+          retailPrice: data.retailPrice || 0,
+          imei1: data.imei1 || '',
+          imei2: data.imei2 || '',  // Also add imei2 while we're at it
+          barcode: data.barcode || '',
+          serialNumber: data.serialNumber || '', // ADD THIS LINE
+          status: data.status || 'On-Hand',
+          dateAdded: data.dateAdded || '',
+          lastUpdated: data.lastUpdated || ''
+        });
+      });
+      
+      // Store all items
+      setAllItems(items);
+      
+      // Load filter options from the fetched data
+      loadFilterOptions(items);
+      
+      // Apply all filters client-side
+      const filteredItems = applyFilters(items);
       setInventoryItems(filteredItems);
-      
+      setInitialLoad(false);
+      setLoading(false);
     } catch (error) {
-      console.error("Error updating item:", error);
-      alert(`Error updating item: ${error.message}`);
-      setSavingItemId(null);
+      console.error("Error fetching inventory data:", error);
+      setError(`Error fetching inventory: ${error.message}`);
+      setLoading(false);
+    }
+  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters]);
+{/* Part 4 End - Data Fetching Functions */}
+
+{/* Part 5 Start - Event Handlers */}
+  // Handle the search button click
+  const handleSearch = () => {
+    fetchInventoryData();
+  };
+
+  // Handle sort change
+  const handleSort = (field) => {
+    if (field === sortField) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new field and default to asc
+      setSortField(field);
+      setSortDirection('asc');
     }
   };
-  
-  // UPDATED: Enhanced sorting logic for new sortable columns
-  const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
-    // Handle numeric fields
-    if (sortField === 'retailPrice') {
-      if (sortDirection === 'asc') {
-        return a.retailPrice - b.retailPrice;
-      } else {
-        return b.retailPrice - a.retailPrice;
-      }
-    }
-    
-    // Handle date field (lastUpdated)
-    if (sortField === 'lastUpdated') {
-      const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
-      const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
-      
-      if (sortDirection === 'asc') {
-        return dateA - dateB;
-      } else {
-        return dateB - dateA;
-      }
-    }
-    
-    // Handle string fields
-    if (sortDirection === 'asc') {
-      return a[sortField]?.localeCompare(b[sortField] || '');
-    } else {
-      return b[sortField]?.localeCompare(a[sortField] || '');
-    }
-  });
+{/* Part 5 End - Event Handlers */}
 
+{/* Part 6 Start - Main Component JSX */}
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-base">
-        <thead>
-          <tr className="bg-gray-100">
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('manufacturer')}
-              style={{ width: '12%' }}
+    <div className="min-h-screen bg-white p-4">
+      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Smartphone className="h-6 w-6 text-white" />
+            <CardTitle className="text-2xl text-white">Inventory List</CardTitle>
+            {!initialLoad && (
+              <span className="text-white/80 text-sm">
+                ({inventoryItems.length} items)
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1 ${showFilters ? 
+                'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
             >
-              Manufacturer
-              {sortField === 'manufacturer' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('model')}
-              style={{ width: '12%' }}
+              <Filter className="h-5 w-5 mr-1" />
+              <span>Filters</span>
+            </button>
+            <button
+              onClick={handleSearch}
+              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
             >
-              Model
-              {sortField === 'model' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('ram')}
-              style={{ width: '7%' }}
+              <Search className="h-5 w-5 mr-1" />
+              <span>Search</span>
+            </button>
+            <button
+              onClick={() => fetchInventoryData()}
+              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
             >
-              RAM
-              {sortField === 'ram' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('storage')}
-              style={{ width: '7%' }}
-            >
-              Storage
-              {sortField === 'storage' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('color')}
-              style={{ width: '12%' }}
-            >
-              Color
-              {sortField === 'color' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('imei1')}
-              style={{ width: '15%' }}
-            >
-              IMEI1
-              {sortField === 'imei1' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('barcode')}
-              style={{ width: '15%' }}
-            >
-              Barcode
-              {sortField === 'barcode' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            {/* NEW: Added Retail Price column */}
-            <th 
-              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('retailPrice')}
-              style={{ width: '10%' }}
-            >
-              Price
-              {sortField === 'retailPrice' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('lastUpdated')}
-              style={{ width: '8%' }}
-            >
-              Date
-              {sortField === 'lastUpdated' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th 
-              className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
-              onClick={() => handleSort('status')}
-              style={{ width: '8%' }}
-            >
-              Status
-              {sortField === 'status' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '6%' }}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedInventoryItems.map((item) => (
-            editingItemId === item.id ? (
-              <InventoryEditForm 
-                key={item.id}
-                itemId={item.id}
-                editFormData={editFormData}
-                handleEditInputChange={handleEditInputChange}
-                handleSaveEdit={handleSaveEdit}
-                handleCancelEdit={handleCancelEdit}
-                savingItemId={savingItemId}
-              />
-            ) : (
-             <InventoryRow 
-                key={item.id}
-                item={item}
-                handleEditClick={handleEditClick}
-                handleDeleteClick={handleDeleteClick}
-                handleEditDetailsClick={handleEditDetailsClick}
-              />
-            )
-          ))}
-        </tbody>
-      </table>
+              <RefreshCw className="h-5 w-5 mr-1" />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </CardHeader>
 
-      {/* Delete confirmation modal */}
-      <DeleteConfirmationModal
-        isOpen={isDeleteModalOpen}
-        itemToDelete={itemToDelete}
-        onCancel={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-        isDeleting={isDeleting}
-      />
+        <CardContent className="p-4">
+          {/* Filters panel */}
+          {showFilters && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
+                <button 
+                  onClick={clearFilters}
+                  className="text-gray-500 hover:text-red-500 flex items-center"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear Filters
+                </button>
+              </div>
+              
+              <InventoryFilters 
+                filters={filters}
+                pendingFilters={pendingFilters}
+                filterOptions={filterOptions}
+                handleFilterChange={handleFilterChange}
+                allItems={allItems}
+              />
+            </div>
+          )}
+          {/* Inventory Summary Section */}
+          {!initialLoad && inventoryItems.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Inventory Summary</h3>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Item Count - 25% */}
+                <div className="w-full md:w-[25%] bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 font-medium">Item Count</p>
+                      <p className="text-xs text-gray-500">Total inventory items</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-blue-600">
+                        {inventoryItems.length.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {inventoryItems.length === 1 ? 'item' : 'items'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Total Value - 30% */}
+                <div className="w-full md:w-[30%] bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 font-medium">Total Value</p>
+                      <p className="text-xs text-gray-500">Combined retail price</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-green-600">
+                        ₱{(() => {
+                          const totalValue = inventoryItems.reduce((total, item) => {
+                            return total + (item.retailPrice || 0);
+                          }, 0);
+                          return totalValue.toLocaleString('en-US', { 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 2 
+                          });
+                        })()}
+                      </p>
+                      <p className="text-xs text-gray-500">retail value</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Status Breakdown - 45% */}
+                <div className="w-full md:w-[45%] bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                  <div className="flex items-start">
+                    <div className="mr-4">
+                      <p className="text-sm text-gray-600 font-medium">Status Breakdown</p>
+                      <p className="text-xs text-gray-500">Items by status</p>
+                    </div>
+                    <div className="flex flex-wrap gap-3 items-center">
+                      {(() => {
+                        const statusCounts = inventoryItems.reduce((counts, item) => {
+                          const status = item.status || 'Unknown';
+                          counts[status] = (counts[status] || 0) + 1;
+                          return counts;
+                        }, {});
+                        
+                        // Define order and display names
+                        const statusOrder = [
+                          { key: 'On-Hand', display: 'Stock' },
+                          { key: 'On-Display', display: 'Display' },
+                          { key: 'Sold', display: 'Sold' },
+                          { key: 'Reserved', display: 'Reserved' },
+                          { key: 'Defective', display: 'Defective' }
+                        ];
+                        
+                        return statusOrder
+                          .filter(status => statusCounts[status.key] > 0)
+                          .map((status) => (
+                            <div key={status.key} className="flex items-center">
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                status.key === 'On-Hand' ? 'bg-blue-100 text-blue-700' :
+                                status.key === 'On-Display' ? 'bg-yellow-100 text-yellow-700' :
+                                status.key === 'Sold' ? 'bg-purple-100 text-purple-700' :
+                                status.key === 'Reserved' ? 'bg-orange-100 text-orange-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {status.display}
+                              </span>
+                              <span className="font-semibold text-gray-700 ml-1">
+                                {statusCounts[status.key]}
+                              </span>
+                            </div>
+                          ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            {initialLoad ? (
+              <div className="text-center py-12">
+                <p className="text-lg mb-4">Use the search button to load inventory items</p>
+                <p className="text-sm text-gray-500 mb-6">You can apply filters before searching or search all items</p>
+                <button
+                  onClick={handleSearch}
+                  className="bg-[rgb(52,69,157)] text-white px-6 py-2 rounded-md flex items-center mx-auto"
+                >
+                  <Search className="h-5 w-5 mr-2" />
+                  Search All Inventory
+                </button>
+              </div>
+            ) : inventoryItems.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-gray-500">No inventory items match your filters</p>
+                <button
+                  onClick={clearFilters}
+                  className="mt-4 text-blue-600 hover:text-blue-800 underline"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            ) : (
+              <InventoryTable 
+                inventoryItems={inventoryItems}
+                allItems={allItems}
+                setAllItems={setAllItems}
+                setInventoryItems={setInventoryItems}
+                loading={loading}
+                error={error}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                handleSort={handleSort}
+                applyFilters={applyFilters}
+              />
+            )}
+          </div>
+          <div className="overflow-x-auto"></div>
+          {/* Show loading state */}
+          {loading && (
+            <div className="text-center py-4">
+              <RefreshCw className="h-6 w-6 animate-spin mx-auto text-[rgb(52,69,157)]" />
+              <p className="text-gray-600 mt-2">Loading inventory items...</p>
+            </div>
+          )}
+          
+          {/* Show error state */}
+          {error && (
+            <div className="text-center py-4 text-red-600">
+              <p>{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  fetchInventoryData();
+                }}
+                className="mt-2 text-blue-600 hover:text-blue-800 underline"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
-InventoryTable.propTypes = {
-  inventoryItems: PropTypes.array.isRequired,
-  handleSort: PropTypes.func.isRequired,
-  sortField: PropTypes.string.isRequired,
-  sortDirection: PropTypes.string.isRequired,
-  allItems: PropTypes.array.isRequired,
-  setAllItems: PropTypes.func.isRequired,
-  setInventoryItems: PropTypes.func.isRequired,
-  applyFilters: PropTypes.func.isRequired
-};
-
-export default InventoryTable;
+export default InventoryListForm;
+{/* Part 6 End - Main Component JSX */}
 </file>
 
 <file path="src/components/InventorySummaryForm.jsx">
@@ -9661,7 +9229,615 @@ export default InventorySummaryForm;
 {/* Part 6 End - Inventory Value Summary and Footer */}
 </file>
 
+<file path="src/context/GlobalStateContext.jsx">
+{/* Part 1 Start - Imports and Context Creation */}
+// src/context/GlobalStateContext.jsx
+import PropTypes from 'prop-types';
+import { createContext, useState, useContext } from 'react';
+
+// Create context
+export const GlobalStateContext = createContext();
+
+// Custom hook for easier context usage
+export const useGlobalState = () => useContext(GlobalStateContext);
+{/* Part 1 End - Imports and Context Creation */}
+
+{/* Part 2 Start - GlobalStateProvider Component */}
+// Create provider
+export const GlobalStateProvider = ({ children }) => {
+  // ====== STATE DEFINITIONS ======
+  const [phoneToEdit, setPhoneToEdit] = useState(null);
+  const [procurementToEdit, setProcurementToEdit] = useState(null);
+  const [inventoryItemToEdit, setInventoryItemToEdit] = useState(null); // NEW: State for inventory editing
+  const [activeComponent, setActiveComponent] = useState('summary');
+  const [isViewingProcurement, setIsViewingProcurement] = useState(false); // Track view vs edit mode
+  const [procurementMode, setProcurementMode] = useState(''); // NEW: Track procurement mode ('view', 'edit', 'payment')
+  
+  // ====== PHONE EDITING FUNCTIONS ======
+  // Function to set a phone for editing and switch to form
+  const editPhone = (phone) => {
+    setPhoneToEdit(phone);
+    setActiveComponent('form');
+  };
+  
+  // Function to clear the selected phone
+  const clearPhoneToEdit = () => {
+    setPhoneToEdit(null);
+  };
+  
+  // ====== INVENTORY EDITING FUNCTIONS - NEW ======
+  // Function to set an inventory item for editing and switch to selection form
+  const editInventoryItem = (item) => {
+    setInventoryItemToEdit(item);
+    setActiveComponent('selection');
+  };
+  
+  // Function to clear the selected inventory item
+  const clearInventoryItemToEdit = () => {
+    setInventoryItemToEdit(null);
+  };
+  
+  // ====== PROCUREMENT EDITING FUNCTIONS ======
+  // Function to set a procurement for editing and switch to procurement form
+  const editProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(false); // Set to edit mode
+    setProcurementMode('edit'); // NEW: Set mode to edit
+    setActiveComponent('procurement');
+  };
+  
+  // Function to set a procurement for viewing (read-only)
+  const viewProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(true); // Set to view mode
+    setProcurementMode('view'); // NEW: Set mode to view
+    setActiveComponent('procurement');
+  };
+  
+  // NEW: Function to set a procurement for payment entry
+  const paymentProcurement = (procurement) => {
+    setProcurementToEdit(procurement);
+    setIsViewingProcurement(false); // Not in pure view mode
+    setProcurementMode('payment'); // Set mode to payment
+    setActiveComponent('procurement');
+  };
+  
+  // Function to clear the selected procurement
+  const clearProcurementToEdit = () => {
+    setProcurementToEdit(null);
+    setIsViewingProcurement(false); // Reset view mode
+    setProcurementMode(''); // NEW: Reset mode
+  };
+  
+  // ====== CONTEXT VALUE OBJECT ======
+  // Create a value object with all the state and functions
+  const contextValue = {
+    phoneToEdit,
+    editPhone,
+    clearPhoneToEdit,
+    inventoryItemToEdit, // NEW: Add inventory item state
+    editInventoryItem, // NEW: Add inventory edit function
+    clearInventoryItemToEdit, // NEW: Add inventory clear function
+    procurementToEdit,
+    editProcurement,
+    viewProcurement,
+    paymentProcurement, // NEW: Add payment function
+    clearProcurementToEdit,
+    isViewingProcurement,
+    procurementMode, // NEW: Add procurement mode state
+    activeComponent,
+    setActiveComponent
+  };
+  
+  return (
+    <GlobalStateContext.Provider value={contextValue}>
+      {children}
+    </GlobalStateContext.Provider>
+  );
+};
+
+// Add prop types for validation
+GlobalStateProvider.propTypes = {
+  children: PropTypes.node.isRequired
+};
+{/* Part 2 End - GlobalStateProvider Component */}
+
+{/* Part 3 Start - Export Default Hook */}
+// Also provide a default export for the hook for backward compatibility
+export default useGlobalState;
+{/* Part 3 End - Export Default Hook */}
+</file>
+
+<file path="src/components/inventory/InventoryTable.jsx">
+{/* Part 1 Start - Imports */}
+import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
+import { useState } from 'react';
+import PropTypes from 'prop-types';
+import { doc, updateDoc, runTransaction, increment, deleteDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import InventoryRow from './InventoryRow';
+import InventoryEditForm from './InventoryEditForm';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+// Import getCurrentDate utility function
+import { getCurrentDate } from '../phone-selection/utils/phoneUtils';
+{/* Part 1 End - Imports */}
+
+{/* Part 2 Start - Component Definition */}
+const InventoryTable = ({ 
+  inventoryItems, 
+  handleSort, 
+  sortField, 
+  sortDirection, 
+  allItems,
+  setAllItems,
+  setInventoryItems,
+  applyFilters
+}) => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - State Management */}
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: '',
+    color: '',
+    imei1: '',
+    barcode: '',
+    status: '',
+    retailPrice: 0 // NEW: Added retailPrice to initial state
+  });
+  const [savingItemId, setSavingItemId] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  // Get global state function for editing inventory items
+  const { editInventoryItem } = useGlobalState(); // NEW: Get edit function from context
+  {/* Part 3 End - State Management */}
+
+  {/* Part 4 Start - Event Handlers */}
+  
+  {/* Edit Handlers Section */}
+  // NEW: Handle edit details click
+  const handleEditDetailsClick = (item) => {
+    editInventoryItem(item);
+  };
+  // Handle edit button click
+  const handleEditClick = (item) => {
+    // If we're already editing, cancel it first
+    if (editingItemId) {
+      setEditingItemId(null);
+    }
+    
+    // Set the item to edit
+    setEditingItemId(item.id);
+    
+    // Populate form with item data
+    setEditFormData({
+      manufacturer: item.manufacturer,
+      model: item.model,
+      ram: item.ram,
+      storage: item.storage,
+      color: item.color,
+      imei1: item.imei1,
+      barcode: item.barcode || '',
+      status: item.status,
+      retailPrice: item.retailPrice // NEW: Added retailPrice to edit form data
+    });
+  };
+
+  {/* Delete Handlers Section */}
+  // Handle delete button click
+  const handleDeleteClick = (itemId) => {
+    const item = allItems.find(item => item.id === itemId);
+    if (item) {
+      setItemToDelete(item);
+      setIsDeleteModalOpen(true);
+    }
+  };
+
+  // Handle delete confirmation - PRESERVED: Original working delete logic
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Get a reference to the document
+      const itemRef = doc(db, 'inventory', itemToDelete.id);
+      
+      // Delete the document
+      await deleteDoc(itemRef);
+      
+      // Update inventory counts
+      const inventoryId = `${itemToDelete.manufacturer}_${itemToDelete.model}_${itemToDelete.ram}_${itemToDelete.storage}_${itemToDelete.color}`.replace(/\s+/g, '_').toLowerCase();
+      
+      // Reference to the inventory count doc
+      const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+      
+      // Update inventory counts based on the item's status
+      await runTransaction(db, async (transaction) => {
+        const inventoryDoc = await transaction.get(inventoryRef);
+        
+        if (inventoryDoc.exists()) {
+          // Determine which field to decrement based on status
+          const decrementField = 
+            itemToDelete.status === 'On-Hand' ? 'onHand' : 
+            itemToDelete.status === 'On-Display' ? 'onDisplay' : 
+            itemToDelete.status === 'Sold' ? 'sold' : 
+            itemToDelete.status === 'Reserved' ? 'reserved' : 
+            'defective';
+          
+          // Decrement total and status count
+          transaction.update(inventoryRef, {
+            total: increment(-1),
+            [decrementField]: increment(-1),
+            lastUpdated: new Date().toLocaleDateString()
+          });
+        }
+      });
+      
+      // Update local state by removing the deleted item
+      const updatedItems = allItems.filter(item => item.id !== itemToDelete.id);
+      setAllItems(updatedItems);
+      
+      // Re-apply filters
+      const filteredItems = applyFilters(updatedItems);
+      setInventoryItems(filteredItems);
+      
+      // Close the modal and reset state
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+      setIsDeleting(false);
+      
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      alert(`Error deleting item: ${error.message}`);
+      setIsDeleting(false);
+    }
+  };
+
+  // Handle cancel delete
+  const handleDeleteCancel = () => {
+    setIsDeleteModalOpen(false);
+    setItemToDelete(null);
+  };
+
+  {/* Edit Form Handlers Section */}
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditFormData({
+      manufacturer: '',
+      model: '',
+      ram: '',
+      storage: '',
+      color: '',
+      imei1: '',
+      barcode: '',
+      status: '',
+      retailPrice: 0 // NEW: Added retailPrice to reset state
+    });
+  };
+
+  // Handle edit form input changes
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle save edits - includes lastUpdated
+  const handleSaveEdit = async (id) => {
+    setSavingItemId(id);
+    
+    try {
+      // Create an update object with the edited fields
+      const updateData = {
+        manufacturer: editFormData.manufacturer,
+        model: editFormData.model,
+        ram: editFormData.ram,
+        storage: editFormData.storage,
+        color: editFormData.color,
+        imei1: editFormData.imei1,
+        barcode: editFormData.barcode,
+        status: editFormData.status,
+        lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
+      };
+      
+      // Get a reference to the document
+      const itemRef = doc(db, 'inventory', id);
+      
+      // Update the document
+      await updateDoc(itemRef, updateData);
+      
+      // If the status was changed, update the inventory counts
+      const originalItem = allItems.find(item => item.id === id);
+      if (originalItem && originalItem.status !== editFormData.status) {
+        // Create a unique ID for this inventory item type
+        const inventoryId = `${editFormData.manufacturer}_${editFormData.model}_${editFormData.ram}_${editFormData.storage}_${editFormData.color}`.replace(/\s+/g, '_').toLowerCase();
+        
+        // Reference to the inventory count doc
+        const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+        
+        // Run as a transaction to ensure data consistency
+        await runTransaction(db, async (transaction) => {
+          const inventoryDoc = await transaction.get(inventoryRef);
+          
+          if (inventoryDoc.exists()) {
+            // Decrement the old status count
+            const decrementField = 
+              originalItem.status === 'On-Hand' ? 'onHand' : 
+              originalItem.status === 'On-Display' ? 'onDisplay' : 
+              originalItem.status === 'Sold' ? 'sold' : 
+              originalItem.status === 'Reserved' ? 'reserved' : 
+              'defective';
+            
+            // Increment the new status count
+            const incrementField = 
+              editFormData.status === 'On-Hand' ? 'onHand' : 
+              editFormData.status === 'On-Display' ? 'onDisplay' : 
+              editFormData.status === 'Sold' ? 'sold' : 
+              editFormData.status === 'Reserved' ? 'reserved' : 
+              'defective';
+            
+            // Update counters
+            transaction.update(inventoryRef, {
+              [decrementField]: increment(-1),
+              [incrementField]: increment(1),
+              lastUpdated: new Date().toLocaleDateString()
+            });
+          }
+        });
+      }
+      
+      // Update local state - includes lastUpdated
+      setAllItems(prevItems => 
+        prevItems.map(item => 
+          item.id === id 
+            ? { 
+                ...item, 
+                ...updateData,
+                // Keep original prices since we're not editing them
+                dealersPrice: item.dealersPrice,
+                retailPrice: item.retailPrice
+              } 
+            : item
+        )
+      );
+      
+      // Reset editing state
+      setEditingItemId(null);
+      setSavingItemId(null);
+      
+      // Re-apply filters to update the displayed inventory items - includes lastUpdated
+      const updatedItems = allItems.map(item => 
+        item.id === id 
+          ? { 
+              ...item, 
+              ...updateData,
+              // Keep original prices since we're not editing them
+              dealersPrice: item.dealersPrice,
+              retailPrice: item.retailPrice
+            } 
+          : item
+      );
+      const filteredItems = applyFilters(updatedItems);
+      setInventoryItems(filteredItems);
+      
+    } catch (error) {
+      console.error("Error updating item:", error);
+      alert(`Error updating item: ${error.message}`);
+      setSavingItemId(null);
+    }
+  };
+  {/* Part 4 End - Event Handlers */}
+  
+  {/* Part 5 Start - Sorting Logic */}
+  // UPDATED: Enhanced sorting logic for new sortable columns
+  const sortedInventoryItems = [...inventoryItems].sort((a, b) => {
+    // Handle numeric fields
+    if (sortField === 'retailPrice') {
+      if (sortDirection === 'asc') {
+        return a.retailPrice - b.retailPrice;
+      } else {
+        return b.retailPrice - a.retailPrice;
+      }
+    }
+    
+    // Handle date field (lastUpdated)
+    if (sortField === 'lastUpdated') {
+      const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
+      const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
+      
+      if (sortDirection === 'asc') {
+        return dateA - dateB;
+      } else {
+        return dateB - dateA;
+      }
+    }
+    
+    // Handle string fields
+    if (sortDirection === 'asc') {
+      return a[sortField]?.localeCompare(b[sortField] || '');
+    } else {
+      return b[sortField]?.localeCompare(a[sortField] || '');
+    }
+  });
+  {/* Part 5 End - Sorting Logic */}
+
+  {/* Part 6 Start - Component Render */}
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-base">
+        <thead>
+          <tr className="bg-gray-100">
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('manufacturer')}
+              style={{ width: '12%' }}
+            >
+              Manufacturer
+              {sortField === 'manufacturer' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('model')}
+              style={{ width: '12%' }}
+            >
+              Model
+              {sortField === 'model' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('ram')}
+              style={{ width: '7%' }}
+            >
+              RAM
+              {sortField === 'ram' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('storage')}
+              style={{ width: '7%' }}
+            >
+              Storage
+              {sortField === 'storage' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('color')}
+              style={{ width: '12%' }}
+            >
+              Color
+              {sortField === 'color' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('imei1')}
+              style={{ width: '15%' }}
+            >
+              IMEI1
+              {sortField === 'imei1' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('barcode')}
+              style={{ width: '15%' }}
+            >
+              Barcode
+              {sortField === 'barcode' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            {/* NEW: Added Retail Price column */}
+            <th 
+              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('retailPrice')}
+              style={{ width: '10%' }}
+            >
+              Price
+              {sortField === 'retailPrice' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('lastUpdated')}
+              style={{ width: '8%' }}
+            >
+              Date
+              {sortField === 'lastUpdated' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th 
+              className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('status')}
+              style={{ width: '8%' }}
+            >
+              Status
+              {sortField === 'status' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            <th className="border px-2 py-3 text-center font-semibold" style={{ width: '6%' }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedInventoryItems.map((item) => (
+            editingItemId === item.id ? (
+              <InventoryEditForm 
+                key={item.id}
+                itemId={item.id}
+                editFormData={editFormData}
+                handleEditInputChange={handleEditInputChange}
+                handleSaveEdit={handleSaveEdit}
+                handleCancelEdit={handleCancelEdit}
+                savingItemId={savingItemId}
+              />
+            ) : (
+             <InventoryRow 
+                key={item.id}
+                item={item}
+                handleEditClick={handleEditClick}
+                handleDeleteClick={handleDeleteClick}
+                handleEditDetailsClick={handleEditDetailsClick}
+              />
+            )
+          ))}
+        </tbody>
+      </table>
+
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        itemToDelete={itemToDelete}
+        onCancel={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+      />
+    </div>
+  );
+};
+{/* Part 6 End - Component Render */}
+
+{/* Part 7 Start - PropTypes Definition */}
+InventoryTable.propTypes = {
+  inventoryItems: PropTypes.array.isRequired,
+  handleSort: PropTypes.func.isRequired,
+  sortField: PropTypes.string.isRequired,
+  sortDirection: PropTypes.string.isRequired,
+  allItems: PropTypes.array.isRequired,
+  setAllItems: PropTypes.func.isRequired,
+  setInventoryItems: PropTypes.func.isRequired,
+  applyFilters: PropTypes.func.isRequired
+};
+{/* Part 7 End - PropTypes Definition */}
+
+{/* Part 8 Start - Export */}
+export default InventoryTable;
+{/* Part 8 End - Export */}
+</file>
+
 <file path="src/components/phone-selection/PhoneSelectionForm.jsx">
+{/* Part 1 Start - Imports and Dependencies */}
 import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
 import { updatePhoneInInventory } from './services/inventoryService'; // NEW: Import update function
 import { useState, useEffect, useRef } from 'react';
@@ -9686,8 +9862,9 @@ import {
   addPhoneToInventory 
 } from './services/inventoryService';
 import { Search, ArrowRight, CircleAlert } from 'lucide-react';
+{/* Part 1 End - Imports and Dependencies */}
 
-{/* Part 1 Start - State Definitions */}
+{/* Part 2 Start - Component and State Definitions */}
 const PhoneSelectionForm = () => {
   // Get inventory item to edit from global state
   const { inventoryItemToEdit, clearInventoryItemToEdit } = useGlobalState(); // NEW: Get inventory edit state
@@ -9757,8 +9934,9 @@ const PhoneSelectionForm = () => {
   const [imei2Error, setImei2Error] = useState('');
   const [lastUpdated, setLastUpdated] = useState(getCurrentDate());
   const [userEnteredBarcode, setUserEnteredBarcode] = useState(false);
-{/* Part 1 End - State Definitions */}
+{/* Part 2 End - Component and State Definitions */}
 
+{/* Part 3 Start - Event Handlers */}
   // ====== EVENT HANDLERS ======
   // Event handlers for form inputs
   const handleManufacturerChange = (e) => {
@@ -10076,8 +10254,9 @@ const PhoneSelectionForm = () => {
       alert(`Error ${isEditMode ? 'updating' : 'saving'} phone details. Please try again.`);
     }
   };
-  
+{/* Part 3 End - Event Handlers */}
 
+{/* Part 4 Start - Effect Hooks */}
   // ====== EFFECT HOOKS ======
   // Fetch manufacturers on component mount
   useEffect(() => {
@@ -10268,7 +10447,9 @@ const PhoneSelectionForm = () => {
       }
     };
   }, [isEditMode, clearInventoryItemToEdit]);
+{/* Part 4 End - Effect Hooks */}
 
+{/* Part 5 Start - Component Render */}
   // Show loading state for initial load
   if ((loading || optionsLoading) && manufacturers.length === 0) {
     return (
@@ -10444,6 +10625,7 @@ const PhoneSelectionForm = () => {
     </div>
   );
 };
+{/* Part 5 End - Component Render */}
 
 export default PhoneSelectionForm;
 </file>

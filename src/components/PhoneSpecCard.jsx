@@ -1,9 +1,15 @@
+{/* Part 1 Start - Imports */}
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Battery, Camera, Cpu, Monitor, Palette } from 'lucide-react';
 import PropTypes from 'prop-types';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneSpecCard = () => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - Static Data */}
   const phoneData = {
     manufacturer: "Samsung",
     model: "Galaxy S25 Ultra",
@@ -24,7 +30,9 @@ const PhoneSpecCard = () => {
     wirelessCharging: "25W",
     colors: ["Titanium Silver Blue", "Titanium Black", "Titanium White Silver", "Titanium Gray"]
   };
+  {/* Part 3 End - Static Data */}
 
+  {/* Part 4 Start - Sub-component Definition */}
   const SpecRow = ({ label, value }) => (
     <div className="flex items-center py-0.5">
       <p className="text-[rgb(52,69,157)] w-40 text-base">{label}:</p>
@@ -36,7 +44,9 @@ const PhoneSpecCard = () => {
     label: PropTypes.string.isRequired,
     value: PropTypes.string.isRequired
   };
+  {/* Part 4 End - Sub-component Definition */}
 
+  {/* Part 5 Start - Component Render */}
   return (
     <div className="min-h-screen bg-white p-4">
       <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
@@ -131,5 +141,8 @@ const PhoneSpecCard = () => {
     </div>
   );
 };
+{/* Part 5 End - Component Render */}
 
+{/* Part 6 Start - Export */}
 export default PhoneSpecCard;
+{/* Part 6 End - Export */}

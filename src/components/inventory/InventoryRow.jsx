@@ -1,12 +1,18 @@
+{/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
 import { Edit, Trash2, FileEdit } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const InventoryRow = ({
   item,
   handleEditClick,
   handleDeleteClick,
   handleEditDetailsClick // NEW: Add handler for edit details
 }) => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - Helper Functions */}
   // Helper function to get status display
   const getStatusDisplay = (status) => {
     const statusMap = {
@@ -23,7 +29,9 @@ const InventoryRow = ({
   const formatPrice = (price) => {
     return `₱${(price || 0).toLocaleString()}`;
   };
+  {/* Part 3 End - Helper Functions */}
   
+  {/* Part 4 Start - Component Render */}
   return (
     <tr className="hover:bg-gray-50">
       <td className="border px-2 py-3 whitespace-nowrap text-sm font-medium">{item.manufacturer}</td>
@@ -80,7 +88,9 @@ const InventoryRow = ({
     </tr>
   );
 };
+{/* Part 4 End - Component Render */}
 
+{/* Part 5 Start - PropTypes Definition */}
 InventoryRow.propTypes = {
   item: PropTypes.shape({
     id: PropTypes.string.isRequired,
@@ -99,5 +109,8 @@ InventoryRow.propTypes = {
   handleDeleteClick: PropTypes.func.isRequired,
   handleEditDetailsClick: PropTypes.func.isRequired // NEW: Add prop type
 };
+{/* Part 5 End - PropTypes Definition */}
 
+{/* Part 6 Start - Export */}
 export default InventoryRow;
+{/* Part 6 End - Export */}

@@ -1,8 +1,11 @@
+{/* Part 1 Start - Imports and Dependencies */}
 import PropTypes from 'prop-types';
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+{/* Part 1 End - Imports and Dependencies */}
 
+{/* Part 2 Start - Component Definition */}
 const InventoryFilters = ({ 
   filters, 
   pendingFilters, 
@@ -10,6 +13,9 @@ const InventoryFilters = ({
   handleFilterChange,
   allItems
 }) => {
+{/* Part 2 End - Component Definition */}
+
+{/* Part 3 Start - State Definitions */}
   // State for filtered options based on selections
   const [filteredModels, setFilteredModels] = useState([]);
   const [filteredRams, setFilteredRams] = useState([]);
@@ -21,7 +27,9 @@ const InventoryFilters = ({
   const [isLoadingRams, setIsLoadingRams] = useState(false);
   const [isLoadingStorages, setIsLoadingStorages] = useState(false);
   const [isLoadingColors, setIsLoadingColors] = useState(false);
+{/* Part 3 End - State Definitions */}
 
+{/* Part 4 Start - Data Loading Functions */}
   // Load models for selected manufacturer from database
   const loadModelsForManufacturer = async (manufacturer) => {
     if (!manufacturer) return;
@@ -151,7 +159,9 @@ const InventoryFilters = ({
       setIsLoadingColors(false);
     }
   };
+{/* Part 4 End - Data Loading Functions */}
 
+{/* Part 5 Start - Effect Hooks */}
   // Update models when manufacturer changes
   useEffect(() => {
     if (filters.manufacturer) {
@@ -295,7 +305,9 @@ const InventoryFilters = ({
     allItems, 
     filterOptions.colors
   ]);
+{/* Part 5 End - Effect Hooks */}
 
+{/* Part 6 Start - Component Render */}
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* Manufacturer filter */}
@@ -567,7 +579,9 @@ const InventoryFilters = ({
     </div>
   );
 };
+{/* Part 6 End - Component Render */}
 
+{/* Part 7 Start - PropTypes Validation */}
 InventoryFilters.propTypes = {
   filters: PropTypes.object.isRequired,
   pendingFilters: PropTypes.object.isRequired,
@@ -575,5 +589,8 @@ InventoryFilters.propTypes = {
   handleFilterChange: PropTypes.func.isRequired,
   allItems: PropTypes.array.isRequired
 };
+{/* Part 7 End - PropTypes Validation */}
 
+{/* Part 8 Start - Export */}
 export default InventoryFilters;
+{/* Part 8 End - Export */}

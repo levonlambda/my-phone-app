@@ -1,6 +1,9 @@
+{/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
 import { RefreshCw, Save, XCircle } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const InventoryEditForm = ({ 
   editFormData, 
   handleEditInputChange, 
@@ -9,12 +12,17 @@ const InventoryEditForm = ({
   itemId, 
   savingItemId 
 }) => {
+{/* Part 2 End - Component Definition */}
+
+  {/* Part 3 Start - Helper Functions */}
   // NEW: Function to format price with currency - read-only display
   const formatPrice = (price) => {
     if (!price && price !== 0) return '-';
     return `₱${price.toLocaleString()}`;
   };
+  {/* Part 3 End - Helper Functions */}
 
+  {/* Part 4 Start - Component Render */}
   return (
     <tr className="hover:bg-gray-50">
       <td className="border px-2 py-3 whitespace-nowrap">
@@ -129,7 +137,9 @@ const InventoryEditForm = ({
     </tr>
   );
 };
+{/* Part 4 End - Component Render */}
 
+{/* Part 5 Start - PropTypes Definition */}
 InventoryEditForm.propTypes = {
   editFormData: PropTypes.object.isRequired,
   handleEditInputChange: PropTypes.func.isRequired,
@@ -138,5 +148,8 @@ InventoryEditForm.propTypes = {
   itemId: PropTypes.string.isRequired,
   savingItemId: PropTypes.string
 };
+{/* Part 5 End - PropTypes Definition */}
 
+{/* Part 6 Start - Export */}
 export default InventoryEditForm;
+{/* Part 6 End - Export */}

@@ -1,9 +1,17 @@
+{/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
 import { X, Monitor, Cpu, Camera, Battery, Palette } from 'lucide-react';
+{/* Part 1 End - Imports */}
 
+{/* Part 2 Start - Component Definition */}
 const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
-  if (!isOpen || !phone) return null;
+{/* Part 2 End - Component Definition */}
 
+  {/* Part 3 Start - Early Return */}
+  if (!isOpen || !phone) return null;
+  {/* Part 3 End - Early Return */}
+
+  {/* Part 4 Start - Sub-component Definition */}
   const SpecRow = ({ label, value }) => (
     <div className="flex items-center py-0.5">
       <p className="text-[rgb(52,69,157)] w-36 text-sm">{label}:</p>
@@ -15,12 +23,16 @@ const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
     label: PropTypes.string.isRequired,
     value: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
   };
+  {/* Part 4 End - Sub-component Definition */}
 
+  {/* Part 5 Start - Helper Functions */}
   const formatArray = (arr) => {
     if (!arr || !Array.isArray(arr)) return '-';
     return arr.join(', ');
   };
+  {/* Part 5 End - Helper Functions */}
 
+  {/* Part 6 Start - Component Render */}
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -135,11 +147,16 @@ const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
     </div>
   );
 };
+{/* Part 6 End - Component Render */}
 
+{/* Part 7 Start - PropTypes Definition */}
 PhoneDetailModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   phone: PropTypes.object,
   onClose: PropTypes.func.isRequired
 };
+{/* Part 7 End - PropTypes Definition */}
 
+{/* Part 8 Start - Export */}
 export default PhoneDetailModal;
+{/* Part 8 End - Export */}

@@ -1,3 +1,4 @@
+{/* Part 1 Start - Imports and Dependencies */}
 import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
 import { updatePhoneInInventory } from './services/inventoryService'; // NEW: Import update function
 import { useState, useEffect, useRef } from 'react';
@@ -22,8 +23,9 @@ import {
   addPhoneToInventory 
 } from './services/inventoryService';
 import { Search, ArrowRight, CircleAlert } from 'lucide-react';
+{/* Part 1 End - Imports and Dependencies */}
 
-{/* Part 1 Start - State Definitions */}
+{/* Part 2 Start - Component and State Definitions */}
 const PhoneSelectionForm = () => {
   // Get inventory item to edit from global state
   const { inventoryItemToEdit, clearInventoryItemToEdit } = useGlobalState(); // NEW: Get inventory edit state
@@ -93,8 +95,9 @@ const PhoneSelectionForm = () => {
   const [imei2Error, setImei2Error] = useState('');
   const [lastUpdated, setLastUpdated] = useState(getCurrentDate());
   const [userEnteredBarcode, setUserEnteredBarcode] = useState(false);
-{/* Part 1 End - State Definitions */}
+{/* Part 2 End - Component and State Definitions */}
 
+{/* Part 3 Start - Event Handlers */}
   // ====== EVENT HANDLERS ======
   // Event handlers for form inputs
   const handleManufacturerChange = (e) => {
@@ -412,8 +415,9 @@ const PhoneSelectionForm = () => {
       alert(`Error ${isEditMode ? 'updating' : 'saving'} phone details. Please try again.`);
     }
   };
-  
+{/* Part 3 End - Event Handlers */}
 
+{/* Part 4 Start - Effect Hooks */}
   // ====== EFFECT HOOKS ======
   // Fetch manufacturers on component mount
   useEffect(() => {
@@ -604,7 +608,9 @@ const PhoneSelectionForm = () => {
       }
     };
   }, [isEditMode, clearInventoryItemToEdit]);
+{/* Part 4 End - Effect Hooks */}
 
+{/* Part 5 Start - Component Render */}
   // Show loading state for initial load
   if ((loading || optionsLoading) && manufacturers.length === 0) {
     return (
@@ -780,5 +786,6 @@ const PhoneSelectionForm = () => {
     </div>
   );
 };
+{/* Part 5 End - Component Render */}
 
 export default PhoneSelectionForm;
