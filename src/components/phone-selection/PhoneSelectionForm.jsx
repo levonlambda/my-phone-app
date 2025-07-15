@@ -22,6 +22,7 @@ import {
   checkDuplicateImeis, 
   addPhoneToInventory 
 } from './services/inventoryService';
+import supplierService from '../../services/supplierService'; // NEW: Import supplier service
 import { Search, ArrowRight, CircleAlert } from 'lucide-react';
 {/* Part 1 End - Imports and Dependencies */}
 
@@ -75,6 +76,9 @@ const PhoneSelectionForm = () => {
   const [imei2, setImei2] = useState('');
   const [barcode, setBarcode] = useState('');
   const [serialNumber, setSerialNumber] = useState(''); // NEW: Added serial number state
+  const [location, setLocation] = useState(''); // NEW: Added location state
+  const [supplier, setSupplier] = useState(''); // NEW: Added supplier state
+  const [suppliers, setSuppliers] = useState([]); // NEW: Added suppliers array state
   const [dealersPrice, setDealersPrice] = useState('');
   const [retailPrice, setRetailPrice] = useState('');
   const [status, setStatus] = useState('On-Hand');
@@ -168,6 +172,16 @@ const PhoneSelectionForm = () => {
     const newSerialNumber = e.target.value.toUpperCase();
     console.log('Serial number changing to:', newSerialNumber); // ADD THIS
     setSerialNumber(newSerialNumber);
+  };
+
+  const handleLocationChange = (e) => {
+    const newLocation = e.target.value;
+    setLocation(newLocation);
+  };
+
+  const handleSupplierChange = (e) => {
+    const newSupplier = e.target.value;
+    setSupplier(newSupplier);
   };
 
   const handleBarcodeSearchChange = (e) => {
@@ -298,10 +312,10 @@ const PhoneSelectionForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Basic form validation
+    // Basic form validation - UPDATED to include location and supplier
     if (!selectedManufacturer || !selectedModel || !selectedRam || 
         !selectedStorage || !selectedColor || !imei1 || !barcode || 
-        !dealersPrice || !retailPrice) {
+        !dealersPrice || !retailPrice || !location || !supplier) {
       alert('Please fill in all required fields');
       return;
     }
@@ -342,6 +356,8 @@ const PhoneSelectionForm = () => {
       imei2,
       barcode,
       serialNumber, // NEW: Added serial number to phone data
+      location, // NEW: Added location to phone data
+      supplier, // NEW: Added supplier to phone data
       dealersPrice: dPrice,
       retailPrice: rPrice,
       status,
@@ -392,6 +408,8 @@ const PhoneSelectionForm = () => {
       setImei1('');
       setImei2('');
       setSerialNumber(''); // NEW: Reset serial number after submission
+      setLocation(''); // NEW: Reset location after submission
+      setSupplier(''); // NEW: Reset supplier after submission
       setStatus('On-Hand');
       
       // Clear edit mode
@@ -440,6 +458,24 @@ const PhoneSelectionForm = () => {
       initializeForm();
     }
   }, [manufacturers.length, fetchManufacturers]);
+
+  // NEW: Fetch suppliers on component mount
+  useEffect(() => {
+    async function fetchSuppliers() {
+      try {
+        const result = await supplierService.getAllSuppliers();
+        if (result.success) {
+          setSuppliers(result.suppliers);
+        } else {
+          console.error("Error loading suppliers:", result.error);
+        }
+      } catch (error) {
+        console.error("Error fetching suppliers:", error);
+      }
+    }
+    
+    fetchSuppliers();
+  }, []);
 
   // Check if selections are complete and fetch prices directly from Firestore
   useEffect(() => {
@@ -554,6 +590,7 @@ const PhoneSelectionForm = () => {
       }
       
       // Update the previous selection ref
+      // Update ref
       prevSelectionRef.current = priceSelectionKey;
       prevColorRef.current = selectedColor;
     };
@@ -578,6 +615,8 @@ const PhoneSelectionForm = () => {
       setImei2(inventoryItemToEdit.imei2 || '');
       setBarcode(inventoryItemToEdit.barcode || '');
       setSerialNumber(inventoryItemToEdit.serialNumber || '');
+      setLocation(inventoryItemToEdit.location || ''); // NEW: Set location for editing
+      setSupplier(inventoryItemToEdit.supplier || ''); // NEW: Set supplier for editing
       setDealersPrice(formatNumberWithCommas(inventoryItemToEdit.dealersPrice?.toString() || '0'));
       setRetailPrice(formatNumberWithCommas(inventoryItemToEdit.retailPrice?.toString() || '0'));
       setStatus(inventoryItemToEdit.status);
@@ -758,12 +797,17 @@ const PhoneSelectionForm = () => {
                 imei2={imei2}
                 barcode={barcode}
                 serialNumber={serialNumber}
+                location={location}
+                supplier={supplier}
+                suppliers={suppliers}
                 status={status}
                 lastUpdated={lastUpdated}
                 handleImei1Change={handleImei1Change}
                 handleImei2Change={handleImei2Change}
                 handleBarcodeChange={handleBarcodeChange}
                 handleSerialNumberChange={handleSerialNumberChange}
+                handleLocationChange={handleLocationChange}
+                handleSupplierChange={handleSupplierChange}
                 handleStatusChange={handleStatusChange}
                 imei1Error={imei1Error}
                 imei2Error={imei2Error}

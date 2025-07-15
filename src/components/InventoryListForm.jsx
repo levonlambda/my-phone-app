@@ -425,6 +425,8 @@ const InventoryListForm = () => {
           imei2: data.imei2 || '',  // Also add imei2 while we're at it
           barcode: data.barcode || '',
           serialNumber: data.serialNumber || '', // ADD THIS LINE
+          location: data.location || '', // FIXED: Added location field
+          supplier: data.supplier || '', // FIXED: Added supplier field
           status: data.status || 'On-Hand',
           dateAdded: data.dateAdded || '',
           lastUpdated: data.lastUpdated || ''

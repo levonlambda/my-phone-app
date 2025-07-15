@@ -35,7 +35,9 @@ const InventoryTable = ({
     imei1: '',
     barcode: '',
     status: '',
-    retailPrice: 0 // NEW: Added retailPrice to initial state
+    retailPrice: 0, // NEW: Added retailPrice to initial state
+    location: '', // NEW: Added location to initial state
+    supplier: '' // NEW: Added supplier to initial state
   });
   const [savingItemId, setSavingItemId] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -72,7 +74,9 @@ const InventoryTable = ({
       imei1: item.imei1,
       barcode: item.barcode || '',
       status: item.status,
-      retailPrice: item.retailPrice // NEW: Added retailPrice to edit form data
+      retailPrice: item.retailPrice, // NEW: Added retailPrice to edit form data
+      location: item.location || '', // NEW: Preserve location
+      supplier: item.supplier || '' // NEW: Preserve supplier
     });
   };
 
@@ -166,7 +170,9 @@ const InventoryTable = ({
       imei1: '',
       barcode: '',
       status: '',
-      retailPrice: 0 // NEW: Added retailPrice to reset state
+      retailPrice: 0, // NEW: Added retailPrice to reset state
+      location: '', // NEW: Reset location
+      supplier: '' // NEW: Reset supplier
     });
   };
 
@@ -185,6 +191,9 @@ const InventoryTable = ({
     setSavingItemId(id);
     
     try {
+      // Get the original item to preserve location and supplier
+      const originalItem = allItems.find(item => item.id === id);
+      
       // Create an update object with the edited fields
       const updateData = {
         manufacturer: editFormData.manufacturer,
@@ -195,6 +204,8 @@ const InventoryTable = ({
         imei1: editFormData.imei1,
         barcode: editFormData.barcode,
         status: editFormData.status,
+        location: originalItem.location || '', // NEW: Preserve location
+        supplier: originalItem.supplier || '', // NEW: Preserve supplier
         lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
       };
       
@@ -205,7 +216,6 @@ const InventoryTable = ({
       await updateDoc(itemRef, updateData);
       
       // If the status was changed, update the inventory counts
-      const originalItem = allItems.find(item => item.id === id);
       if (originalItem && originalItem.status !== editFormData.status) {
         // Create a unique ID for this inventory item type
         const inventoryId = `${editFormData.manufacturer}_${editFormData.model}_${editFormData.ram}_${editFormData.storage}_${editFormData.color}`.replace(/\s+/g, '_').toLowerCase();

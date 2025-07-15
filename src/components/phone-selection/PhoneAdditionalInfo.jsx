@@ -8,12 +8,17 @@ const PhoneAdditionalInfo = ({
   imei2,
   barcode,
   serialNumber,
+  location,
+  supplier,
+  suppliers,
   status,
   lastUpdated,
   handleImei1Change,
   handleImei2Change,
   handleBarcodeChange,
   handleSerialNumberChange,
+  handleLocationChange,
+  handleSupplierChange,
   handleStatusChange,
   imei1Error,
   imei2Error,
@@ -83,6 +88,37 @@ const PhoneAdditionalInfo = ({
         </div>
       </div>
       
+      {/* Location and Supplier Fields - NEW */}
+      <div className="flex gap-4">
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">Location:</label>
+          <input 
+            type="text" 
+            className="w-full p-2 border rounded"
+            value={location}
+            onChange={handleLocationChange}
+            placeholder="Enter location"
+            required
+          />
+        </div>
+        <div className="flex-1 space-y-2">
+          <label className="block text-[rgb(52,69,157)] font-semibold">Supplier:</label>
+          <select
+            className="w-full p-2 border rounded"
+            value={supplier}
+            onChange={handleSupplierChange}
+            required
+          >
+            <option value="">-- Select Supplier --</option>
+            {suppliers.map(sup => (
+              <option key={sup.id} value={sup.id}>
+                {sup.supplierName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      
       {/* Status and Last Updated Fields */}
       <div className="flex gap-4">
         <div className="flex-1 space-y-2">
@@ -121,12 +157,17 @@ PhoneAdditionalInfo.propTypes = {
   imei2: PropTypes.string.isRequired,
   barcode: PropTypes.string.isRequired,
   serialNumber: PropTypes.string.isRequired,
+  location: PropTypes.string.isRequired,
+  supplier: PropTypes.string.isRequired,
+  suppliers: PropTypes.array.isRequired,
   status: PropTypes.string.isRequired,
   lastUpdated: PropTypes.string.isRequired,
   handleImei1Change: PropTypes.func.isRequired,
   handleImei2Change: PropTypes.func.isRequired,
   handleBarcodeChange: PropTypes.func.isRequired,
   handleSerialNumberChange: PropTypes.func.isRequired,
+  handleLocationChange: PropTypes.func.isRequired,
+  handleSupplierChange: PropTypes.func.isRequired,
   handleStatusChange: PropTypes.func.isRequired,
   imei1Error: PropTypes.string,
   imei2Error: PropTypes.string
