@@ -475,7 +475,7 @@ const InventoryListForm = () => {
 {/* Part 6 Start - Main Component JSX */}
   return (
     <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+      <Card className="w-full mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]" style={{ maxWidth: '1472px' }}>
         <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <Smartphone className="h-6 w-6 text-white" />

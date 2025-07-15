@@ -62,30 +62,30 @@ const InventoryRow = ({
   {/* Part 4 Start - Component Render */}
   return (
     <tr className="hover:bg-gray-50">
-      <td className="border px-2 py-3 whitespace-nowrap text-sm font-medium">{item.manufacturer}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.manufacturer}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.model}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.ram}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.storage}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.color}</td>
-      <td className="border px-2 py-3 whitespace-nowrap font-mono text-xs">{item.imei1}</td>
+      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.imei1}</td>
       {/* UPDATED: Replaced barcode with serial number */}
-      <td className="border px-2 py-3 whitespace-nowrap text-xs font-mono uppercase">
+      <td className="border px-2 py-3 whitespace-nowrap text-sm uppercase">
         {item.serialNumber || 'N/A'}
       </td>
       {/* NEW: Added supplier column */}
       <td className="border px-2 py-3 whitespace-nowrap text-sm">
         {supplierName}
       </td>
-      <td className="border px-2 py-3 whitespace-nowrap text-right">
-        <span className="text-gray-600 font-medium">
+      <td className="border px-2 py-3 whitespace-nowrap text-sm text-right">
+        <span className="text-gray-600">
           {formatPrice(item.retailPrice)}
         </span>
       </td>
-      <td className="border px-2 py-3 whitespace-nowrap text-xs text-gray-500">
+      <td className="border px-2 py-3 whitespace-nowrap text-sm text-gray-500">
         {item.lastUpdated || '-'}
       </td>
       <td className="border px-2 py-3 text-center whitespace-nowrap">
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+        <span className={`px-2 py-1 text-sm rounded-full ${
           item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800' :
           item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800' :
           item.status === 'Sold' ? 'bg-purple-100 text-purple-800' :
