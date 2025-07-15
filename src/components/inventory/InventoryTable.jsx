@@ -33,11 +33,11 @@ const InventoryTable = ({
     storage: '',
     color: '',
     imei1: '',
-    barcode: '',
+    serialNumber: '', // UPDATED: Added serialNumber instead of barcode
+    supplier: '', // UPDATED: Added supplier
     status: '',
     retailPrice: 0, // NEW: Added retailPrice to initial state
     location: '', // NEW: Added location to initial state
-    supplier: '' // NEW: Added supplier to initial state
   });
   const [savingItemId, setSavingItemId] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -72,11 +72,11 @@ const InventoryTable = ({
       storage: item.storage,
       color: item.color,
       imei1: item.imei1,
-      barcode: item.barcode || '',
+      serialNumber: item.serialNumber || '', // UPDATED: Added serialNumber
+      supplier: item.supplier || '', // UPDATED: Added supplier
       status: item.status,
       retailPrice: item.retailPrice, // NEW: Added retailPrice to edit form data
       location: item.location || '', // NEW: Preserve location
-      supplier: item.supplier || '' // NEW: Preserve supplier
     });
   };
 
@@ -168,11 +168,11 @@ const InventoryTable = ({
       storage: '',
       color: '',
       imei1: '',
-      barcode: '',
+      serialNumber: '', // UPDATED: Reset serialNumber
+      supplier: '', // UPDATED: Reset supplier
       status: '',
       retailPrice: 0, // NEW: Added retailPrice to reset state
       location: '', // NEW: Reset location
-      supplier: '' // NEW: Reset supplier
     });
   };
 
@@ -202,10 +202,11 @@ const InventoryTable = ({
         storage: editFormData.storage,
         color: editFormData.color,
         imei1: editFormData.imei1,
-        barcode: editFormData.barcode,
+        serialNumber: editFormData.serialNumber || '', // UPDATED: Save serialNumber
+        barcode: originalItem.barcode || '', // Preserve barcode from original
         status: editFormData.status,
         location: originalItem.location || '', // NEW: Preserve location
-        supplier: originalItem.supplier || '', // NEW: Preserve supplier
+        supplier: editFormData.supplier || '', // UPDATED: Save supplier
         lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
       };
       
@@ -320,11 +321,11 @@ const InventoryTable = ({
       }
     }
     
-    // Handle string fields
+    // Handle string fields (including serialNumber and supplier)
     if (sortDirection === 'asc') {
-      return a[sortField]?.localeCompare(b[sortField] || '');
+      return (a[sortField] || '').localeCompare(b[sortField] || '');
     } else {
-      return b[sortField]?.localeCompare(a[sortField] || '');
+      return (b[sortField] || '').localeCompare(a[sortField] || '');
     }
   });
   {/* Part 5 End - Sorting Logic */}
@@ -395,13 +396,25 @@ const InventoryTable = ({
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </th>
+            {/* UPDATED: Replaced barcode with serial number */}
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
-              onClick={() => handleSort('barcode')}
-              style={{ width: '15%' }}
+              onClick={() => handleSort('serialNumber')}
+              style={{ width: '12%' }}
             >
-              Barcode
-              {sortField === 'barcode' && (
+              Serial Number
+              {sortField === 'serialNumber' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
+            {/* NEW: Added Supplier column */}
+            <th 
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+              onClick={() => handleSort('supplier')}
+              style={{ width: '12%' }}
+            >
+              Supplier
+              {sortField === 'supplier' && (
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </th>

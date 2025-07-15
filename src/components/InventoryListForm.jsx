@@ -359,6 +359,7 @@ const InventoryListForm = () => {
       color: '',
       imei1: '',
       barcode: '',
+      serialNumber: '', 
       startDate: '',
       endDate: ''
     });

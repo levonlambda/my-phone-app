@@ -1,6 +1,8 @@
 {/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
 import { Edit, Trash2, FileEdit } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import supplierService from '../../services/supplierService';
 {/* Part 1 End - Imports */}
 
 {/* Part 2 Start - Component Definition */}
@@ -13,6 +15,32 @@ const InventoryRow = ({
 {/* Part 2 End - Component Definition */}
 
   {/* Part 3 Start - Helper Functions */}
+  // State for supplier name lookup
+  const [supplierName, setSupplierName] = useState('N/A');
+  
+  // Fetch supplier name when component mounts or supplier changes
+  useEffect(() => {
+    async function fetchSupplierName() {
+      if (item.supplier) {
+        try {
+          const result = await supplierService.getSupplierById(item.supplier);
+          if (result.success && result.supplier) {
+            setSupplierName(result.supplier.supplierName);
+          } else {
+            setSupplierName('N/A');
+          }
+        } catch (error) {
+          console.error('Error fetching supplier name:', error);
+          setSupplierName('N/A');
+        }
+      } else {
+        setSupplierName('N/A');
+      }
+    }
+    
+    fetchSupplierName();
+  }, [item.supplier]);
+
   // Helper function to get status display
   const getStatusDisplay = (status) => {
     const statusMap = {
@@ -40,7 +68,14 @@ const InventoryRow = ({
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.storage}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.color}</td>
       <td className="border px-2 py-3 whitespace-nowrap font-mono text-xs">{item.imei1}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-xs font-mono uppercase">{item.barcode || '-'}</td>
+      {/* UPDATED: Replaced barcode with serial number */}
+      <td className="border px-2 py-3 whitespace-nowrap text-xs font-mono uppercase">
+        {item.serialNumber || 'N/A'}
+      </td>
+      {/* NEW: Added supplier column */}
+      <td className="border px-2 py-3 whitespace-nowrap text-sm">
+        {supplierName}
+      </td>
       <td className="border px-2 py-3 whitespace-nowrap text-right">
         <span className="text-gray-600 font-medium">
           {formatPrice(item.retailPrice)}
@@ -100,7 +135,8 @@ InventoryRow.propTypes = {
     storage: PropTypes.string.isRequired,
     color: PropTypes.string.isRequired,
     imei1: PropTypes.string.isRequired,
-    barcode: PropTypes.string,
+    serialNumber: PropTypes.string, // FIXED: Added serialNumber
+    supplier: PropTypes.string, // FIXED: Added supplier
     retailPrice: PropTypes.number, // NEW: Added retailPrice prop
     status: PropTypes.string.isRequired,
     lastUpdated: PropTypes.string

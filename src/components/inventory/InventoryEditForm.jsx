@@ -1,6 +1,8 @@
 {/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
 import { RefreshCw, Save, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import supplierService from '../../services/supplierService';
 {/* Part 1 End - Imports */}
 
 {/* Part 2 Start - Component Definition */}
@@ -15,6 +17,25 @@ const InventoryEditForm = ({
 {/* Part 2 End - Component Definition */}
 
   {/* Part 3 Start - Helper Functions */}
+  // State for suppliers list
+  const [suppliers, setSuppliers] = useState([]);
+  
+  // Fetch suppliers when component mounts
+  useEffect(() => {
+    async function fetchSuppliers() {
+      try {
+        const result = await supplierService.getAllSuppliers();
+        if (result.success) {
+          setSuppliers(result.suppliers);
+        }
+      } catch (error) {
+        console.error("Error fetching suppliers:", error);
+      }
+    }
+    
+    fetchSuppliers();
+  }, []);
+
   // NEW: Function to format price with currency - read-only display
   const formatPrice = (price) => {
     if (!price && price !== 0) return '-';
@@ -79,15 +100,34 @@ const InventoryEditForm = ({
           className="w-full p-1 border rounded font-mono"
         />
       </td>
+      {/* UPDATED: Replaced barcode with serial number */}
       <td className="border px-2 py-3 font-mono whitespace-nowrap">
         <input
           type="text"
-          name="barcode"
-          value={editFormData.barcode}
+          name="serialNumber"
+          value={editFormData.serialNumber}
           onChange={handleEditInputChange}
           className="w-full p-1 border rounded font-mono"
+          placeholder="N/A"
         />
       </td>
+      {/* NEW: Added supplier dropdown */}
+      <td className="border px-2 py-3 whitespace-nowrap">
+        <select
+          name="supplier"
+          value={editFormData.supplier}
+          onChange={handleEditInputChange}
+          className="w-full p-1 border rounded"
+        >
+          <option value="">N/A</option>
+          {suppliers.map(sup => (
+            <option key={sup.id} value={sup.id}>
+              {sup.supplierName}
+            </option>
+          ))}
+        </select>
+      </td>
+
       {/* NEW: Added retail price column - read-only display */}
       <td className="border px-2 py-3 whitespace-nowrap text-right">
         <span className="text-gray-600 font-medium">
