@@ -167,6 +167,18 @@ const ProcurementManagementForm = () => {
 {/* Part 2 End - Data Fetching Functions */}
 
 {/* Part 3 Start - Form Action Handlers with Payment Update */}
+  // ====== SEARCH AND FILTER HANDLERS ======
+  
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+  
+  // Handle status filter change
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+  
   // ====== FORM ACTION HANDLERS ======
   
   // CHANGED: Handle payment status click to open payment mode
@@ -174,6 +186,12 @@ const ProcurementManagementForm = () => {
     console.log('Opening payment mode for procurement:', procurement.id);
     // Use global state to open procurement in payment mode
     paymentProcurement(procurement);
+  };
+
+  // NEW: Handle delivery status click
+  const handleDeliveryUpdate = (procurement) => {
+    console.log('Delivery clicked for procurement:', procurement.id);
+    // TODO: Will implement stock receiving functionality later
   };
 
   const handleViewProcurement = (procurement) => {
@@ -239,29 +257,17 @@ const ProcurementManagementForm = () => {
           await fetchAllProcurements();
           
         } else {
-          console.error("Error deleting procurement:", result.error);
-          setError(`Error deleting procurement: ${result.error}`);
+          setError(`Failed to delete procurement: ${result.error}`);
+          alert(`Error: ${result.error}`);
         }
-        
       } catch (error) {
-        console.error('Error deleting procurement:', error);
-        setError(`Error deleting procurement: ${error.message}`);
+        console.error("Error in delete handler:", error);
+        setError(`Failed to delete procurement: ${error.message}`);
+        alert(`Error: ${error.message}`);
       } finally {
         setLoading(false);
       }
     }
-  };
-
-  // ====== SEARCH AND FILTER HANDLERS ======
-  
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  // Handle status filter change
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
   };
 {/* Part 3 End - Form Action Handlers with Payment Update */}
 
@@ -573,9 +579,14 @@ const ProcurementManagementForm = () => {
                             </button>
                           </td>
                           <td className="border px-3 py-3 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${deliveryStatus.className}`}>
+                            {/* CHANGED: Convert Delivery column to clickable status button */}
+                            <button
+                              onClick={() => handleDeliveryUpdate(procurement)}
+                              className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${deliveryStatus.className} hover:opacity-80 cursor-pointer`}
+                              title={`${deliveryStatus.label === 'Delivered' ? 'View received items' : 'Click to receive inventory'}`}
+                            >
                               {deliveryStatus.label}
-                            </span>
+                            </button>
                           </td>
                           <td className="border px-3 py-3">
                             <div className="flex items-center justify-center gap-1">
