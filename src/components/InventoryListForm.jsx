@@ -30,6 +30,7 @@ const InventoryListForm = () => {
     imei1: '',
     barcode: '',
     serialNumber: '', // ADD THIS LINE
+    supplier: '', // ADD THIS LINE
     startDate: '',
     endDate: ''
   });
@@ -41,6 +42,7 @@ const InventoryListForm = () => {
     imei1: '',
     barcode: '',
     serialNumber: '', // ADD THIS LINE
+    supplier: '', // ADD THIS LINE
     startDate: '',
     endDate: ''
   });
@@ -75,7 +77,7 @@ const InventoryListForm = () => {
     return value.replace(/,/g, '');
   };
 
-  // Sync filters to pendingFilters when filters change - UPDATED: Added date fields
+  // Sync filters to pendingFilters when filters change - UPDATED: Added date fields and supplier
   useEffect(() => {
     setPendingFilters(prevPending => ({
       ...prevPending,
@@ -84,10 +86,11 @@ const InventoryListForm = () => {
       imei1: filters.imei1,
       barcode: filters.barcode,
       serialNumber: filters.serialNumber,
+      supplier: filters.supplier,
       startDate: filters.startDate,
       endDate: filters.endDate
     }));
-  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.serialNumber, filters.startDate, filters.endDate]);
+  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.serialNumber, filters.supplier, filters.startDate, filters.endDate]);
 
   // Load manufacturer list on component mount
   useEffect(() => {
@@ -114,7 +117,7 @@ const InventoryListForm = () => {
 {/* Part 2 End - Helper Functions and Effects */}
 
 {/* Part 3 Start - Filter Logic and Handlers */}
-  // Apply filters to the data - UPDATED: Fixed date filtering logic
+  // Apply filters to the data - UPDATED: Fixed date filtering logic and added supplier
   const applyFilters = useCallback((items) => {
     return items.filter(item => {
       // Apply manufacturer filter
@@ -164,6 +167,14 @@ const InventoryListForm = () => {
       if (filters.serialNumber) {
         // If filter is set, item must have a serial number AND it must include the search term
         if (!item.serialNumber || !item.serialNumber.includes(filters.serialNumber)) {
+          return false;
+        }
+      }
+      
+      // Apply supplier filter (partial match)
+      if (filters.supplier) {
+        // If filter is set, item must have a supplier AND it must include the search term
+        if (!item.supplier || !item.supplier.toLowerCase().includes(filters.supplier.toLowerCase())) {
           return false;
         }
       }
@@ -258,12 +269,12 @@ const InventoryListForm = () => {
     });
   }, [filters.manufacturer, filters.model]);
 
-  // Handle filter change - UPDATED: Added date field handling
+  // Handle filter change - UPDATED: Added date field handling and supplier
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     
-    // For debounced text inputs (price fields, imei, barcode, dates)
-    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'startDate' || name === 'endDate') {
+    // For debounced text inputs (price fields, imei, barcode, dates, supplier)
+    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'supplier' || name === 'startDate' || name === 'endDate') {
       // For price fields, handle numeric input
       if (name === 'minPrice' || name === 'maxPrice') {
         // Allow only numbers and commas
@@ -308,7 +319,7 @@ const InventoryListForm = () => {
           }));
         }, 500); // 500ms delay for dates
       } else {
-        // For text search fields (IMEI, barcode, serial number)
+        // For text search fields (IMEI, barcode, serial number, supplier)
         setPendingFilters(prev => ({
           ...prev,
           [name]: value
@@ -345,7 +356,7 @@ const InventoryListForm = () => {
     }
   };
 
-  // Clear all filters - UPDATED: Added date fields
+  // Clear all filters - UPDATED: Added date fields and supplier
   const clearFilters = () => {
     // Clear both actual filters and pending filters
     setFilters({
@@ -360,6 +371,7 @@ const InventoryListForm = () => {
       imei1: '',
       barcode: '',
       serialNumber: '', 
+      supplier: '',
       startDate: '',
       endDate: ''
     });
@@ -370,6 +382,7 @@ const InventoryListForm = () => {
       imei1: '',
       barcode: '',
       serialNumber: '',
+      supplier: '',
       startDate: '',
       endDate: ''
     });

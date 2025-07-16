@@ -357,28 +357,8 @@ const InventoryFilters = ({
           <p className="text-xs text-gray-500 mt-1">Loading models...</p>
         )}
         {!filters.manufacturer && (
-          <p className="text-xs text-gray-500 mt-1">Select a manufacturer first</p>
+          <p className="text-xs text-gray-500 mt-1">Select manufacturer first</p>
         )}
-      </div>
-      
-      {/* Status filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Status
-        </label>
-        <select
-          name="status"
-          value={filters.status}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        >
-          <option value="">All Statuses</option>
-          {filterOptions.statuses.map(status => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
       </div>
       
       {/* RAM filter */}
@@ -443,6 +423,26 @@ const InventoryFilters = ({
         )}
       </div>
       
+      {/* Status filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Status
+        </label>
+        <select
+          name="status"
+          value={filters.status}
+          onChange={handleFilterChange}
+          className="w-full p-2 border rounded"
+        >
+          <option value="">All Statuses</option>
+          {filterOptions.statuses.map(status => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+      </div>
+      
       {/* Color filter */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -474,106 +474,130 @@ const InventoryFilters = ({
         )}
       </div>
       
-      {/* IMEI1 filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          IMEI1
-        </label>
-        <input
-          type="text"
-          name="imei1"
-          value={pendingFilters.imei1}
-          onChange={handleFilterChange}
-          placeholder="Search IMEI"
-          className="w-full p-2 border rounded"
-        />
-      </div>
-      
-      {/* Barcode filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Barcode
-        </label>
-        <input
-          type="text"
-          name="barcode"
-          value={pendingFilters.barcode}
-          onChange={handleFilterChange}
-          placeholder="Search barcode"
-          className="w-full p-2 border rounded"
-        />
-      </div>
-
-      {/* Serial Number filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Serial Number
-        </label>
-        <input
-          type="text"
-          name="serialNumber"
-          value={pendingFilters.serialNumber}
-          onChange={handleFilterChange}
-          placeholder="Search serial number"
-          className="w-full p-2 border rounded"
-        />
-      </div>
-
-      {/* Start Date filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Start Date
-        </label>
-        <input
-          type="date"
-          name="startDate"
-          value={pendingFilters.startDate}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        />
-      </div>
-      
-      {/* End Date filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          End Date
-        </label>
-        <input
-          type="date"
-          name="endDate"
-          value={pendingFilters.endDate}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        />
-      </div>
-      
-      {/* Price range */}
-      <div className="flex gap-2">
-        <div className="flex-1">
+      {/* IMEI1 with Date Range group */}
+      <div className="space-y-4">
+        {/* IMEI1 filter */}
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min Price
+            IMEI1
           </label>
           <input
             type="text"
-            name="minPrice"
-            value={pendingFilters.minPrice}
+            name="imei1"
+            value={pendingFilters.imei1}
             onChange={handleFilterChange}
-            placeholder="0"
+            placeholder="Search IMEI"
             className="w-full p-2 border rounded"
           />
         </div>
-        <div className="flex-1">
+        
+        {/* Date Range - positioned below IMEI1 */}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
+            <input
+              type="date"
+              name="startDate"
+              value={pendingFilters.startDate}
+              onChange={handleFilterChange}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
+            <input
+              type="date"
+              name="endDate"
+              value={pendingFilters.endDate}
+              onChange={handleFilterChange}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Barcode with Supplier group */}
+      <div className="space-y-4">
+        {/* Barcode filter */}
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max Price
+            Barcode
           </label>
           <input
             type="text"
-            name="maxPrice"
-            value={pendingFilters.maxPrice}
+            name="barcode"
+            value={pendingFilters.barcode}
             onChange={handleFilterChange}
-            placeholder="999,999"
+            placeholder="Search barcode"
             className="w-full p-2 border rounded"
           />
+        </div>
+        
+        {/* Supplier filter - NEW */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Supplier
+          </label>
+          <input
+            type="text"
+            name="supplier"
+            value={pendingFilters.supplier}
+            onChange={handleFilterChange}
+            placeholder="Search supplier"
+            className="w-full p-2 border rounded"
+          />
+        </div>
+      </div>
+
+      {/* Serial Number with Price Range group */}
+      <div className="space-y-4">
+        {/* Serial Number filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Serial Number
+          </label>
+          <input
+            type="text"
+            name="serialNumber"
+            value={pendingFilters.serialNumber}
+            onChange={handleFilterChange}
+            placeholder="Search serial number"
+            className="w-full p-2 border rounded"
+          />
+        </div>
+        
+        {/* Price Range - positioned below Serial Number */}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Min Price
+            </label>
+            <input
+              type="text"
+              name="minPrice"
+              value={pendingFilters.minPrice}
+              onChange={handleFilterChange}
+              placeholder="0"
+              className="w-full p-2 border rounded"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Max Price
+            </label>
+            <input
+              type="text"
+              name="maxPrice"
+              value={pendingFilters.maxPrice}
+              onChange={handleFilterChange}
+              placeholder="999,999"
+              className="w-full p-2 border rounded"
+            />
+          </div>
         </div>
       </div>
     </div>
