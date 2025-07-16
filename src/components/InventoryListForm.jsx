@@ -42,7 +42,6 @@ const InventoryListForm = () => {
     imei1: '',
     barcode: '',
     serialNumber: '', // ADD THIS LINE
-    supplier: '', // ADD THIS LINE
     startDate: '',
     endDate: ''
   });
@@ -54,6 +53,7 @@ const InventoryListForm = () => {
     rams: [],
     storages: [],
     colors: [],
+    suppliers: [],
     statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
   });
   
@@ -77,7 +77,7 @@ const InventoryListForm = () => {
     return value.replace(/,/g, '');
   };
 
-  // Sync filters to pendingFilters when filters change - UPDATED: Added date fields and supplier
+  // Sync filters to pendingFilters when filters change - UPDATED: Added date fields
   useEffect(() => {
     setPendingFilters(prevPending => ({
       ...prevPending,
@@ -86,11 +86,10 @@ const InventoryListForm = () => {
       imei1: filters.imei1,
       barcode: filters.barcode,
       serialNumber: filters.serialNumber,
-      supplier: filters.supplier,
       startDate: filters.startDate,
       endDate: filters.endDate
     }));
-  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.serialNumber, filters.supplier, filters.startDate, filters.endDate]);
+  }, [filters.minPrice, filters.maxPrice, filters.imei1, filters.barcode, filters.serialNumber, filters.startDate, filters.endDate]);
 
   // Load manufacturer list on component mount
   useEffect(() => {
@@ -113,6 +112,30 @@ const InventoryListForm = () => {
     }
     
     loadManufacturers();
+  }, []);
+
+  // Load supplier list from suppliers collection
+  useEffect(() => {
+    async function loadSuppliers() {
+      try {
+        const suppliersRef = collection(db, 'suppliers');
+        const snapshot = await getDocs(suppliersRef);
+        
+        const suppliers = snapshot.docs.map(doc => ({
+          id: doc.id,
+          name: doc.data().supplierName
+        })).sort((a, b) => a.name.localeCompare(b.name));
+        
+        setFilterOptions(prev => ({
+          ...prev,
+          suppliers
+        }));
+      } catch (error) {
+        console.error("Error loading suppliers:", error);
+      }
+    }
+    
+    loadSuppliers();
   }, []);
 {/* Part 2 End - Helper Functions and Effects */}
 
@@ -171,10 +194,9 @@ const InventoryListForm = () => {
         }
       }
       
-      // Apply supplier filter (partial match)
+      // Apply supplier filter (exact match by ID)
       if (filters.supplier) {
-        // If filter is set, item must have a supplier AND it must include the search term
-        if (!item.supplier || !item.supplier.toLowerCase().includes(filters.supplier.toLowerCase())) {
+        if (item.supplier !== filters.supplier) {
           return false;
         }
       }
@@ -259,27 +281,31 @@ const InventoryListForm = () => {
     
     const colors = [...new Set(filteredData.map(item => item.color))].sort();
     
-    setFilterOptions({
+    setFilterOptions(prev => ({
+      ...prev,
       manufacturers,
       models,
       rams,
       storages,
       colors,
       statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
-    });
+    }));
   }, [filters.manufacturer, filters.model]);
 
-  // Handle filter change - UPDATED: Added date field handling and supplier
+  // Handle filter change - UPDATED: Added date field handling and supplier as dropdown
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     
-    // For debounced text inputs (price fields, imei, barcode, dates, supplier)
-    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'supplier' || name === 'startDate' || name === 'endDate') {
+    // For debounced text inputs (price fields, imei, barcode, dates, serial number)
+    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'startDate' || name === 'endDate') {
       // For price fields, handle numeric input
       if (name === 'minPrice' || name === 'maxPrice') {
         // Allow only numbers and commas
         const sanitizedValue = value.replace(/[^\d,]/g, '');
-        const formattedValue = formatNumberWithCommas(sanitizedValue);
+        // Remove all commas first
+        const numberOnly = sanitizedValue.replace(/,/g, '');
+        // Format with proper comma placement
+        const formattedValue = formatNumberWithCommas(numberOnly);
         
         // Update pending value first (for display)
         setPendingFilters(prev => ({
@@ -382,7 +408,6 @@ const InventoryListForm = () => {
       imei1: '',
       barcode: '',
       serialNumber: '',
-      supplier: '',
       startDate: '',
       endDate: ''
     });

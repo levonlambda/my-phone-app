@@ -537,19 +537,24 @@ const InventoryFilters = ({
           />
         </div>
         
-        {/* Supplier filter - NEW */}
+        {/* Supplier filter - DROPDOWN */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Supplier
           </label>
-          <input
-            type="text"
+          <select
             name="supplier"
-            value={pendingFilters.supplier}
+            value={filters.supplier}
             onChange={handleFilterChange}
-            placeholder="Search supplier"
             className="w-full p-2 border rounded"
-          />
+          >
+            <option value="">All Suppliers</option>
+            {filterOptions.suppliers.map(supplier => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
