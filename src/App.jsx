@@ -7,8 +7,9 @@ import PhoneListForm from './components/PhoneListForm';
 import InventorySummaryForm from './components/InventorySummaryForm';
 import PriceManagementForm from './components/PriceManagementForm';
 import PhoneProcurementForm from './components/PhoneProcurementForm';
-import SupplierManagementForm from './components/SupplierManagementForm'; // NEW: Added supplier management import
-import ProcurementManagementForm from './components/ProcurementManagementForm'; // NEW: Added procurement management import
+import SupplierManagementForm from './components/SupplierManagementForm';
+import ProcurementManagementForm from './components/ProcurementManagementForm';
+import StockReceivingForm from './components/StockReceivingForm'; // NEW: Added stock receiving import
 // Import the hook from our consolidated file
 import { useGlobalState } from './context/GlobalStateContext';
 
@@ -56,6 +57,12 @@ function App() {
             Procurement Management
           </button>
           <button 
+            className={`px-4 py-2 rounded ${activeComponent === 'stockreceiving' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
+            onClick={() => setActiveComponent('stockreceiving')}
+          >
+            Stock Receiving (Test)
+          </button>
+          <button 
             className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
             onClick={() => setActiveComponent('suppliers')}
           >
@@ -86,6 +93,7 @@ function App() {
       {activeComponent === 'selection' && <PhoneSelectionForm />}
       {activeComponent === 'procurement' && <PhoneProcurementForm />}
       {activeComponent === 'procurementmgmt' && <ProcurementManagementForm />}
+      {activeComponent === 'stockreceiving' && <StockReceivingForm />}
       {activeComponent === 'suppliers' && <SupplierManagementForm />}
       {activeComponent === 'form' && <PhoneSpecForm />}
       {activeComponent === 'inventory' && <InventoryListForm />}
