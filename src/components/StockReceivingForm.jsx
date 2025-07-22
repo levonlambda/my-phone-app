@@ -5,6 +5,7 @@ import {
   Package, 
   Calendar, 
   Building2,
+  MapPin,
   X
 } from 'lucide-react';
 
@@ -15,6 +16,7 @@ const StockReceivingForm = () => {
   // Form state
   const [dateDelivered, setDateDelivered] = useState(new Date().toISOString().split('T')[0]);
   const [bulkLocation, setBulkLocation] = useState('');
+  const [deliveryReference, setDeliveryReference] = useState('');
   
   // State for group barcodes
   const [groupBarcodes, setGroupBarcodes] = useState({});
@@ -242,7 +244,7 @@ const StockReceivingForm = () => {
             {/* Procurement Info Section */}
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <div className="flex flex-wrap gap-4">
-                {/* Date Delivered - Increased */}
+                {/* Date Delivered */}
                 <div className="space-y-2 flex-1 min-w-[140px] max-w-[180px]">
                   <label className="block text-sm font-semibold text-[rgb(52,69,157)]">
                     <Calendar className="h-4 w-4 inline mr-1" />
@@ -257,15 +259,36 @@ const StockReceivingForm = () => {
                   />
                 </div>
 
-                {/* Set all locations - Increased */}
-                <div className="flex items-end gap-2">
+                {/* Reference - Now Editable and Repositioned */}
+                <div className="space-y-2 flex-1 min-w-[140px] max-w-[200px]">
+                  <label className="block text-sm font-semibold text-[rgb(52,69,157)]">
+                    Reference:
+                  </label>
                   <input
                     type="text"
-                    value={bulkLocation}
-                    onChange={(e) => setBulkLocation(e.target.value)}
-                    placeholder="Enter location for all items"
-                    className="w-[220px] px-3 py-2 border rounded text-sm"
+                    value={deliveryReference}
+                    onChange={(e) => setDeliveryReference(e.target.value)}
+                    placeholder="Delivery receipt #"
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
                   />
+                </div>
+
+                {/* Set all locations with label */}
+                <div className="flex items-end gap-2">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-[rgb(52,69,157)]">
+                      <MapPin className="h-4 w-4 inline mr-1" />
+                      Set all locations to:
+                    </label>
+                    <input
+                      type="text"
+                      value={bulkLocation}
+                      onChange={(e) => setBulkLocation(e.target.value)}
+                      placeholder="Enter location for all items"
+                      className="w-[220px] px-3 py-2 border rounded text-sm"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={handleBulkLocationSet}
@@ -275,7 +298,7 @@ const StockReceivingForm = () => {
                   </button>
                 </div>
 
-                {/* Supplier - Lengthened */}
+                {/* Supplier */}
                 <div className="space-y-2 flex-1 min-w-[200px] max-w-[275px]">
                   <label className="block text-sm font-semibold text-[rgb(52,69,157)]">
                     <Building2 className="h-4 w-4 inline mr-1" />
@@ -289,20 +312,7 @@ const StockReceivingForm = () => {
                   />
                 </div>
 
-                {/* Reference - Increased */}
-                <div className="space-y-2 flex-1 min-w-[140px] max-w-[200px]">
-                  <label className="block text-sm font-semibold text-[rgb(52,69,157)]">
-                    Reference:
-                  </label>
-                  <input
-                    type="text"
-                    value={dummyProcurement.reference}
-                    className="w-full px-3 py-2 border rounded text-sm bg-gray-100"
-                    disabled
-                  />
-                </div>
-
-                {/* Purchase Date - Increased */}
+                {/* Purchase Date */}
                 <div className="space-y-2 flex-1 min-w-[120px] max-w-[160px]">
                   <label className="block text-sm font-semibold text-[rgb(52,69,157)]">
                     Purchase Date:
