@@ -1,4 +1,4 @@
-{/* Part 1 Start - Complete File: Imports, State, and Helper Functions */}
+{/* Part 1 Start - Imports and Initial State */}
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs } from 'firebase/firestore';
@@ -110,7 +110,9 @@ const InventorySummaryForm = () => {
       }
     }));
   };
+{/* Part 1 End - Imports and Initial State */}
 
+{/* Part 2 Start - Helper Functions and Filters */}
   // Handle filter change
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -177,9 +179,7 @@ const InventorySummaryForm = () => {
     }
     return `${value}GB`;
   };
-{/* Part 1 End - Complete File: Imports, State, and Helper Functions */}
 
-{/* Part 2 Start - Filter Functions and Updated fetchInventoryData */}
   // Apply filters to data
   const applyFilters = () => {
     if (!inventoryData.length) return;
@@ -235,7 +235,9 @@ const InventorySummaryForm = () => {
       }
       filteredStorages = [...new Set(filtered.map(item => item.storage))].sort();
     }
-    
+{/* Part 2 End - Helper Functions and Filters */}
+
+{/* Part 3 Start - Filter Options Update and Date Helper */}
     if (filters.manufacturer || filters.model || filters.ram || filters.storage) {
       let filtered = inventoryData;
       if (filters.manufacturer) {
@@ -319,7 +321,9 @@ const InventorySummaryForm = () => {
       const rams = new Set();
       const storages = new Set();
       const colors = new Set();
-      
+{/* Part 3 End - Filter Options Update and Date Helper */}
+
+{/* Part 4 Start - Inventory Data Processing */}
       snapshot.forEach(doc => {
         const item = { id: doc.id, ...doc.data() };
         
@@ -456,7 +460,9 @@ const InventorySummaryForm = () => {
         const storageB = extractNumericValue(b.storage);
         return storageA - storageB; // Ascending order (smallest to largest)
       });
-      
+{/* Part 4 End - Inventory Data Processing */}
+
+{/* Part 5 Start - Final Data Setup and Effects */}
       const filterOpts = {
         manufacturers: [...manufacturers].sort(),
         models: [...models].sort(),
@@ -502,9 +508,7 @@ const InventorySummaryForm = () => {
     applyFilters();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, inventoryData]);
-{/* Part 2 End - Filter Functions and Updated fetchInventoryData */}
 
-{/* Part 3 Start - Loading and Error States */}
   // Loading state
   if (loading) {
     return (
@@ -545,7 +549,9 @@ const InventorySummaryForm = () => {
       </div>
     );
   }
+{/* Part 5 End - Final Data Setup and Effects */}
 
+{/* Part 6 Start - Main Return Header and Filter Panel */}
   return (
     <div className="min-h-screen bg-white p-4">
       <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
@@ -659,7 +665,9 @@ const InventorySummaryForm = () => {
             )}
           </div>
         )}
+{/* Part 6 End - Main Return Header and Filter Panel */}
 
+{/* Part 7 Start - Excluded Models Info and Table Start */}
         {/* NEW: Add Excluded Models Info Display */}
         <CardContent className="p-4">
           {excludedModelsInfo.length > 0 && (
@@ -685,9 +693,7 @@ const InventorySummaryForm = () => {
               </div>
             </div>
           )}
-{/* Part 3 End - Loading and Error States */}
 
-{/* Part 4 Start - Main Table Content */}
           {filteredData.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
               <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -778,8 +784,10 @@ const InventorySummaryForm = () => {
                               {item.totalAvailable}
                             </span>
                           </td>
-                        </tr> {/* Part 5 Start - Expanded Color Breakdown Section */}
-                        
+                        </tr>
+{/* Part 7 End - Excluded Models Info and Table Start */}
+
+{/* Part 8 Start - Expanded Color Breakdown */}
                         {/* Expanded color breakdown */}
                         {expandedRows.has(index) && (
                           <tr>
@@ -868,7 +876,9 @@ const InventorySummaryForm = () => {
                                             )}
                                           </div>
                                         )}
-                                        
+{/* Part 8 End - Expanded Color Breakdown */}
+
+{/* Part 9 Start - Display and Stock Items Tables */}
                                         {/* On Display Items */}
                                         {colorData.onDisplayItems.length > 0 && (
                                           <div>
@@ -986,9 +996,9 @@ const InventorySummaryForm = () => {
                   </tbody>
                 </table>
               </div>
-{/* Part 5 End - Expanded Color Breakdown Section */}
+{/* Part 9 End - Display and Stock Items Tables */}
 
-{/* Part 6 Start - Inventory Value Summary and Footer */}
+{/* Part 10 Start - Inventory Value Summary and Footer */}
               {/* Inventory Value Summary */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
@@ -1091,4 +1101,4 @@ const InventorySummaryForm = () => {
 };
 
 export default InventorySummaryForm;
-{/* Part 6 End - Inventory Value Summary and Footer */}
+{/* Part 10 End - Inventory Value Summary and Footer */}
