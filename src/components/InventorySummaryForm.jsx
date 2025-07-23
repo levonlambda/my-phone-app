@@ -353,13 +353,14 @@ const InventorySummaryForm = () => {
             totalOnDisplay: 0,
             totalOnHand: 0,
             totalAvailable: 0,
+            totalPending: 0,  // NEW: Added totalPending
             dealersPrice: item.dealersPrice || 0,
             retailPrice: item.retailPrice || 0,
             colors: {}
           };
         }
         
-        // Group by color within each base configuration
+        // Group by color for color breakdown
         if (!groupedData[baseKey].colors[item.color]) {
           groupedData[baseKey].colors[item.color] = {
             color: item.color,
@@ -367,6 +368,7 @@ const InventorySummaryForm = () => {
             onDisplay: 0,
             onHand: 0,
             available: 0,
+            pending: 0,  // NEW: Added pending to color breakdown
             dealersPrice: item.dealersPrice || 0,
             retailPrice: item.retailPrice || 0,
             soldItems: [],
@@ -375,56 +377,122 @@ const InventorySummaryForm = () => {
           };
         }
         
-        const colorData = groupedData[baseKey].colors[item.color];
-        
-        // UPDATED: Count and store items based on status with current month filter for sold items
-        switch (item.status) {
-          case 'Sold':
-            // NEW: Only count and include sold items from the current month
-            if (isWithinCurrentMonth(item.lastUpdated)) {
-              colorData.sold++;
-              groupedData[baseKey].totalSold++;
-              colorData.soldItems.push(item);
-            }
-            break;
-          case 'On-Display':
-            colorData.onDisplay++;
-            groupedData[baseKey].totalOnDisplay++;
-            colorData.onDisplayItems.push(item);
-            break;
-          case 'On-Hand':
-            colorData.onHand++;
-            groupedData[baseKey].totalOnHand++;
-            colorData.onHandItems.push(item);
-            break;
+        // Update counts based on status
+        if (item.status === 'Sold') {
+          // NEW: Filter sold items by current month
+          if (isWithinCurrentMonth(item.lastUpdated)) {
+            groupedData[baseKey].totalSold++;
+            groupedData[baseKey].colors[item.color].sold++;
+            groupedData[baseKey].colors[item.color].soldItems.push(item);
+          }
+        } else if (item.status === 'On-Display') {
+          groupedData[baseKey].totalOnDisplay++;
+          groupedData[baseKey].totalAvailable++;
+          groupedData[baseKey].colors[item.color].onDisplay++;
+          groupedData[baseKey].colors[item.color].available++;
+          groupedData[baseKey].colors[item.color].onDisplayItems.push(item);
+        } else if (item.status === 'On-Hand' || item.status === 'Stock') {
+          groupedData[baseKey].totalOnHand++;
+          groupedData[baseKey].totalAvailable++;
+          groupedData[baseKey].colors[item.color].onHand++;
+          groupedData[baseKey].colors[item.color].available++;
+          groupedData[baseKey].colors[item.color].onHandItems.push(item);
         }
-        
-        colorData.available = colorData.onDisplay + colorData.onHand;
       });
       
-      // Process grouped data
-      Object.values(groupedData).forEach(group => {
-        group.totalAvailable = group.totalOnDisplay + group.totalOnHand;
+      // NEW: Fetch procurement data to calculate pending items
+      const procurementsRef = collection(db, 'procurements');
+      const procurementsSnapshot = await getDocs(procurementsRef);
+      
+      procurementsSnapshot.forEach(doc => {
+        const procurement = { id: doc.id, ...doc.data() };
         
-        group.colors = Object.values(group.colors).map(colorData => {
-          const sortByLastUpdated = (a, b) => {
-            const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
-            const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
-            return dateA - dateB;
-          };
-          
-          colorData.soldItems.sort(sortByLastUpdated);
-          colorData.onDisplayItems.sort(sortByLastUpdated);
-          colorData.onHandItems.sort(sortByLastUpdated);
-          
-          return colorData;
-        }).sort((a, b) => a.color.localeCompare(b.color));
+        // Only process if delivery status is pending
+        if (procurement.deliveryStatus === 'pending' && procurement.items && Array.isArray(procurement.items)) {
+          procurement.items.forEach(item => {
+            // Check if this model should be excluded from summary
+            const modelKey = `${item.manufacturer}_${item.model}`;
+            if (excludedModels.has(modelKey)) {
+              return; // Skip this item
+            }
+            
+            const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
+            
+            // If this configuration exists in grouped data, update pending count
+            if (groupedData[baseKey]) {
+              groupedData[baseKey].totalPending += (item.quantity || 0);
+              
+              // Update color-specific pending count
+              if (groupedData[baseKey].colors[item.color]) {
+                groupedData[baseKey].colors[item.color].pending += (item.quantity || 0);
+              } else {
+                // Create color entry if it doesn't exist yet
+                groupedData[baseKey].colors[item.color] = {
+                  color: item.color,
+                  sold: 0,
+                  onDisplay: 0,
+                  onHand: 0,
+                  available: 0,
+                  pending: item.quantity || 0,
+                  dealersPrice: item.dealersPrice || 0,
+                  retailPrice: item.retailPrice || 0,
+                  soldItems: [],
+                  onDisplayItems: [],
+                  onHandItems: []
+                };
+              }
+            } else {
+              // Create new entry if this configuration doesn't exist yet
+              groupedData[baseKey] = {
+                manufacturer: item.manufacturer,
+                model: item.model,
+                ram: item.ram,
+                storage: item.storage,
+                totalSold: 0,
+                totalOnDisplay: 0,
+                totalOnHand: 0,
+                totalAvailable: 0,
+                totalPending: item.quantity || 0,
+                dealersPrice: item.dealersPrice || 0,
+                retailPrice: item.retailPrice || 0,
+                colors: {
+                  [item.color]: {
+                    color: item.color,
+                    sold: 0,
+                    onDisplay: 0,
+                    onHand: 0,
+                    available: 0,
+                    pending: item.quantity || 0,
+                    soldItems: [],
+                    onDisplayItems: [],
+                    onHandItems: []
+                  }
+                }
+              };
+              
+              // Add to filter options if not already present
+              if (item.manufacturer) manufacturers.add(item.manufacturer);
+              if (item.model) models.add(item.model);
+              if (item.ram) rams.add(item.ram);
+              if (item.storage) storages.add(item.storage);
+              if (item.color) colors.add(item.color);
+            }
+          });
+        }
       });
       
-      // UPDATED: Helper function to extract numeric value from RAM/storage strings
+      // Convert colors object to array and sort by color name
+      Object.values(groupedData).forEach(item => {
+        item.colors = Object.values(item.colors).sort((a, b) => 
+          a.color.localeCompare(b.color)
+        );
+      });
+      
+      // Helper function to extract numeric value from RAM/Storage strings
       const extractNumericValue = (value) => {
         if (!value) return 0;
-        // Extract the number from strings like "3GB", "128GB", "1TB", etc.
+        
+        // Extract numeric value and unit
         const match = value.match(/(\d+(?:\.\d+)?)/);
         if (!match) return 0;
         
@@ -721,13 +789,14 @@ const InventorySummaryForm = () => {
                       <th className="px-3 py-3 text-left">RAM</th>
                       <th className="px-3 py-3 text-left">Storage</th>
                       <th className="px-3 py-3 text-left">Colors</th>
-                      <th className="pl-0 pr-1 py-3 text-right">{"Dealer's Price"}</th>
-                      <th className="px-1 py-3 text-right">Retail Price</th>
+                      <th className="pl-0 pr-1 py-3 text-center">DP</th>
+                      <th className="px-1 py-3 text-center">SRP</th>
                       <th className="px-1 py-3 text-right">Margin</th>
                       <th className="pl-12 pr-1 py-3 text-center">Sold</th>
                       <th className="px-1 py-3 text-center">Display</th>
                       <th className="px-1 py-3 text-center">Stock</th>
                       <th className="px-1 py-3 text-center">Available</th>
+                      <th className="px-1 py-3 text-center">Pending</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -784,6 +853,11 @@ const InventorySummaryForm = () => {
                               {item.totalAvailable}
                             </span>
                           </td>
+                          <td className="px-1 py-2 text-sm text-center">
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">
+                              {item.totalPending}
+                            </span>
+                          </td>
                         </tr>
 {/* Part 7 End - Excluded Models Info and Table Start */}
 
@@ -791,7 +865,7 @@ const InventorySummaryForm = () => {
                         {/* Expanded color breakdown */}
                         {expandedRows.has(index) && (
                           <tr>
-                            <td colSpan="12" className="px-0 py-0 border-b border-gray-200">
+                            <td colSpan="13" className="px-0 py-0 border-b border-gray-200">
                               <div className="px-4 pb-4 pt-2 bg-gray-100">
                                 <div className="space-y-4">
                                   <h4 className="font-semibold text-gray-700 mb-3">
@@ -817,6 +891,9 @@ const InventorySummaryForm = () => {
                                               </span>
                                               <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                                                 Available: {colorData.available}
+                                              </span>
+                                              <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                                                Pending: {colorData.pending}
                                               </span>
                                             </div>
                                           </div>
