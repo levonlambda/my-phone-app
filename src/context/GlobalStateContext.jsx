@@ -20,6 +20,7 @@ export const GlobalStateProvider = ({ children }) => {
   const [activeComponent, setActiveComponent] = useState('summary');
   const [isViewingProcurement, setIsViewingProcurement] = useState(false); // Track view vs edit mode
   const [procurementMode, setProcurementMode] = useState(''); // NEW: Track procurement mode ('view', 'edit', 'payment')
+  const [procurementForReceiving, setProcurementForReceiving] = useState(null); // NEW: State for stock receiving
   
   // ====== PHONE EDITING FUNCTIONS ======
   // Function to set a phone for editing and switch to form
@@ -70,11 +71,22 @@ export const GlobalStateProvider = ({ children }) => {
     setActiveComponent('procurement');
   };
   
+  // NEW: Function to open stock receiving form with procurement data
+  const receiveProcurement = (procurement) => {
+    setProcurementForReceiving(procurement);
+    setActiveComponent('stockreceiving');
+  };
+  
   // Function to clear the selected procurement
   const clearProcurementToEdit = () => {
     setProcurementToEdit(null);
     setIsViewingProcurement(false); // Reset view mode
     setProcurementMode(''); // NEW: Reset mode
+  };
+  
+  // NEW: Function to clear procurement for receiving
+  const clearProcurementForReceiving = () => {
+    setProcurementForReceiving(null);
   };
   
   // ====== CONTEXT VALUE OBJECT ======
@@ -90,9 +102,12 @@ export const GlobalStateProvider = ({ children }) => {
     editProcurement,
     viewProcurement,
     paymentProcurement, // NEW: Add payment function
+    receiveProcurement, // NEW: Add receive function
     clearProcurementToEdit,
     isViewingProcurement,
     procurementMode, // NEW: Add procurement mode state
+    procurementForReceiving, // NEW: Add procurement for receiving state
+    clearProcurementForReceiving, // NEW: Add clear function
     activeComponent,
     setActiveComponent
   };

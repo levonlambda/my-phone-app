@@ -23,7 +23,7 @@ import supplierService from '../services/supplierService';
 
 const ProcurementManagementForm = () => {
   // ====== GLOBAL STATE ======
-  const { editProcurement, viewProcurement, paymentProcurement } = useGlobalState(); // ADDED: paymentProcurement
+  const { editProcurement, viewProcurement, paymentProcurement, receiveProcurement } = useGlobalState(); // ADDED: receiveProcurement
 
   // ====== STATE DEFINITIONS ======
   // State for procurement data
@@ -188,10 +188,11 @@ const ProcurementManagementForm = () => {
     paymentProcurement(procurement);
   };
 
-  // NEW: Handle delivery status click
+  // CHANGED: Handle delivery status click to open stock receiving form
   const handleDeliveryUpdate = (procurement) => {
-    console.log('Delivery clicked for procurement:', procurement.id);
-    // TODO: Will implement stock receiving functionality later
+    console.log('Opening stock receiving for procurement:', procurement.id);
+    // Use global state to open stock receiving form with procurement data
+    receiveProcurement(procurement);
   };
 
   const handleViewProcurement = (procurement) => {
@@ -218,40 +219,19 @@ const ProcurementManagementForm = () => {
       `Payment Status: ${isPaid ? 'PAID' : 'UNPAID'}\n\n` +
       `This will:\n` +
       (isPaid 
-        ? `• Mark both purchase and payment ledger entries as deleted\n• Supplier balance will remain unchanged\n`
-        : `• Remove ₱${formatPrice(procurement.grandTotal?.toString() || '0')} from supplier's outstanding balance\n• Mark the purchase ledger entry as deleted\n`) +
-      `• Permanently delete the procurement record\n\n` +
-      `This action cannot be undone!`;
+        ? `• Update supplier balance (Deduct ₱${formatPrice(procurement.grandTotal?.toString() || '0')})\n• Remove payment record\n• Delete all procurement items`
+        : `• Delete all procurement items\n• Not affect supplier balance (unpaid)`) +
+      `\n\nThis action cannot be undone.`;
     
-    if (window.confirm(confirmMessage)) {
+    if (confirm(confirmMessage)) {
+      setLoading(true);
+      
       try {
-        setLoading(true);
-        setError('');
-        
-        console.log("Deleting procurement with supplier service:", procurement.id);
-        
-        const result = await supplierService.deleteProcurement(procurement.id);
+        // Use supplier service to properly delete procurement and update supplier
+        const result = await supplierService.deleteProcurement(procurement.id, procurement.supplierId);
         
         if (result.success) {
-          console.log("Procurement deleted successfully:", result);
-          
-          // ENHANCED: Show detailed success message based on payment status
-          let message = `Procurement deleted successfully!\n\n`;
-          message += `Reference: ${procurement.reference || procurement.id}\n`;
-          message += `Supplier: ${procurement.supplierName}\n`;
-          message += `Amount: ₱${formatPrice(procurement.grandTotal?.toString() || '0')}\n`;
-          
-          if (result.wasPaid) {
-            message += `\n✅ This was a PAID procurement\n`;
-            message += `• Both purchase and payment entries marked as deleted\n`;
-            message += `• Supplier balance remains: ₱${formatPrice(result.finalBalance?.toString() || '0')}`;
-          } else {
-            message += `\n❌ This was an UNPAID procurement\n`;
-            message += `• Purchase entry marked as deleted\n`;
-            message += `• Supplier balance reduced to: ₱${formatPrice(result.finalBalance?.toString() || '0')}`;
-          }
-          
-          alert(message);
+          console.log("Procurement deleted successfully");
           
           // Refresh the procurement list
           await fetchAllProcurements();
