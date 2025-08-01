@@ -11,6 +11,7 @@ import {
 import { useGlobalState } from '../context/GlobalStateContext';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { checkDuplicateImeis } from './phone-selection/services/InventoryService';
 
 const StockReceivingForm = () => {
   // Get procurement data from global state
@@ -31,6 +32,10 @@ const StockReceivingForm = () => {
   
   // State for view-only mode
   const [isViewOnly, setIsViewOnly] = useState(false);
+  
+  // State for validation errors
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [isValidating, setIsValidating] = useState(false);
   
   // Use actual procurement data or dummy data for testing - wrapped in useMemo to prevent recreating on every render
   const procurementData = useMemo(() => {
@@ -234,6 +239,15 @@ const StockReceivingForm = () => {
         item.id === itemId ? { ...item, [field]: value } : item
       )
     );
+    
+    // Clear error for this field when user types
+    if (fieldErrors[`${field}-${itemId}`]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`${field}-${itemId}`];
+        return newErrors;
+      });
+    }
   };
 
   // Handle bulk location set
@@ -243,6 +257,17 @@ const StockReceivingForm = () => {
     setReceivingItems(prevItems =>
       prevItems.map(item => ({ ...item, location: bulkLocation }))
     );
+    
+    // Clear all location errors
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      Object.keys(newErrors).forEach(key => {
+        if (key.startsWith('location-')) {
+          delete newErrors[key];
+        }
+      });
+      return newErrors;
+    });
   };
 
   // Handle barcode change for a group
@@ -258,6 +283,13 @@ const StockReceivingForm = () => {
         item.groupId === groupId ? { ...item, barcode: value.toUpperCase() } : item
       )
     );
+    
+    // Clear barcode errors for this group
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[`barcode-group-${groupId}`];
+      return newErrors;
+    });
   };
 
   // Toggle barcode edit mode
@@ -305,14 +337,134 @@ const StockReceivingForm = () => {
     }
   };
 
+  // Check for duplicate serial numbers
+  const checkDuplicateSerialNumbers = async (serialNumber, excludeItemId = null) => {
+    if (!serialNumber) return { isValid: true, error: '' };
+    
+    try {
+      const serialQuery = query(
+        collection(db, 'inventory'),
+        where("serialNumber", "==", serialNumber)
+      );
+      const serialSnapshot = await getDocs(serialQuery);
+      
+      // Check if found document is not the current item being edited
+      const foundDocs = serialSnapshot.docs.filter(doc => doc.id !== excludeItemId);
+      if (foundDocs.length > 0) {
+        return {
+          isValid: false,
+          error: 'This serial number already exists in inventory'
+        };
+      }
+      
+      return { isValid: true, error: '' };
+    } catch (error) {
+      console.error("Error checking serial number:", error);
+      return {
+        isValid: false,
+        error: 'Error checking serial number'
+      };
+    }
+  };
+
+  // Validate all fields before submission
+  const validateForm = async () => {
+    const errors = {};
+    let hasErrors = false;
+    
+    // Validate reference field
+    if (!deliveryReference.trim()) {
+      errors['reference'] = 'Reference is required';
+      hasErrors = true;
+    }
+    
+    // Validate each item
+    for (const item of receivingItems) {
+      // Validate IMEI1
+      if (!item.imei1) {
+        errors[`imei1-${item.id}`] = 'IMEI1 is required';
+        hasErrors = true;
+      } else if (item.imei1.length !== 15) {
+        errors[`imei1-${item.id}`] = 'IMEI1 must be exactly 15 digits';
+        hasErrors = true;
+      }
+      
+      // Validate location
+      if (!item.location) {
+        errors[`location-${item.id}`] = 'Location is required';
+        hasErrors = true;
+      }
+      
+      // Validate barcode for group
+      const groupBarcode = groupBarcodes[item.groupId];
+      if (!groupBarcode) {
+        errors[`barcode-group-${item.groupId}`] = 'Barcode is required';
+        hasErrors = true;
+      }
+    }
+    
+    // Check for duplicate IMEIs and serial numbers
+    if (!hasErrors) {
+      for (const item of receivingItems) {
+        // Check IMEI duplicates
+        const imeiCheck = await checkDuplicateImeis(item.imei1, item.imei2);
+        if (!imeiCheck.isValid) {
+          if (imeiCheck.imei1Error) {
+            errors[`imei1-${item.id}`] = imeiCheck.imei1Error;
+            hasErrors = true;
+          }
+          if (imeiCheck.imei2Error) {
+            errors[`imei2-${item.id}`] = imeiCheck.imei2Error;
+            hasErrors = true;
+          }
+        }
+        
+        // Check serial number duplicates
+        if (item.serialNumber) {
+          const serialCheck = await checkDuplicateSerialNumbers(item.serialNumber);
+          if (!serialCheck.isValid) {
+            errors[`serialNumber-${item.id}`] = serialCheck.error;
+            hasErrors = true;
+          }
+        }
+      }
+    }
+    
+    return { errors, hasErrors };
+  };
+
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Start validation
+    setIsValidating(true);
+    setFieldErrors({});
+    
+    // Validate form
+    const { errors, hasErrors } = await validateForm();
+    
+    if (hasErrors) {
+      setFieldErrors(errors);
+      setIsValidating(false);
+      // Scroll to first error
+      const firstErrorField = document.querySelector('.border-red-500');
+      if (firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstErrorField.focus();
+      }
+      return;
+    }
+    
+    // If validation passed, proceed with submission
     console.log('Submitting receiving items:', receivingItems);
     console.log('Procurement ID:', procurementData.id);
     console.log('Date Delivered:', dateDelivered);
     console.log('Delivery Reference:', deliveryReference);
+    
     // TODO: Implement actual submission logic
+    
+    setIsValidating(false);
   };
 
   // Handle cancel - return to procurement management
@@ -381,14 +533,29 @@ const StockReceivingForm = () => {
                   <label className="block text-sm font-semibold text-[rgb(52,69,157)]">
                     Reference:
                   </label>
-                  <input
-                    type="text"
-                    value={deliveryReference}
-                    onChange={(e) => setDeliveryReference(e.target.value)}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                    placeholder="Delivery Receipt #"
-                    disabled={isViewOnly}
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      value={deliveryReference}
+                      onChange={(e) => {
+                        setDeliveryReference(e.target.value);
+                        // Clear reference error when user types
+                        if (fieldErrors['reference']) {
+                          setFieldErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors['reference'];
+                            return newErrors;
+                          });
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border rounded text-sm ${fieldErrors['reference'] ? 'border-red-500' : ''}`}
+                      placeholder="Delivery Receipt #"
+                      disabled={isViewOnly}
+                    />
+                    {fieldErrors['reference'] && (
+                      <p className="text-red-500 text-xs mt-1">{fieldErrors['reference']}</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Bulk Location */}
@@ -467,63 +634,84 @@ const StockReceivingForm = () => {
                 {isViewOnly ? 'Received Items' : 'Items to Receive'}
               </h3>
               
+              {/* Items grouped by product */}
               {Object.entries(groupedItems).map(([groupKey, group]) => (
                 <div key={groupKey} className="border rounded-lg overflow-hidden">
                   {/* Group Header */}
-                  <div className="bg-gray-100 p-4 border-b">
-                    <div className="flex flex-wrap gap-x-6 gap-y-2 text-base font-semibold items-center">
-                      <span>{group.product.manufacturer}</span>
-                      <span className="text-gray-600">•</span>
-                      <span>({group.items.length} {group.items.length === 1 ? 'pc' : 'pcs'})</span>
-                      <span className="text-gray-600">•</span>
-                      <span>{group.product.model}</span>
-                      <span className="text-gray-600">•</span>
-                      <span>{group.product.ram} / {group.product.storage}</span>
-                      <span className="text-gray-600">•</span>
-                      <span>{group.product.color}</span>
-                      <span className="text-gray-600">•</span>
-                      <span>Retail Price: ₱{formatPrice(group.product.retailPrice)}</span>
-                      <div className="flex items-center gap-2 ml-auto">
-                        <button
-                          type="button"
-                          onClick={() => toggleBarcodeEditMode(groupKey)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-                          disabled={isViewOnly}
-                        >
-                          {barcodeEditMode[groupKey] ? 'Save' : 'Barcode'}
-                        </button>
-                        <span className="font-mono text-sm">
-                          {barcodeEditMode[groupKey] ? (
-                            <input
-                              type="text"
-                              value={groupBarcodes[groupKey] || ''}
-                              onChange={(e) => handleGroupBarcodeChange(groupKey, e.target.value)}
-                              className="px-2 py-1 border rounded text-sm font-mono uppercase"
-                              placeholder="Enter barcode"
-                              autoFocus
-                              disabled={isViewOnly}
-                            />
-                          ) : (
-                            <span className="bg-gray-200 px-2 py-1 rounded">
+                  <div className="bg-gray-100 px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-x-6">
+                      <span className="text-base font-semibold">{group.product.manufacturer}</span>
+                      <span className="text-base font-semibold">•</span>
+                      <span className="text-base font-semibold">({group.items.length} {group.items.length === 1 ? 'pc' : 'pcs'})</span>
+                      <span className="text-base font-semibold">•</span>
+                      <span className="text-base font-semibold">{group.product.model}</span>
+                      <span className="text-base font-semibold">•</span>
+                      <span className="text-base font-semibold">{group.product.ram} / {group.product.storage}</span>
+                      <span className="text-base font-semibold">•</span>
+                      <span className="text-base font-semibold">{group.product.color}</span>
+                      <span className="text-base font-semibold">•</span>
+                      <span className="text-base font-semibold">Retail Price: ₱{formatPrice(group.product.retailPrice)}</span>
+                    </div>
+                    
+                    {/* Barcode Edit - Button First, Field Second */}
+                    <div className="flex items-center gap-2">
+                      {barcodeEditMode[groupKey] ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleBarcodeEditMode(groupKey)}
+                            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                            disabled={isViewOnly}
+                          >
+                            Save
+                          </button>
+                          <input
+                            type="text"
+                            value={groupBarcodes[groupKey] || ''}
+                            onChange={(e) => handleGroupBarcodeChange(groupKey, e.target.value)}
+                            className={`px-2 py-1 border rounded text-sm w-32 ${fieldErrors[`barcode-group-${groupKey}`] ? 'border-red-500' : ''}`}
+                            placeholder="Enter barcode"
+                            disabled={isViewOnly}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleBarcodeEditMode(groupKey)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                            disabled={isViewOnly}
+                          >
+                            Barcode
+                          </button>
+                          <div className="flex flex-col">
+                            <div className={`px-2 py-1 border rounded text-sm font-mono min-w-[8rem] ${
+                              !groupBarcodes[groupKey] 
+                                ? 'border-red-500 text-red-600 bg-red-50' 
+                                : 'border-gray-300 bg-white'
+                            }`}>
                               {groupBarcodes[groupKey] || 'NO BARCODE'}
-                            </span>
-                          )}
-                        </span>
-                      </div>
+                            </div>
+                            {fieldErrors[`barcode-group-${groupKey}`] && (
+                              <p className="text-red-500 text-xs mt-1">{fieldErrors[`barcode-group-${groupKey}`]}</p>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-
+                  
                   {/* Items Table */}
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="border px-3 py-2 text-left font-semibold w-12">#</th>
-                          <th className="border px-3 py-2 text-left font-semibold">IMEI 1</th>
-                          <th className="border px-3 py-2 text-left font-semibold">IMEI 2</th>
-                          <th className="border px-3 py-2 text-left font-semibold">Serial Number</th>
-                          <th className="border px-3 py-2 text-left font-semibold">Location</th>
-                          <th className="border px-3 py-2 text-left font-semibold">Status</th>
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-y">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">#</th>
+                          <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">IMEI 1</th>
+                          <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">IMEI 2</th>
+                          <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Serial Number</th>
+                          <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Location</th>
+                          <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -531,66 +719,86 @@ const StockReceivingForm = () => {
                           <tr key={item.id} className={`border-b ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                             <td className="px-3 py-3 text-sm">{index + 1}</td>
                             <td className="px-3 py-3">
-                              <input
-                                type="text"
-                                value={item.imei1}
-                                onChange={(e) => handleItemChange(item.id, 'imei1', e.target.value)}
-                                onKeyDown={(e) => handleKeyDown(e, groupKey, index, 'imei1')}
-                                data-group={groupKey}
-                                data-item={index}
-                                data-field="imei1"
-                                className="w-full px-2 py-1.5 border rounded text-sm"
-                                placeholder="15-digit IMEI"
-                                maxLength={15}
-                                required
-                                disabled={isViewOnly}
-                              />
+                              <div>
+                                <input
+                                  type="text"
+                                  value={item.imei1}
+                                  onChange={(e) => handleItemChange(item.id, 'imei1', e.target.value)}
+                                  onKeyDown={(e) => handleKeyDown(e, groupKey, index, 'imei1')}
+                                  data-group={groupKey}
+                                  data-item={index}
+                                  data-field="imei1"
+                                  className={`w-full px-2 py-1.5 border rounded text-sm ${fieldErrors[`imei1-${item.id}`] ? 'border-red-500' : ''}`}
+                                  placeholder="15-digit IMEI"
+                                  maxLength={15}
+                                  required
+                                  disabled={isViewOnly}
+                                />
+                                {fieldErrors[`imei1-${item.id}`] && (
+                                  <p className="text-red-500 text-xs mt-1">{fieldErrors[`imei1-${item.id}`]}</p>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-3">
-                              <input
-                                type="text"
-                                value={item.imei2}
-                                onChange={(e) => handleItemChange(item.id, 'imei2', e.target.value)}
-                                onKeyDown={(e) => handleKeyDown(e, groupKey, index, 'imei2')}
-                                data-group={groupKey}
-                                data-item={index}
-                                data-field="imei2"
-                                className="w-full px-2 py-1.5 border rounded text-sm"
-                                placeholder="Optional"
-                                maxLength={15}
-                                disabled={isViewOnly}
-                              />
+                              <div>
+                                <input
+                                  type="text"
+                                  value={item.imei2}
+                                  onChange={(e) => handleItemChange(item.id, 'imei2', e.target.value)}
+                                  onKeyDown={(e) => handleKeyDown(e, groupKey, index, 'imei2')}
+                                  data-group={groupKey}
+                                  data-item={index}
+                                  data-field="imei2"
+                                  className={`w-full px-2 py-1.5 border rounded text-sm ${fieldErrors[`imei2-${item.id}`] ? 'border-red-500' : ''}`}
+                                  placeholder="Optional"
+                                  maxLength={15}
+                                  disabled={isViewOnly}
+                                />
+                                {fieldErrors[`imei2-${item.id}`] && (
+                                  <p className="text-red-500 text-xs mt-1">{fieldErrors[`imei2-${item.id}`]}</p>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-3">
-                              <input
-                                type="text"
-                                value={item.serialNumber}
-                                onChange={(e) => handleItemChange(item.id, 'serialNumber', e.target.value)}
-                                onKeyDown={(e) => handleKeyDown(e, groupKey, index, 'serialNumber')}
-                                data-group={groupKey}
-                                data-item={index}
-                                data-field="serialNumber"
-                                className="w-full px-2 py-1.5 border rounded text-sm"
-                                placeholder="Optional"
-                                disabled={isViewOnly}
-                              />
+                              <div>
+                                <input
+                                  type="text"
+                                  value={item.serialNumber}
+                                  onChange={(e) => handleItemChange(item.id, 'serialNumber', e.target.value)}
+                                  onKeyDown={(e) => handleKeyDown(e, groupKey, index, 'serialNumber')}
+                                  data-group={groupKey}
+                                  data-item={index}
+                                  data-field="serialNumber"
+                                  className={`w-full px-2 py-1.5 border rounded text-sm ${fieldErrors[`serialNumber-${item.id}`] ? 'border-red-500' : ''}`}
+                                  placeholder="Optional"
+                                  disabled={isViewOnly}
+                                />
+                                {fieldErrors[`serialNumber-${item.id}`] && (
+                                  <p className="text-red-500 text-xs mt-1">{fieldErrors[`serialNumber-${item.id}`]}</p>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-3">
-                              <input
-                                type="text"
-                                value={item.location}
-                                onChange={(e) => handleItemChange(item.id, 'location', e.target.value)}
-                                className="w-full px-2 py-1.5 border rounded text-sm"
-                                placeholder="Location"
-                                required
-                                disabled={isViewOnly}
-                              />
+                              <div>
+                                <input
+                                  type="text"
+                                  value={item.location}
+                                  onChange={(e) => handleItemChange(item.id, 'location', e.target.value)}
+                                  className={`w-full px-2 py-1.5 border rounded text-sm ${fieldErrors[`location-${item.id}`] ? 'border-red-500' : ''}`}
+                                  placeholder="Required"
+                                  required
+                                  disabled={isViewOnly}
+                                />
+                                {fieldErrors[`location-${item.id}`] && (
+                                  <p className="text-red-500 text-xs mt-1">{fieldErrors[`location-${item.id}`]}</p>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-3">
                               <select
                                 value={item.status}
                                 onChange={(e) => handleItemChange(item.id, 'status', e.target.value)}
-                                className={`w-full px-2 py-1.5 border rounded text-sm font-medium ${
+                                className={`w-full px-2 py-1.5 border rounded text-sm ${
                                   item.status === 'Stock' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                                   item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
                                   item.status === 'Sold' ? 'bg-purple-100 text-purple-800 border-purple-300' :
@@ -631,9 +839,14 @@ const StockReceivingForm = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 text-sm font-medium"
+                  disabled={isValidating}
+                  className={`px-6 py-2.5 rounded text-sm font-medium ${
+                    isValidating 
+                      ? 'bg-gray-400 text-white cursor-not-allowed' 
+                      : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
+                  }`}
                 >
-                  Receive Items ({receivingItems.length} units)
+                  {isValidating ? 'Validating...' : `Receive Items (${receivingItems.length} units)`}
                 </button>
               </div>
             )}
