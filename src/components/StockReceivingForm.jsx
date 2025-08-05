@@ -688,7 +688,7 @@ const StockReceivingForm = () => {
                             <div className={`px-2 py-1 border rounded text-sm font-mono min-w-[8rem] ${
                               !groupBarcodes[groupKey] 
                                 ? 'border-red-500 text-red-600 bg-red-50' 
-                                : 'border-gray-300 bg-white'
+                                : 'border-gray-300 bg-gray-100'
                             }`}>
                               {groupBarcodes[groupKey] || 'NO BARCODE'}
                             </div>
