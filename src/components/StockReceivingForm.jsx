@@ -6,12 +6,25 @@ import {
   Calendar, 
   Building2,
   MapPin,
-  X
+  X,
+  CheckCircle,
+  Loader
 } from 'lucide-react';
 import { useGlobalState } from '../context/GlobalStateContext';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  limit,
+  doc,
+  writeBatch,
+  runTransaction,
+  increment
+} from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { checkDuplicateImeis } from './phone-selection/services/InventoryService';
+import { createInventoryId, getCurrentDate } from './phone-selection/utils/phoneUtils';
 
 const StockReceivingForm = () => {
   // Get procurement data from global state
@@ -36,6 +49,12 @@ const StockReceivingForm = () => {
   // State for validation errors
   const [fieldErrors, setFieldErrors] = useState({});
   const [isValidating, setIsValidating] = useState(false);
+  
+  // State for save process
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState('');
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   
   // Use actual procurement data or dummy data for testing - wrapped in useMemo to prevent recreating on every render
   const procurementData = useMemo(() => {
@@ -336,28 +355,24 @@ const StockReceivingForm = () => {
       }
     }
   };
-
+  
   // Check for duplicate serial numbers
-  const checkDuplicateSerialNumbers = async (serialNumber, excludeItemId = null) => {
-    if (!serialNumber) return { isValid: true, error: '' };
+  const checkDuplicateSerialNumbers = async (serialNumber) => {
+    if (!serialNumber) return { isValid: true };
     
     try {
-      const serialQuery = query(
-        collection(db, 'inventory'),
-        where("serialNumber", "==", serialNumber)
-      );
-      const serialSnapshot = await getDocs(serialQuery);
+      const inventoryRef = collection(db, 'inventory');
+      const q = query(inventoryRef, where("serialNumber", "==", serialNumber));
+      const snapshot = await getDocs(q);
       
-      // Check if found document is not the current item being edited
-      const foundDocs = serialSnapshot.docs.filter(doc => doc.id !== excludeItemId);
-      if (foundDocs.length > 0) {
+      if (!snapshot.empty) {
         return {
           isValid: false,
           error: 'This serial number already exists in inventory'
         };
       }
       
-      return { isValid: true, error: '' };
+      return { isValid: true };
     } catch (error) {
       console.error("Error checking serial number:", error);
       return {
@@ -366,21 +381,21 @@ const StockReceivingForm = () => {
       };
     }
   };
-
-  // Validate all fields before submission
+  
+  // Validate form
   const validateForm = async () => {
     const errors = {};
     let hasErrors = false;
     
-    // Validate reference field
+    // Check reference field
     if (!deliveryReference.trim()) {
-      errors['reference'] = 'Reference is required';
+      errors['reference'] = 'Delivery reference is required';
       hasErrors = true;
     }
     
-    // Validate each item
+    // Check each item
     for (const item of receivingItems) {
-      // Validate IMEI1
+      // Check IMEI1
       if (!item.imei1) {
         errors[`imei1-${item.id}`] = 'IMEI1 is required';
         hasErrors = true;
@@ -389,13 +404,19 @@ const StockReceivingForm = () => {
         hasErrors = true;
       }
       
-      // Validate location
+      // Check IMEI2
+      if (item.imei2 && item.imei2.length !== 15) {
+        errors[`imei2-${item.id}`] = 'IMEI2 must be exactly 15 digits';
+        hasErrors = true;
+      }
+      
+      // Check location
       if (!item.location) {
         errors[`location-${item.id}`] = 'Location is required';
         hasErrors = true;
       }
       
-      // Validate barcode for group
+      // Check barcode for group
       const groupBarcode = groupBarcodes[item.groupId];
       if (!groupBarcode) {
         errors[`barcode-group-${item.groupId}`] = 'Barcode is required';
@@ -456,15 +477,171 @@ const StockReceivingForm = () => {
       return;
     }
     
-    // If validation passed, proceed with submission
-    console.log('Submitting receiving items:', receivingItems);
-    console.log('Procurement ID:', procurementData.id);
-    console.log('Date Delivered:', dateDelivered);
-    console.log('Delivery Reference:', deliveryReference);
-    
-    // TODO: Implement actual submission logic
-    
+    // If validation passed, show confirmation dialog
     setIsValidating(false);
+    setShowConfirmDialog(true);
+  };
+
+  // Confirm and save
+  const handleConfirmSave = async () => {
+    setShowConfirmDialog(false);
+    setIsSaving(true);
+    setSaveProgress('Preparing to save items...');
+
+    try {
+      const batch = writeBatch(db);
+      let itemsSaved = 0;
+
+      // 1. Add items to inventory collection
+      setSaveProgress('Adding items to inventory...');
+      
+      for (const item of receivingItems) {
+        const inventoryData = {
+          manufacturer: item.manufacturer,
+          model: item.model,
+          ram: item.ram,
+          storage: item.storage,
+          color: item.color,
+          dealersPrice: item.dealersPrice,
+          retailPrice: item.retailPrice,
+          imei1: item.imei1,
+          imei2: item.imei2 || '',
+          serialNumber: item.serialNumber || '',
+          barcode: groupBarcodes[item.groupId] || '',
+          location: item.location,
+          status: item.status,
+          supplier: procurementData.supplierName,
+          supplierId: procurementData.supplierId || '',
+          lastUpdated: dateDelivered,
+          dateAdded: dateDelivered
+        };
+
+        const docRef = doc(collection(db, 'inventory'));
+        batch.set(docRef, inventoryData);
+        itemsSaved++;
+      }
+
+      // 2. Update inventory_counts collection
+      setSaveProgress('Updating inventory counts...');
+      
+      // Group items by product configuration for count updates
+      const countUpdates = {};
+      receivingItems.forEach(item => {
+        const inventoryId = createInventoryId(
+          item.manufacturer,
+          item.model,
+          item.ram,
+          item.storage,
+          item.color
+        );
+        
+        if (!countUpdates[inventoryId]) {
+          countUpdates[inventoryId] = {
+            manufacturer: item.manufacturer,
+            model: item.model,
+            ram: item.ram,
+            storage: item.storage,
+            color: item.color,
+            counts: {
+              Stock: 0,
+              'On-Display': 0,
+              Sold: 0,
+              Reserved: 0,
+              Defective: 0
+            }
+          };
+        }
+        
+        countUpdates[inventoryId].counts[item.status]++;
+      });
+
+      // Update counts using transactions for each product configuration
+      for (const [inventoryId, data] of Object.entries(countUpdates)) {
+        await runTransaction(db, async (transaction) => {
+          const inventoryRef = doc(db, 'inventory_counts', inventoryId);
+          const inventoryDoc = await transaction.get(inventoryRef);
+          
+          if (!inventoryDoc.exists()) {
+            // Create new inventory count document
+            transaction.set(inventoryRef, {
+              manufacturer: data.manufacturer,
+              model: data.model,
+              ram: data.ram,
+              storage: data.storage,
+              color: data.color,
+              total: data.counts.Stock + data.counts['On-Display'] + data.counts.Sold + 
+                     data.counts.Reserved + data.counts.Defective,
+              onHand: data.counts.Stock,
+              onDisplay: data.counts['On-Display'],
+              sold: data.counts.Sold,
+              reserved: data.counts.Reserved,
+              defective: data.counts.Defective,
+              lastUpdated: getCurrentDate()
+            });
+          } else {
+            // Update existing counts
+            transaction.update(inventoryRef, {
+              total: increment(data.counts.Stock + data.counts['On-Display'] + 
+                            data.counts.Sold + data.counts.Reserved + data.counts.Defective),
+              onHand: increment(data.counts.Stock),
+              onDisplay: increment(data.counts['On-Display']),
+              sold: increment(data.counts.Sold),
+              reserved: increment(data.counts.Reserved),
+              defective: increment(data.counts.Defective),
+              lastUpdated: getCurrentDate()
+            });
+          }
+        });
+      }
+
+      // 3. Update procurement record
+      setSaveProgress('Updating procurement record...');
+      const procurementRef = doc(db, 'procurements', procurementData.id);
+      batch.update(procurementRef, {
+        deliveryStatus: 'delivered',
+        dateDelivered: dateDelivered,
+        deliveryReference: deliveryReference
+      });
+
+      // 4. Create ledger entry for delivery
+      if (procurementData.supplierId) {
+        setSaveProgress('Creating delivery ledger entry...');
+        const ledgerData = {
+          supplierId: procurementData.supplierId,
+          supplierName: procurementData.supplierName,
+          procurementId: procurementData.id,
+          entryType: 'delivery',
+          description: `Stock received - ${receivingItems.length} units`,
+          reference: deliveryReference,
+          entryDate: dateDelivered,
+          createdAt: new Date().toISOString(),
+          isDeleted: false
+        };
+
+        const ledgerRef = doc(collection(db, 'supplier_ledger'));
+        batch.set(ledgerRef, ledgerData);
+      }
+
+      // Commit all batch operations
+      setSaveProgress('Finalizing save...');
+      await batch.commit();
+
+      // Show success
+      setSaveProgress(`Successfully added ${itemsSaved} items to inventory!`);
+      setSaveSuccess(true);
+
+      // Wait a moment then close
+      setTimeout(() => {
+        clearProcurementForReceiving();
+        setActiveComponent('procurementmgmt');
+      }, 2000);
+
+    } catch (error) {
+      console.error('Error saving items:', error);
+      alert(`Error saving items: ${error.message}`);
+      setIsSaving(false);
+      setSaveProgress('');
+    }
   };
 
   // Handle cancel - return to procurement management
@@ -839,9 +1016,9 @@ const StockReceivingForm = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isValidating}
+                  disabled={isValidating || isSaving}
                   className={`px-6 py-2.5 rounded text-sm font-medium ${
-                    isValidating 
+                    isValidating || isSaving
                       ? 'bg-gray-400 text-white cursor-not-allowed' 
                       : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
                   }`}
@@ -853,6 +1030,56 @@ const StockReceivingForm = () => {
           </form>
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Confirm Stock Receiving
+            </h3>
+            <p className="text-gray-600 mb-6">
+              You are about to add {receivingItems.length} items to inventory. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Progress Indicator */}
+      {isSaving && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center">
+              {!saveSuccess ? (
+                <>
+                  <Loader className="h-8 w-8 animate-spin text-[rgb(52,69,157)] mb-4" />
+                  <p className="text-gray-700 font-medium">{saveProgress}</p>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                  <p className="text-gray-700 font-medium">{saveProgress}</p>
+                  <p className="text-sm text-gray-500 mt-2">Returning to procurement management...</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
