@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Smartphone, RefreshCw, Filter, X, Search } from 'lucide-react';
+import { Smartphone, RefreshCw, Filter, X, Search, FileText } from 'lucide-react';
 import InventoryTable from './inventory/InventoryTable';
 import InventoryFilters from './inventory/InventoryFilters';
 
@@ -62,6 +62,9 @@ const InventoryListForm = () => {
   
   // Debounce timer ref
   const debounceTimerRef = useRef(null);
+  
+  // State for Word export
+  const [isExporting, setIsExporting] = useState(false);
 {/* Part 1 End - Imports and Initial State */}
 
 {/* Part 2 Start - Helper Functions and Effects */}
@@ -508,6 +511,341 @@ const InventoryListForm = () => {
       setSortDirection('asc');
     }
   };
+
+  // Handle Word export
+  const handleWordExport = async () => {
+    if (inventoryItems.length === 0) {
+      alert('No inventory items to export');
+      return;
+    }
+
+    setIsExporting(true);
+    
+    try {
+      // Get supplier information
+      const suppliersRef = collection(db, 'suppliers');
+      const suppliersSnapshot = await getDocs(suppliersRef);
+      const suppliersMap = {};
+      suppliersSnapshot.forEach(doc => {
+        suppliersMap[doc.id] = doc.data().supplierName;
+      });
+
+      // Build filter summary
+      let filterSummary = [];
+      if (filters.manufacturer) {
+        filterSummary.push(`Brand: ${filters.manufacturer}`);
+      } else {
+        filterSummary.push('Brand: All');
+      }
+      
+      if (filters.model) {
+        filterSummary.push(`Model: ${filters.model}`);
+      } else {
+        filterSummary.push('Model: All');
+      }
+      
+      if (filters.ram) {
+        filterSummary.push(`RAM: ${filters.ram}`);
+      } else {
+        filterSummary.push('RAM: All');
+      }
+      
+      if (filters.storage) {
+        filterSummary.push(`Storage: ${filters.storage}`);
+      } else {
+        filterSummary.push('Storage: All');
+      }
+      
+      if (filters.status) {
+        filterSummary.push(`Status: ${filters.status}`);
+      } else {
+        filterSummary.push('Status: All');
+      }
+      
+      if (filters.color) {
+        filterSummary.push(`Color: ${filters.color}`);
+      } else {
+        filterSummary.push('Color: All');
+      }
+      
+      if (filters.supplier) {
+        const supplierName = suppliersMap[filters.supplier] || filters.supplier;
+        filterSummary.push(`Supplier: ${supplierName}`);
+      } else {
+        filterSummary.push('Supplier: All');
+      }
+      
+      if (filters.startDate) {
+        filterSummary.push(`Start Date: ${new Date(filters.startDate).toLocaleDateString('en-US')}`);
+      }
+      
+      if (filters.endDate) {
+        filterSummary.push(`End Date: ${new Date(filters.endDate).toLocaleDateString('en-US')}`);
+      }
+
+      // Create HTML content with Word-specific namespace and minimal margins
+      let htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+              xmlns:w="urn:schemas-microsoft-com:office:word" 
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>Inventory List Report</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+              <w:DoNotOptimizeForBrowser/>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            @page {
+              size: 8.5in 11in;
+              margin: 0.5in 0.5in 0.5in 0.5in;
+              mso-header-margin: 0;
+              mso-footer-margin: 0;
+              mso-paper-source: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+              font-size: 10pt;
+              color: #000;
+            }
+            div.Section1 {
+              page: Section1;
+              margin: 0;
+              padding: 0;
+            }
+            h1 { 
+              text-align: center; 
+              color: #34459d;
+              font-size: 21pt;
+              margin: 0 0 10pt 0;
+              padding: 0;
+              font-weight: bold;
+            }
+            .header-info {
+              margin: 0 0 3pt 0;
+              font-size: 11pt;
+              padding: 0;
+            }
+            .header-info p {
+              margin: 0 0 3pt 0;
+              padding: 0;
+            }
+            .filter-info {
+              margin: 10pt 0 20pt 0;
+              font-size: 11pt;
+              padding: 0;
+            }
+            .filter-info p {
+              margin: 0;
+              padding: 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              border-spacing: 0;
+              margin: 0;
+              padding: 0;
+              table-layout: fixed;
+            }
+            th {
+              background-color: #34459d;
+              color: white;
+              padding: 6pt 8pt;
+              text-align: left;
+              font-size: 10pt;
+              font-weight: bold;
+              border: 1pt solid #34459d;
+              vertical-align: middle;
+            }
+            td {
+              padding: 5pt 8pt;
+              border: 1pt solid #ddd;
+              font-size: 9pt;
+              font-family: Arial, sans-serif;
+              vertical-align: middle;
+              mso-line-height-rule: exactly;
+              line-height: 14pt;
+            }
+            th.center, td.center {
+              text-align: center;
+            }
+            .phone-cell {
+              font-weight: bold;
+              text-align: center;
+              vertical-align: middle;
+              white-space: nowrap;
+            }
+            .phone-number {
+              font-size: 9pt;
+              font-weight: bold;
+              color: #000;
+            }
+            .imei-cell {
+              font-family: Arial, sans-serif;
+              font-size: 9pt;
+            }
+            .gray-row {
+              background-color: #f0f0f0;
+            }
+            .white-row {
+              background-color: white;
+            }
+            .model-cell {
+              font-size: 9pt;
+            }
+            .status-cell {
+              white-space: nowrap !important;
+              font-size: 9pt;
+              min-width: 80pt;
+              width: 80pt;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="Section1">
+            <h1>Inventory List Report</h1>
+            <div class="header-info">
+              <p><b>Generated Date:</b> ${new Date().toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</p>
+              <p><b>Total Items:</b> ${inventoryItems.length}</p>
+            </div>
+            <div class="filter-info">
+              <p><b>Applied Filters:</b></p>
+              <p>${filterSummary.join(' | ')}</p>
+            </div>
+            <table>
+              <colgroup>
+                <col style="width: 12%;">
+                <col style="width: 8%;">
+                <col style="width: 32%;">
+                <col style="width: 14%;">
+                <col style="width: 19%;">
+                <col style="width: 15%;">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th class="center">Phone</th>
+                  <th>Brand</th>
+                  <th>Model</th>
+                  <th>Color</th>
+                  <th>IMEI</th>
+                  <th class="center" style="white-space: nowrap;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      // Group items by manufacturer, model, storage, and color
+      const groupedItems = {};
+      inventoryItems.forEach(item => {
+        const key = `${item.manufacturer}_${item.model}_${item.storage}_${item.color}`;
+        if (!groupedItems[key]) {
+          groupedItems[key] = {
+            manufacturer: item.manufacturer,
+            model: item.model,
+            ram: item.ram,
+            storage: item.storage,
+            color: item.color,
+            items: []
+          };
+        }
+        groupedItems[key].items.push(item);
+      });
+
+      // Sort grouped items
+      const sortedGroups = Object.values(groupedItems).sort((a, b) => {
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        if (a.model !== b.model) {
+          return a.model.localeCompare(b.model);
+        }
+        if (a.storage !== b.storage) {
+          const storageA = parseInt(a.storage) || 0;
+          const storageB = parseInt(b.storage) || 0;
+          return storageA - storageB;
+        }
+        return a.color.localeCompare(b.color);
+      });
+
+      // Generate rows with alternating colors
+      let groupIndex = 0;
+      sortedGroups.forEach(group => {
+        const rowspan = group.items.length;
+        const rowClass = groupIndex % 2 === 0 ? 'white-row' : 'gray-row';
+        const phoneCountBg = groupIndex % 2 === 0 ? 'white' : '#f0f0f0';
+        
+        // Format RAM and storage with GB
+        const ramDisplay = group.ram ? `${group.ram}GB` : 'N/A';
+        const storageDisplay = group.storage ? `${group.storage}GB` : 'N/A';
+        const modelDisplay = `${group.model} (${ramDisplay}+${storageDisplay})`;
+        
+        // First row of the group
+        htmlContent += `
+          <tr class="${rowClass}">
+            <td rowspan="${rowspan}" class="phone-cell" style="background-color: ${phoneCountBg}; white-space: nowrap;">
+              Phone ${group.items.length}
+            </td>
+            <td rowspan="${rowspan}" style="vertical-align: middle;">${group.manufacturer}</td>
+            <td rowspan="${rowspan}" class="model-cell" style="vertical-align: middle;">${modelDisplay}</td>
+            <td rowspan="${rowspan}" style="vertical-align: middle;">${group.color}</td>
+            <td class="imei-cell">${group.items[0].imei1 || 'N/A'}</td>
+            <td class="center status-cell" style="white-space: nowrap !important; width: 80pt;">${group.items[0].status === 'On-Hand' ? 'Stock' : group.items[0].status}</td>
+          </tr>
+        `;
+
+        // Additional rows for the same group
+        for (let i = 1; i < group.items.length; i++) {
+          const item = group.items[i];
+          htmlContent += `
+            <tr class="${rowClass}">
+              <td class="imei-cell">${item.imei1 || 'N/A'}</td>
+              <td class="center status-cell" style="white-space: nowrap !important; width: 80pt;">${item.status === 'On-Hand' ? 'Stock' : item.status}</td>
+            </tr>
+          `;
+        }
+        
+        groupIndex++;
+      });
+
+      htmlContent += `
+              </tbody>
+            </table>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Create blob and download with proper MIME type for Word
+      const blob = new Blob([htmlContent], { 
+        type: 'application/vnd.ms-word;charset=utf-8' 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Inventory_List_${new Date().toISOString().split('T')[0]}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsExporting(false);
+    } catch (error) {
+      console.error('Error exporting to Word:', error);
+      alert('Failed to export to Word. Please try again.');
+      setIsExporting(false);
+    }
+  };
 {/* Part 5 End - Event Handlers */}
 
 {/* Part 6 Start - Main Component JSX */}
@@ -546,6 +884,18 @@ const InventoryListForm = () => {
             >
               <RefreshCw className="h-5 w-5 mr-1" />
               <span>Refresh</span>
+            </button>
+            <button
+              onClick={handleWordExport}
+              disabled={isExporting || inventoryItems.length === 0}
+              className={`flex items-center gap-1 ${
+                isExporting || inventoryItems.length === 0
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-white text-[rgb(52,69,157)]'
+              } px-4 py-2 rounded text-base font-medium`}
+            >
+              <FileText className="h-5 w-5 mr-1" />
+              <span>{isExporting ? 'Exporting...' : 'Export'}</span>
             </button>
           </div>
         </CardHeader>
