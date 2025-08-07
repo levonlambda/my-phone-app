@@ -21,6 +21,7 @@ const InventorySummaryForm = () => {
   const [error, setError] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [expandedColorSections, setExpandedColorSections] = useState({});
+  const [expandedColorRows, setExpandedColorRows] = useState({}); // NEW: Track expanded color rows
   
   // NEW: Add state for excluded models info
   const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
@@ -90,14 +91,34 @@ const InventorySummaryForm = () => {
         delete newState[index];
         return newState;
       });
+      setExpandedColorRows(prev => {
+        const newState = { ...prev };
+        delete newState[index];
+        return newState;
+      });
     } else {
       newExpandedRows.add(index);
       setExpandedColorSections(prev => ({
         ...prev,
         [index]: {}
       }));
+      setExpandedColorRows(prev => ({
+        ...prev,
+        [index]: {}
+      }));
     }
     setExpandedRows(newExpandedRows);
+  };
+
+  // NEW: Toggle color row expansion (for showing/hiding detail sections)
+  const toggleColorRowExpansion = (rowIndex, colorIndex) => {
+    setExpandedColorRows(prev => ({
+      ...prev,
+      [rowIndex]: {
+        ...prev[rowIndex],
+        [colorIndex]: !prev[rowIndex]?.[colorIndex]
+      }
+    }));
   };
 
   // Toggle section expansion for color breakdown
@@ -874,11 +895,21 @@ const InventorySummaryForm = () => {
                                   
                                   {item.colors.map((colorData, colorIndex) => (
                                     <div key={colorIndex} className="border border-gray-200 rounded-lg bg-white">
-                                      {/* Color header */}
-                                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                                      {/* Color header - Now clickable to expand/collapse detail sections */}
+                                      <div 
+                                        className="px-4 py-3 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                                        onClick={() => toggleColorRowExpansion(index, colorIndex)}
+                                      >
                                         <div className="flex justify-between items-center">
                                           <div className="flex items-center gap-4">
-                                            <h5 className="font-bold text-lg text-gray-800">{colorData.color}</h5>
+                                            <div className="flex items-center gap-2">
+                                              {expandedColorRows[index]?.[colorIndex] ? (
+                                                <ChevronDown className="h-5 w-5 text-gray-600" />
+                                              ) : (
+                                                <ChevronRight className="h-5 w-5 text-gray-600" />
+                                              )}
+                                              <h5 className="font-bold text-lg text-gray-800">{colorData.color}</h5>
+                                            </div>
                                             <div className="flex gap-4 text-sm">
                                               <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
                                                 Sold: {colorData.sold}
@@ -903,164 +934,166 @@ const InventorySummaryForm = () => {
                                         </div>
                                       </div>
                                       
-                                      {/* Color details sections */}
-                                      <div className="p-4 space-y-3">
-                                        {/* Sold Items */}
-                                        {colorData.soldItems.length > 0 && (
-                                          <div>
-                                            <div 
-                                              className="flex items-center justify-between cursor-pointer bg-purple-50 p-2 rounded-t border border-purple-200"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleColorSectionExpansion(index, colorIndex, 'sold');
-                                              }}
-                                            >
-                                              <h6 className="font-semibold text-purple-700">
-                                                Sold Units ({colorData.sold})
-                                              </h6>
-                                              {expandedColorSections[index]?.[`${colorIndex}_sold`] ? (
-                                                <ChevronDown className="h-4 w-4 text-purple-500" />
-                                              ) : (
-                                                <ChevronRight className="h-4 w-4 text-purple-500" />
+                                      {/* Color details sections - Only show when color row is expanded */}
+                                      {expandedColorRows[index]?.[colorIndex] && (
+                                        <div className="p-4 space-y-3">
+                                          {/* Sold Items */}
+                                          {colorData.soldItems.length > 0 && (
+                                            <div>
+                                              <div 
+                                                className="flex items-center justify-between cursor-pointer bg-purple-50 p-2 rounded-t border border-purple-200"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleColorSectionExpansion(index, colorIndex, 'sold');
+                                                }}
+                                              >
+                                                <h6 className="font-semibold text-purple-700">
+                                                  Sold Units ({colorData.sold})
+                                                </h6>
+                                                {expandedColorSections[index]?.[`${colorIndex}_sold`] ? (
+                                                  <ChevronDown className="h-4 w-4 text-purple-500" />
+                                                ) : (
+                                                  <ChevronRight className="h-4 w-4 text-purple-500" />
+                                                )}
+                                              </div>
+                                              
+                                              {expandedColorSections[index]?.[`${colorIndex}_sold`] && (
+                                                <div className="overflow-x-auto border border-t-0 border-purple-200 rounded-b">
+                                                  <table className="min-w-full">
+                                                    <thead className="bg-purple-50">
+                                                      <tr className="text-xs text-purple-800">
+                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white">
+                                                      {colorData.soldItems.map((soldItem, soldIndex) => (
+                                                        <tr key={soldIndex} className={soldIndex % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
+                                                          <td className="py-2 px-3 text-xs">{soldItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{soldItem.imei2 || '-'}</td>
+                                                          <td className="py-2 px-3 text-xs">{soldItem.barcode || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(soldItem.retailPrice)}</td>
+                                                          <td className="py-2 px-3 text-xs">{formatDate(soldItem.lastUpdated)}</td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
                                               )}
                                             </div>
-                                            
-                                            {expandedColorSections[index]?.[`${colorIndex}_sold`] && (
-                                              <div className="overflow-x-auto border border-t-0 border-purple-200 rounded-b">
-                                                <table className="min-w-full">
-                                                  <thead className="bg-purple-50">
-                                                    <tr className="text-xs text-purple-800">
-                                                      <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                      <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                      <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                      <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                      <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody className="bg-white">
-                                                    {colorData.soldItems.map((soldItem, soldIndex) => (
-                                                      <tr key={soldIndex} className={soldIndex % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
-                                                        <td className="py-2 px-3 text-xs">{soldItem.imei1 || 'N/A'}</td>
-                                                        <td className="py-2 px-3 text-xs">{soldItem.imei2 || '-'}</td>
-                                                        <td className="py-2 px-3 text-xs">{soldItem.barcode || 'N/A'}</td>
-                                                        <td className="py-2 px-3 text-xs text-right">{formatPrice(soldItem.retailPrice)}</td>
-                                                        <td className="py-2 px-3 text-xs">{formatDate(soldItem.lastUpdated)}</td>
-                                                      </tr>
-                                                    ))}
-                                                  </tbody>
-                                                </table>
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
+                                          )}
 {/* Part 8 End - Expanded Color Breakdown */}
 
 {/* Part 9 Start - Display and Stock Items Tables */}
-                                        {/* On Display Items */}
-                                        {colorData.onDisplayItems.length > 0 && (
-                                          <div>
-                                            <div 
-                                              className="flex items-center justify-between cursor-pointer bg-yellow-50 p-2 rounded-t border border-yellow-200"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleColorSectionExpansion(index, colorIndex, 'display');
-                                              }}
-                                            >
-                                              <h6 className="font-semibold text-yellow-700">
-                                                Display Units ({colorData.onDisplay})
-                                              </h6>
-                                              {expandedColorSections[index]?.[`${colorIndex}_display`] ? (
-                                                <ChevronDown className="h-4 w-4 text-yellow-500" />
-                                              ) : (
-                                                <ChevronRight className="h-4 w-4 text-yellow-500" />
+                                          {/* On Display Items */}
+                                          {colorData.onDisplayItems.length > 0 && (
+                                            <div>
+                                              <div 
+                                                className="flex items-center justify-between cursor-pointer bg-yellow-50 p-2 rounded-t border border-yellow-200"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleColorSectionExpansion(index, colorIndex, 'display');
+                                                }}
+                                              >
+                                                <h6 className="font-semibold text-yellow-700">
+                                                  Display Units ({colorData.onDisplay})
+                                                </h6>
+                                                {expandedColorSections[index]?.[`${colorIndex}_display`] ? (
+                                                  <ChevronDown className="h-4 w-4 text-yellow-500" />
+                                                ) : (
+                                                  <ChevronRight className="h-4 w-4 text-yellow-500" />
+                                                )}
+                                              </div>
+                                              
+                                              {expandedColorSections[index]?.[`${colorIndex}_display`] && (
+                                                <div className="overflow-x-auto border border-t-0 border-yellow-200 rounded-b">
+                                                  <table className="min-w-full">
+                                                    <thead className="bg-yellow-50">
+                                                      <tr className="text-xs text-yellow-800">
+                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white">
+                                                      {colorData.onDisplayItems.map((displayItem, displayIndex) => (
+                                                        <tr key={displayIndex} className={displayIndex % 2 === 0 ? 'bg-white' : 'bg-yellow-50'}>
+                                                          <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
+                                                          <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>
+                                                          <td className="py-2 px-3 text-xs">{formatDate(displayItem.lastUpdated)}</td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
                                               )}
                                             </div>
-                                            
-                                            {expandedColorSections[index]?.[`${colorIndex}_display`] && (
-                                              <div className="overflow-x-auto border border-t-0 border-yellow-200 rounded-b">
-                                                <table className="min-w-full">
-                                                  <thead className="bg-yellow-50">
-                                                    <tr className="text-xs text-yellow-800">
-                                                      <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                      <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                      <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                      <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                      <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody className="bg-white">
-                                                    {colorData.onDisplayItems.map((displayItem, displayIndex) => (
-                                                      <tr key={displayIndex} className={displayIndex % 2 === 0 ? 'bg-white' : 'bg-yellow-50'}>
-                                                        <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
-                                                        <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
-                                                        <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
-                                                        <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>
-                                                        <td className="py-2 px-3 text-xs">{formatDate(displayItem.lastUpdated)}</td>
-                                                      </tr>
-                                                    ))}
-                                                  </tbody>
-                                                </table>
+                                          )}
+                                          
+                                          {/* On Hand Items */}
+                                          {colorData.onHandItems.length > 0 && (
+                                            <div>
+                                              <div 
+                                                className="flex items-center justify-between cursor-pointer bg-blue-50 p-2 rounded-t border border-blue-200"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleColorSectionExpansion(index, colorIndex, 'stock');
+                                                }}
+                                              >
+                                                <h6 className="font-semibold text-blue-700">
+                                                  Stock Units ({colorData.onHand})
+                                                </h6>
+                                                {expandedColorSections[index]?.[`${colorIndex}_stock`] ? (
+                                                  <ChevronDown className="h-4 w-4 text-blue-500" />
+                                                ) : (
+                                                  <ChevronRight className="h-4 w-4 text-blue-500" />
+                                                )}
                                               </div>
-                                            )}
-                                          </div>
-                                        )}
-                                        
-                                        {/* On Hand Items */}
-                                        {colorData.onHandItems.length > 0 && (
-                                          <div>
-                                            <div 
-                                              className="flex items-center justify-between cursor-pointer bg-blue-50 p-2 rounded-t border border-blue-200"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleColorSectionExpansion(index, colorIndex, 'stock');
-                                              }}
-                                            >
-                                              <h6 className="font-semibold text-blue-700">
-                                                Stock Units ({colorData.onHand})
-                                              </h6>
-                                              {expandedColorSections[index]?.[`${colorIndex}_stock`] ? (
-                                                <ChevronDown className="h-4 w-4 text-blue-500" />
-                                              ) : (
-                                                <ChevronRight className="h-4 w-4 text-blue-500" />
+                                              
+                                              {expandedColorSections[index]?.[`${colorIndex}_stock`] && (
+                                                <div className="overflow-x-auto border border-t-0 border-blue-200 rounded-b">
+                                                  <table className="min-w-full">
+                                                    <thead className="bg-blue-50">
+                                                      <tr className="text-xs text-blue-800">
+                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white">
+                                                      {colorData.onHandItems.map((handItem, handIndex) => (
+                                                        <tr key={handIndex} className={handIndex % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                                          <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
+                                                          <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>
+                                                          <td className="py-2 px-3 text-xs">{formatDate(handItem.lastUpdated)}</td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
                                               )}
                                             </div>
-                                            
-                                            {expandedColorSections[index]?.[`${colorIndex}_stock`] && (
-                                              <div className="overflow-x-auto border border-t-0 border-blue-200 rounded-b">
-                                                <table className="min-w-full">
-                                                  <thead className="bg-blue-50">
-                                                    <tr className="text-xs text-blue-800">
-                                                      <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                      <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                      <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                      <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                      <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody className="bg-white">
-                                                    {colorData.onHandItems.map((handItem, handIndex) => (
-                                                      <tr key={handIndex} className={handIndex % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                                                        <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
-                                                        <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
-                                                        <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
-                                                        <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>
-                                                        <td className="py-2 px-3 text-xs">{formatDate(handItem.lastUpdated)}</td>
-                                                      </tr>
-                                                    ))}
-                                                  </tbody>
-                                                </table>
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
+                                          )}
 
-                                        {/* Empty states */}
-                                        {colorData.soldItems.length === 0 && colorData.onDisplayItems.length === 0 && colorData.onHandItems.length === 0 && (
-                                          <div className="text-center py-4 text-gray-500">
-                                            No detailed information available for this color
-                                          </div>
-                                        )}
-                                      </div>
+                                          {/* Empty states */}
+                                          {colorData.soldItems.length === 0 && colorData.onDisplayItems.length === 0 && colorData.onHandItems.length === 0 && (
+                                            <div className="text-center py-4 text-gray-500">
+                                              No detailed information available for this color
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   ))}
                                 </div>

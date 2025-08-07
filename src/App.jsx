@@ -57,12 +57,6 @@ function App() {
             Procurement Management
           </button>
           <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'stockreceiving' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('stockreceiving')}
-          >
-            Stock Receiving (Test)
-          </button>
-          <button 
             className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
             onClick={() => setActiveComponent('suppliers')}
           >

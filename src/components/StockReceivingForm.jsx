@@ -99,6 +99,13 @@ const StockReceivingForm = () => {
   useEffect(() => {
     if (procurementData.deliveryStatus === 'delivered' || procurementData.isReceived === true) {
       setIsViewOnly(true);
+      // Also set the delivery date and reference if available
+      if (procurementData.dateDelivered) {
+        setDateDelivered(procurementData.dateDelivered);
+      }
+      if (procurementData.deliveryReference) {
+        setDeliveryReference(procurementData.deliveryReference);
+      }
     }
   }, [procurementData]);
 
@@ -118,6 +125,109 @@ const StockReceivingForm = () => {
   useEffect(() => {
     const initializeItemsWithBarcodes = async () => {
       console.log('🚀 Starting initializeItemsWithBarcodes');
+      const isDelivered = procurementData.deliveryStatus === 'delivered' || procurementData.isReceived === true;
+      console.log('Is Delivered Status:', isDelivered);
+      
+      // If in delivered mode, fetch the actual received items from inventory
+      if (isDelivered && procurementData.id) {
+        console.log('📋 Fetching received items for procurement:', procurementData.id);
+        
+        try {
+          // Query inventory for items from this procurement
+          const inventoryRef = collection(db, 'inventory');
+          const q = query(
+            inventoryRef,
+            where("supplierId", "==", procurementData.supplierId || ''),
+            where("supplier", "==", procurementData.supplierName)
+          );
+          
+          const snapshot = await getDocs(q);
+          console.log(`📋 Found ${snapshot.size} inventory items from this supplier`);
+          
+          // Filter items by matching them to procurement items
+          const receivedItems = [];
+          const groupBarcodeMap = {};
+          let rowId = 1;
+          
+          // Group the inventory items by product specification
+          const inventoryByProduct = {};
+          snapshot.forEach(doc => {
+            const item = { id: doc.id, ...doc.data() };
+            const productKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}_${item.color}`;
+            
+            if (!inventoryByProduct[productKey]) {
+              inventoryByProduct[productKey] = [];
+            }
+            inventoryByProduct[productKey].push(item);
+          });
+          
+          // Process each procurement item group
+          procurementData.items.forEach((procItem, groupIndex) => {
+            const productKey = `${procItem.manufacturer}_${procItem.model}_${procItem.ram}_${procItem.storage}_${procItem.color}`;
+            const matchingInventoryItems = inventoryByProduct[productKey] || [];
+            
+            console.log(`🔍 Processing procurement item ${groupIndex}: ${productKey}`);
+            console.log(`   Found ${matchingInventoryItems.length} matching inventory items`);
+            
+            // Set the barcode for this group
+            if (matchingInventoryItems.length > 0 && matchingInventoryItems[0].barcode) {
+              groupBarcodeMap[groupIndex] = matchingInventoryItems[0].barcode;
+            }
+            
+            // Add the received items (up to the procurement quantity)
+            const itemsToShow = matchingInventoryItems.slice(0, procItem.quantity);
+            
+            itemsToShow.forEach((invItem) => {
+              receivedItems.push({
+                id: rowId++,
+                groupId: groupIndex,
+                ...procItem,
+                barcode: invItem.barcode || '',
+                imei1: invItem.imei1 || '',
+                imei2: invItem.imei2 || '',
+                serialNumber: invItem.serialNumber || '',
+                location: invItem.location || '',
+                status: invItem.status || 'On-Hand'
+              });
+            });
+            
+            // If we have fewer received items than procurement quantity, add empty rows
+            const remainingQty = procItem.quantity - itemsToShow.length;
+            for (let i = 0; i < remainingQty; i++) {
+              receivedItems.push({
+                id: rowId++,
+                groupId: groupIndex,
+                ...procItem,
+                barcode: groupBarcodeMap[groupIndex] || '',
+                imei1: '',
+                imei2: '',
+                serialNumber: '',
+                location: '',
+                status: 'On-Hand'
+              });
+            }
+          });
+          
+          console.log('📦 Final received items:', receivedItems);
+          console.log('📦 Final group barcodes:', groupBarcodeMap);
+          
+          setGroupBarcodes(groupBarcodeMap);
+          setReceivingItems(receivedItems);
+          
+        } catch (error) {
+          console.error('❌ Error fetching received items:', error);
+          // Fall back to creating empty rows
+          await createEmptyRows();
+        }
+      } else {
+        // Not in view mode, create empty rows for receiving
+        await createEmptyRows();
+      }
+    };
+    
+    // Helper function to create empty rows
+    const createEmptyRows = async () => {
+      console.log('📝 Creating empty rows for receiving');
       const rows = [];
       let rowId = 1;
       const newGroupBarcodes = {};
@@ -199,7 +309,7 @@ const StockReceivingForm = () => {
             imei2: '',
             serialNumber: '',
             location: '',
-            status: 'Stock'
+            status: 'On-Hand'
           });
         }
       }
@@ -214,7 +324,7 @@ const StockReceivingForm = () => {
     
     // Call the async function
     initializeItemsWithBarcodes();
-  }, [procurementData]);
+  }, [procurementData.id, procurementData.deliveryStatus, procurementData.isReceived, procurementData.items, procurementData.supplierId, procurementData.supplierName]); // Include all dependencies used inside
   
   // Group items by product model
   const groupedItems = useMemo(() => {
@@ -543,7 +653,7 @@ const StockReceivingForm = () => {
             storage: item.storage,
             color: item.color,
             counts: {
-              Stock: 0,
+              'On-Hand': 0,
               'On-Display': 0,
               Sold: 0,
               Reserved: 0,
@@ -569,9 +679,9 @@ const StockReceivingForm = () => {
               ram: data.ram,
               storage: data.storage,
               color: data.color,
-              total: data.counts.Stock + data.counts['On-Display'] + data.counts.Sold + 
+              total: data.counts['On-Hand'] + data.counts['On-Display'] + data.counts.Sold + 
                      data.counts.Reserved + data.counts.Defective,
-              onHand: data.counts.Stock,
+              onHand: data.counts['On-Hand'],
               onDisplay: data.counts['On-Display'],
               sold: data.counts.Sold,
               reserved: data.counts.Reserved,
@@ -581,9 +691,9 @@ const StockReceivingForm = () => {
           } else {
             // Update existing counts
             transaction.update(inventoryRef, {
-              total: increment(data.counts.Stock + data.counts['On-Display'] + 
+              total: increment(data.counts['On-Hand'] + data.counts['On-Display'] + 
                             data.counts.Sold + data.counts.Reserved + data.counts.Defective),
-              onHand: increment(data.counts.Stock),
+              onHand: increment(data.counts['On-Hand']),
               onDisplay: increment(data.counts['On-Display']),
               sold: increment(data.counts.Sold),
               reserved: increment(data.counts.Reserved),
@@ -976,7 +1086,7 @@ const StockReceivingForm = () => {
                                 value={item.status}
                                 onChange={(e) => handleItemChange(item.id, 'status', e.target.value)}
                                 className={`w-full px-2 py-1.5 border rounded text-sm ${
-                                  item.status === 'Stock' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                  item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                                   item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
                                   item.status === 'Sold' ? 'bg-purple-100 text-purple-800 border-purple-300' :
                                   item.status === 'Reserved' ? 'bg-orange-100 text-orange-800 border-orange-300' :
@@ -986,7 +1096,7 @@ const StockReceivingForm = () => {
                                 required
                                 disabled={isViewOnly}
                               >
-                                <option value="Stock">Stock</option>
+                                <option value="On-Hand">On-Hand</option>
                                 <option value="On-Display">On-Display</option>
                                 <option value="Sold">Sold</option>
                                 <option value="Reserved">Reserved</option>
