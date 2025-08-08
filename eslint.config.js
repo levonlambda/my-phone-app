@@ -33,6 +33,13 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
+      'react/prop-types': 'off',
+      'react/no-unescaped-entities': ['warn', {
+        'forbid': [
+          { 'char': '>', 'alternatives': ['&gt;'] },
+          { 'char': '}', 'alternatives': ['&#125;'] }
+        ]
+      }]
     },
   },
 ]

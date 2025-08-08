@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { useAuth } from '../context/AuthContext'; // NEW: Added useAuth import
 import { 
   Smartphone, 
   RefreshCw, 
@@ -14,6 +15,10 @@ import {
 } from 'lucide-react';
 
 const InventorySummaryForm = () => {
+  // Get user role for conditional rendering
+  const { userRole } = useAuth(); // NEW: Get userRole from auth context
+  const isAdmin = userRole === 'admin'; // NEW: Check if user is admin
+  
   // Main state
   const [inventoryData, setInventoryData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -810,9 +815,13 @@ const InventorySummaryForm = () => {
                       <th className="px-3 py-3 text-left">RAM</th>
                       <th className="px-3 py-3 text-left">Storage</th>
                       <th className="px-3 py-3 text-left">Colors</th>
-                      <th className="pl-0 pr-1 py-3 text-center">DP</th>
-                      <th className="px-1 py-3 text-center">SRP</th>
-                      <th className="px-1 py-3 text-right">Margin</th>
+                      {isAdmin && (
+                        <>
+                          <th className="pl-0 pr-1 py-3 text-center">DP</th>
+                          <th className="px-1 py-3 text-center">SRP</th>
+                          <th className="px-1 py-3 text-right">Margin</th>
+                        </>
+                      )}
                       <th className="pl-12 pr-1 py-3 text-center">Sold</th>
                       <th className="px-1 py-3 text-center">Display</th>
                       <th className="px-1 py-3 text-center">Stock</th>
@@ -849,11 +858,15 @@ const InventorySummaryForm = () => {
                               )}
                             </div>
                           </td>
-                          <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
-                          <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
-                          <td className="px-1 py-3 text-sm text-right font-medium">
-                            {calculateMargin(item.dealersPrice, item.retailPrice)}
-                          </td>
+                          {isAdmin && (
+                            <>
+                              <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
+                              <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
+                              <td className="px-1 py-3 text-sm text-right font-medium">
+                                {calculateMargin(item.dealersPrice, item.retailPrice)}
+                              </td>
+                            </>
+                          )}
                           <td className="pl-12 pr-1 py-2 text-sm text-center">
                             <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
                               {item.totalSold}
@@ -1109,91 +1122,93 @@ const InventorySummaryForm = () => {
 {/* Part 9 End - Display and Stock Items Tables */}
 
 {/* Part 10 Start - Inventory Value Summary and Footer */}
-              {/* Inventory Value Summary */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">{"Total Dealer's Value"}</p>
-                        <p className="text-xs text-gray-500">{"(Available units × Dealer's price)"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-blue-600">
-                          {(() => {
-                            const totalDealerValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.dealersPrice);
-                            }, 0);
-                            return formatPrice(totalDealerValue);
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">Total Retail Value</p>
-                        <p className="text-xs text-gray-500">{"(Available units × Retail price)"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-green-600">
-                          {(() => {
-                            const totalRetailValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.retailPrice);
-                            }, 0);
-                            return formatPrice(totalRetailValue);
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
-                        </p>
+              {/* Inventory Value Summary - Only show for admins */}
+              {isAdmin && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600 font-medium">{"Total Dealer's Value"}</p>
+                          <p className="text-xs text-gray-500">{"(Available units × Dealer's price)"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-blue-600">
+                            {(() => {
+                              const totalDealerValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.dealersPrice);
+                              }, 0);
+                              return formatPrice(totalDealerValue);
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">Potential Profit</p>
-                        <p className="text-xs text-gray-500">{"(Retail value - Dealer's value)"}</p>
+                    
+                    <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600 font-medium">Total Retail Value</p>
+                          <p className="text-xs text-gray-500">{"(Available units × Retail price)"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-green-600">
+                            {(() => {
+                              const totalRetailValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.retailPrice);
+                              }, 0);
+                              return formatPrice(totalRetailValue);
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-purple-600">
-                          {(() => {
-                            const totalDealerValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.dealersPrice);
-                            }, 0);
-                            const totalRetailValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.retailPrice);
-                            }, 0);
-                            const potentialProfit = totalRetailValue - totalDealerValue;
-                            return formatPrice(potentialProfit);
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(() => {
-                            const totalDealerValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.dealersPrice);
-                            }, 0);
-                            const totalRetailValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.retailPrice);
-                            }, 0);
-                            const marginPercentage = totalDealerValue > 0 ? 
-                              ((totalRetailValue - totalDealerValue) / totalDealerValue * 100) : 0;
-                            return `${marginPercentage.toFixed(3)}% margin`;
-                          })()}
-                        </p>
+                    </div>
+                    
+                    <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600 font-medium">Potential Profit</p>
+                          <p className="text-xs text-gray-500">{"(Retail value - Dealer's value)"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-purple-600">
+                            {(() => {
+                              const totalDealerValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.dealersPrice);
+                              }, 0);
+                              const totalRetailValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.retailPrice);
+                              }, 0);
+                              const potentialProfit = totalRetailValue - totalDealerValue;
+                              return formatPrice(potentialProfit);
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {(() => {
+                              const totalDealerValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.dealersPrice);
+                              }, 0);
+                              const totalRetailValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.retailPrice);
+                              }, 0);
+                              const marginPercentage = totalDealerValue > 0 ? 
+                                ((totalRetailValue - totalDealerValue) / totalDealerValue * 100) : 0;
+                              return `${marginPercentage.toFixed(3)}% margin`;
+                            })()}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Summary footer */}
               <div className="text-center text-gray-600">
