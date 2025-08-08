@@ -48,6 +48,7 @@ postcss.config.js
 public/vite.svg
 src/App.jsx
 src/assets/react.svg
+src/components/AdminSetup.jsx
 src/components/inventory/DeleteConfirmationModal.jsx
 src/components/inventory/InventoryEditForm.jsx
 src/components/inventory/InventoryFilters.jsx
@@ -55,6 +56,7 @@ src/components/inventory/InventoryRow.jsx
 src/components/inventory/InventoryTable.jsx
 src/components/InventoryListForm.jsx
 src/components/InventorySummaryForm.jsx
+src/components/Login.jsx
 src/components/phone-list/PhoneAdvancedSearch.jsx
 src/components/phone-list/PhoneDetailModal.jsx
 src/components/phone-selection/hooks/usePhoneCache.js
@@ -77,6 +79,7 @@ src/components/SupplierManagementForm.jsx
 src/components/ui/badge/index.jsx
 src/components/ui/badge/variants.jsx
 src/components/ui/card.jsx
+src/context/AuthContext.jsx
 src/context/GlobalStateContext.jsx
 src/firebase/config.js
 src/index.css
@@ -118,47 +121,6 @@ dist-ssr
 *.sw?
 </file>
 
-<file path="eslint.config.js">
-import js from '@eslint/js'
-import globals from 'globals'
-import react from 'eslint-plugin-react'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-
-export default [
-  { ignores: ['dist'] },
-  {
-    files: ['**/*.{js,jsx}'],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        ecmaFeatures: { jsx: true },
-        sourceType: 'module',
-      },
-    },
-    settings: { react: { version: '18.3' } },
-    plugins: {
-      react,
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
-    },
-    rules: {
-      ...js.configs.recommended.rules,
-      ...react.configs.recommended.rules,
-      ...react.configs['jsx-runtime'].rules,
-      ...reactHooks.configs.recommended.rules,
-      'react/jsx-no-target-blank': 'off',
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
-    },
-  },
-]
-</file>
-
 <file path="index.html">
 <!doctype html>
 <html lang="en">
@@ -190,6 +152,263 @@ export default {
 
 <file path="src/assets/react.svg">
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
+</file>
+
+<file path="src/components/AdminSetup.jsx">
+// src/components/AdminSetup.jsx
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '../context/AuthContext';
+import { UserPlus, Mail, Lock, Shield, User, CheckCircle, AlertCircle } from 'lucide-react';
+
+const AdminSetup = () => {
+  const { register, currentUser, userRole } = useAuth();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    role: 'user'
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  // Only allow admins to access this component
+  if (!currentUser || userRole !== 'admin') {
+    return (
+      <div className="max-w-2xl mx-auto p-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <Shield className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-red-900 mb-2">Access Denied</h2>
+              <p className="text-red-700">Only administrators can create new user accounts.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage({ type: '', text: '' });
+
+    // Validation
+    if (!formData.email || !formData.password) {
+      setMessage({ type: 'error', text: 'Please fill in all required fields.' });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters long.' });
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setMessage({ type: 'error', text: 'Passwords do not match.' });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await register(formData.email, formData.password, formData.role);
+      
+      if (result.success) {
+        setMessage({ 
+          type: 'success', 
+          text: `User account created successfully! Email: ${formData.email}, Role: ${formData.role}` 
+        });
+        // Reset form
+        setFormData({
+          email: '',
+          password: '',
+          confirmPassword: '',
+          role: 'user'
+        });
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: result.error || 'Failed to create user account.' 
+        });
+      }
+    } catch (error) {
+      setMessage({ 
+        type: 'error', 
+        text: 'An unexpected error occurred. Please try again.' 
+      });
+      console.error('Registration error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto p-4">
+      <Card>
+        <CardHeader className="bg-[rgb(52,69,157)] text-white">
+          <CardTitle className="text-xl flex items-center gap-2">
+            <UserPlus className="h-6 w-6" />
+            Create New User Account
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Message Display */}
+            {message.text && (
+              <div className={`p-4 rounded-lg flex items-start gap-2 ${
+                message.type === 'success' 
+                  ? 'bg-green-50 border border-green-200 text-green-700' 
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}>
+                {message.type === 'success' ? (
+                  <CheckCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                )}
+                <span className="text-sm">{message.text}</span>
+              </div>
+            )}
+
+            {/* Email Field */}
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                Email Address *
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:border-transparent"
+                  placeholder="user@example.com"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                Password * (minimum 6 characters)
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:border-transparent"
+                  placeholder="Enter password"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {/* Confirm Password Field */}
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+                Confirm Password *
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:border-transparent"
+                  placeholder="Re-enter password"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-2">
+              <label htmlFor="role" className="text-sm font-medium text-gray-700">
+                User Role *
+              </label>
+              <div className="relative">
+                {formData.role === 'admin' ? (
+                  <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                ) : (
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                )}
+                <select
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:border-transparent appearance-none"
+                  disabled={isLoading}
+                >
+                  <option value="user">Regular User</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.role === 'admin' 
+                  ? 'Administrators have full access to all features including procurement, stock receiving, and price management.'
+                  : 'Regular users can access inventory, add phones, and view phone models.'}
+              </p>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-[rgb(52,69,157)] text-white py-2.5 rounded-lg hover:bg-[rgb(52,69,157)]/90 focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-5 w-5" />
+                  <span>Create User Account</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Instructions */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-blue-900 mb-2">Account Creation Guidelines:</h3>
+              <ul className="space-y-1 text-xs text-blue-800 list-disc list-inside">
+                <li>Use a valid email address for each user account</li>
+                <li>Passwords must be at least 6 characters long</li>
+                <li>Assign appropriate roles based on user responsibilities</li>
+                <li>Users will need their email and password to login</li>
+                <li>Store credentials securely and share them privately with users</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default AdminSetup;
 </file>
 
 <file path="src/components/inventory/DeleteConfirmationModal.jsx">
@@ -280,6 +499,197 @@ DeleteConfirmationModal.propTypes = {
 };
 
 export default DeleteConfirmationModal;
+</file>
+
+<file path="src/components/Login.jsx">
+// src/components/Login.jsx
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '../context/AuthContext';
+import { Lock, Mail, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
+
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { login } = useAuth();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    // Basic validation
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const result = await login(email, password);
+      if (!result.success) {
+        setError(result.error || 'Failed to login. Please check your credentials.');
+      }
+      // If successful, the auth state change will automatically redirect
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
+      console.error('Login error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <Card className="shadow-2xl border-0">
+          <CardHeader className="space-y-1 pb-6 bg-[rgb(52,69,157)] text-white rounded-t-lg">
+            <div className="flex justify-center mb-4">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+                <Lock className="h-10 w-10 text-[rgb(52,69,157)]" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold text-center">
+              Tech City Phone Management
+            </CardTitle>
+            <p className="text-center text-blue-100 text-sm">
+              Sign in to access the inventory system
+            </p>
+          </CardHeader>
+          
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">{error}</span>
+                </div>
+              )}
+
+              {/* Email Field */}
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:border-transparent"
+                    placeholder="Enter your email"
+                    disabled={isLoading}
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:border-transparent"
+                    placeholder="Enter your password"
+                    disabled={isLoading}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={togglePasswordVisibility}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember Me & Forgot Password */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember"
+                    type="checkbox"
+                    className="h-4 w-4 text-[rgb(52,69,157)] focus:ring-[rgb(52,69,157)] border-gray-300 rounded"
+                  />
+                  <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
+                    Remember me
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="text-sm text-[rgb(52,69,157)] hover:underline focus:outline-none"
+                  onClick={() => alert('Please contact your administrator to reset your password.')}
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-[rgb(52,69,157)] text-white py-2.5 rounded-lg hover:bg-[rgb(52,69,157)]/90 focus:outline-none focus:ring-2 focus:ring-[rgb(52,69,157)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-5 w-5" />
+                    <span>Sign In</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Demo Credentials Info */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</p>
+                <div className="space-y-1 text-xs text-blue-800">
+                  <p><span className="font-medium">Admin:</span> admin@techcity.com / admin123</p>
+                  <p><span className="font-medium">User:</span> user@techcity.com / user123</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Footer */}
+        <p className="text-center text-sm text-gray-600 mt-6">
+          © 2025 Tech City Phone Management System
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
 </file>
 
 <file path="src/components/phone-selection/hooks/usePhoneOptions.js">
@@ -667,24 +1077,194 @@ CardContent.propTypes = {
 export { Card, CardHeader, CardTitle, CardContent }
 </file>
 
-<file path="src/firebase/config.js">
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+<file path="src/context/AuthContext.jsx">
+// src/context/AuthContext.jsx
+import { createContext, useState, useEffect, useContext } from 'react';
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase/config';
+import PropTypes from 'prop-types';
 
-const firebaseConfig = {
+// Create the context
+const AuthContext = createContext({});
 
-    apiKey: "AIzaSyAdj8EwqtB7uP_gQmevelvbxew4_X4LJyk",  
-    authDomain: "tech-city-phone-information.firebaseapp.com",  
-    projectId: "tech-city-phone-information",  
-    storageBucket: "tech-city-phone-information.firebasestorage.app",  
-    messagingSenderId: "218177382353",  
-    appId: "1:218177382353:web:cf92ab1e75bcd139a062f0"  
+// Custom hook to use auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
-  
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// AuthProvider component
+export const AuthProvider = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Login function
+  const login = async (email, password) => {
+    try {
+      setError(null);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Fetch user role from Firestore
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setUserRole(userData.role || 'user');
+        return { success: true, role: userData.role || 'user' };
+      } else {
+        // If no user document exists, create one with default role
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          email: userCredential.user.email,
+          role: 'user',
+          createdAt: new Date().toISOString()
+        });
+        setUserRole('user');
+        return { success: true, role: 'user' };
+      }
+    } catch (error) {
+      setError(error.message);
+      console.error('Login error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Register function (for creating new users)
+  const register = async (email, password, role = 'user') => {
+    try {
+      setError(null);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Create user document in Firestore with role
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email: userCredential.user.email,
+        role: role,
+        createdAt: new Date().toISOString()
+      });
+      
+      setUserRole(role);
+      return { success: true };
+    } catch (error) {
+      setError(error.message);
+      console.error('Registration error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Logout function
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUserRole(null);
+      return { success: true };
+    } catch (error) {
+      setError(error.message);
+      console.error('Logout error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Check if user has permission to access a component
+  const hasPermission = (requiredRole) => {
+    if (!currentUser) return false;
+    if (userRole === 'admin') return true; // Admins can access everything
+    if (requiredRole === 'admin' && userRole !== 'admin') return false;
+    return true; // Regular users can access non-admin components
+  };
+
+  // Get accessible components based on user role
+  const getAccessibleComponents = () => {
+    if (!currentUser) return [];
+    
+    const allComponents = [
+      { key: 'summary', label: 'Inventory Summary', requiredRole: 'user' },
+      { key: 'inventory', label: 'Inventory List', requiredRole: 'admin' },
+      { key: 'selection', label: 'Add Phone Inventory', requiredRole: 'admin' },
+      { key: 'procurement', label: 'Phone Procurement', requiredRole: 'admin' },
+      { key: 'procurementmgmt', label: 'Procurement Management', requiredRole: 'admin' },
+      { key: 'stockreceiving', label: 'Stock Receiving', requiredRole: 'admin' },
+      { key: 'suppliers', label: 'Supplier Management', requiredRole: 'admin' },
+      { key: 'form', label: 'Add Phone Model', requiredRole: 'admin' },
+      { key: 'phonelist', label: 'Phone Models', requiredRole: 'admin' },
+      { key: 'prices', label: 'Price Management', requiredRole: 'admin' }
+    ];
+
+    if (userRole === 'admin') {
+      return allComponents;
+    }
+
+    // Regular users can only see Inventory Summary
+    return allComponents.filter(component => component.key === 'summary');
+  };
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setCurrentUser(user);
+        
+        // Fetch user role from Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUserRole(userData.role || 'user');
+          } else {
+            // Create user document if it doesn't exist
+            await setDoc(doc(db, 'users', user.uid), {
+              email: user.email,
+              role: 'user',
+              createdAt: new Date().toISOString()
+            });
+            setUserRole('user');
+          }
+        } catch (error) {
+          console.error('Error fetching user role:', error);
+          setUserRole('user');
+        }
+      } else {
+        setCurrentUser(null);
+        setUserRole(null);
+      }
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const value = {
+    currentUser,
+    userRole,
+    loading,
+    error,
+    login,
+    register,
+    logout,
+    hasPermission,
+    getAccessibleComponents
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+AuthProvider.propTypes = {
+  children: PropTypes.node.isRequired
+};
+
+export default AuthContext;
 </file>
 
 <file path="src/index.css">
@@ -700,25 +1280,6 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
-</file>
-
-<file path="src/main.jsx">
-// src/main.jsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import './index.css';
-import './styles.css';
-// Import the GlobalStateProvider from our consolidated file
-import { GlobalStateProvider } from './context/GlobalStateContext';
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <GlobalStateProvider>
-      <App />
-    </GlobalStateProvider>
-  </React.StrictMode>
-);
 </file>
 
 <file path="src/styles.css">
@@ -765,6 +1326,54 @@ export default defineConfig({
     exclude: [],
   },
 })
+</file>
+
+<file path="eslint.config.js">
+import js from '@eslint/js'
+import globals from 'globals'
+import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+
+export default [
+  { ignores: ['dist'] },
+  {
+    files: ['**/*.{js,jsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    settings: { react: { version: '18.3' } },
+    plugins: {
+      react,
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...react.configs.recommended.rules,
+      ...react.configs['jsx-runtime'].rules,
+      ...reactHooks.configs.recommended.rules,
+      'react/jsx-no-target-blank': 'off',
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+      'react/prop-types': 'off',
+      'react/no-unescaped-entities': ['warn', {
+        'forbid': [
+          { 'char': '>', 'alternatives': ['&gt;'] },
+          { 'char': '}', 'alternatives': ['&#125;'] }
+        ]
+      }]
+    },
+  },
+]
 </file>
 
 <file path="package.json">
@@ -4050,6 +4659,51 @@ const PriceManagementForm = () => {
 
 export default PriceManagementForm;
 {/* Part 9 End - Expanded Color Rows and Footer */}
+</file>
+
+<file path="src/firebase/config.js">
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+
+const firebaseConfig = {
+
+    apiKey: "AIzaSyAdj8EwqtB7uP_gQmevelvbxew4_X4LJyk",  
+    authDomain: "tech-city-phone-information.firebaseapp.com",  
+    projectId: "tech-city-phone-information",  
+    storageBucket: "tech-city-phone-information.firebasestorage.app",  
+    messagingSenderId: "218177382353",  
+    appId: "1:218177382353:web:cf92ab1e75bcd139a062f0"  
+};
+  
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+</file>
+
+<file path="src/main.jsx">
+// src/main.jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+import './styles.css';
+// Import the GlobalStateProvider from our consolidated file
+import { GlobalStateProvider } from './context/GlobalStateContext';
+// Import the AuthProvider
+import { AuthProvider } from './context/AuthContext';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <AuthProvider>
+      <GlobalStateProvider>
+        <App />
+      </GlobalStateProvider>
+    </AuthProvider>
+  </React.StrictMode>
+);
 </file>
 
 <file path="src/components/phone-selection/services/InventoryService.js">
@@ -7450,109 +8104,6 @@ export default useGlobalState;
 {/* Part 3 End - Export Default Hook */}
 </file>
 
-<file path="src/App.jsx">
-// src/App.jsx
-import { useEffect } from 'react';
-import PhoneSpecForm from './components/PhoneSpecForm';
-import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
-import InventoryListForm from './components/InventoryListForm';
-import PhoneListForm from './components/PhoneListForm';
-import InventorySummaryForm from './components/InventorySummaryForm';
-import PriceManagementForm from './components/PriceManagementForm';
-import PhoneProcurementForm from './components/PhoneProcurementForm';
-import SupplierManagementForm from './components/SupplierManagementForm';
-import ProcurementManagementForm from './components/ProcurementManagementForm';
-import StockReceivingForm from './components/StockReceivingForm'; // NEW: Added stock receiving import
-// Import the hook from our consolidated file
-import { useGlobalState } from './context/GlobalStateContext';
-
-function App() {
-  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
-  
-  // For debugging
-  useEffect(() => {
-    console.log("App: Active component changed to:", activeComponent);
-    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
-  }, [activeComponent, phoneToEdit]);
-
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="p-4 bg-[rgb(52,69,157)] text-white">
-        <div className="max-w-6xl mx-auto flex flex-wrap gap-4">
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'summary' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('summary')}
-          >
-            Inventory Summary
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'inventory' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('inventory')}
-          >
-            Inventory List
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'selection' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('selection')}
-          >
-            Add Phone Inventory
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'procurement' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('procurement')}
-          >
-            Phone Procurement
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'procurementmgmt' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('procurementmgmt')}
-          >
-            Procurement Management
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'suppliers' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('suppliers')}
-          >
-            Supplier Management
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'form' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('form')}
-          >
-            Add Phone Model
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'phonelist' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('phonelist')}
-          >
-            Phone Models
-          </button>
-          <button 
-            className={`px-4 py-2 rounded ${activeComponent === 'prices' ? 'bg-white text-[rgb(52,69,157)]' : 'bg-transparent'}`}
-            onClick={() => setActiveComponent('prices')}
-          >
-            Price Management
-          </button>
-        </div>
-      </div>
-      
-      {activeComponent === 'summary' && <InventorySummaryForm />}
-      {activeComponent === 'selection' && <PhoneSelectionForm />}
-      {activeComponent === 'procurement' && <PhoneProcurementForm />}
-      {activeComponent === 'procurementmgmt' && <ProcurementManagementForm />}
-      {activeComponent === 'stockreceiving' && <StockReceivingForm />}
-      {activeComponent === 'suppliers' && <SupplierManagementForm />}
-      {activeComponent === 'form' && <PhoneSpecForm />}
-      {activeComponent === 'inventory' && <InventoryListForm />}
-      {activeComponent === 'phonelist' && <PhoneListForm />}
-      {activeComponent === 'prices' && <PriceManagementForm />}
-    </div>
-  );
-}
-
-export default App;
-</file>
-
 <file path="src/components/PhoneProcurementForm.jsx">
 {/* Part 1 Start - Imports, State, and Helper Functions */}
 import { useState, useEffect } from 'react';
@@ -10373,6 +10924,184 @@ export default StockReceivingForm;
 {/* Part 6 End - Form Submission and Export */}
 </file>
 
+<file path="src/App.jsx">
+// src/App.jsx
+import { useEffect } from 'react';
+import PhoneSpecForm from './components/PhoneSpecForm';
+import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
+import InventoryListForm from './components/InventoryListForm';
+import PhoneListForm from './components/PhoneListForm';
+import InventorySummaryForm from './components/InventorySummaryForm';
+import PriceManagementForm from './components/PriceManagementForm';
+import PhoneProcurementForm from './components/PhoneProcurementForm';
+import SupplierManagementForm from './components/SupplierManagementForm';
+import ProcurementManagementForm from './components/ProcurementManagementForm';
+import StockReceivingForm from './components/StockReceivingForm';
+import Login from './components/Login';
+import { useGlobalState } from './context/GlobalStateContext';
+import { useAuth } from './context/AuthContext';
+import { LogOut, User, Shield } from 'lucide-react';
+
+function App() {
+  const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
+  const { currentUser, userRole, loading, logout, getAccessibleComponents, hasPermission } = useAuth();
+  
+  // For debugging
+  useEffect(() => {
+    console.log("App: Active component changed to:", activeComponent);
+    console.log("App: phoneToEdit:", phoneToEdit ? phoneToEdit.id : 'none');
+    console.log("App: User role:", userRole);
+  }, [activeComponent, phoneToEdit, userRole]);
+
+  // Set default component based on user role when authenticated
+  useEffect(() => {
+    if (currentUser && !activeComponent) {
+      const accessibleComponents = getAccessibleComponents();
+      if (accessibleComponents.length > 0) {
+        setActiveComponent(accessibleComponents[0].key);
+      }
+    }
+  }, [currentUser, activeComponent, getAccessibleComponents, setActiveComponent]);
+
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    setActiveComponent('');
+  };
+
+  // Show loading screen while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[rgb(52,69,157)]"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!currentUser) {
+    return <Login />;
+  }
+
+  // Get accessible components for the current user
+  const accessibleComponents = getAccessibleComponents();
+
+  // Component permission map
+  const componentPermissions = {
+    'summary': 'user',
+    'inventory': 'user',
+    'selection': 'user',
+    'procurement': 'admin',
+    'procurementmgmt': 'admin',
+    'stockreceiving': 'admin',
+    'suppliers': 'admin',
+    'form': 'user',
+    'phonelist': 'user',
+    'prices': 'admin'
+  };
+
+  // Check if user has permission for current component
+  const canAccessCurrentComponent = !activeComponent || hasPermission(componentPermissions[activeComponent]);
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="p-4 bg-[rgb(52,69,157)] text-white">
+        <div className="max-w-7xl mx-auto">
+          {/* Header with user info and logout */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-bold">Tech City Inventory System</h1>
+              <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full">
+                {userRole === 'admin' ? (
+                  <Shield className="h-4 w-4" />
+                ) : (
+                  <User className="h-4 w-4" />
+                )}
+                <span className="text-sm font-medium">
+                  {userRole === 'admin' ? 'Administrator' : 'User'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm">{currentUser.email}</span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* Navigation buttons */}
+          <div className="flex flex-wrap gap-2">
+            {accessibleComponents.map(component => (
+              <button
+                key={component.key}
+                className={`px-4 py-2 rounded transition-colors ${
+                  activeComponent === component.key 
+                    ? 'bg-white text-[rgb(52,69,157)]' 
+                    : 'bg-transparent hover:bg-white/20'
+                }`}
+                onClick={() => setActiveComponent(component.key)}
+              >
+                {component.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Main content area */}
+      <div className="p-4">
+        {!canAccessCurrentComponent ? (
+          <div className="max-w-2xl mx-auto mt-12">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+              <Shield className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-red-900 mb-2">Access Denied</h2>
+              <p className="text-red-700">
+                You don&apos;t have permission to access this section. 
+                {userRole !== 'admin' && ' This feature is only available to administrators.'}
+              </p>
+              <button
+                onClick={() => {
+                  const firstAccessible = accessibleComponents[0];
+                  if (firstAccessible) {
+                    setActiveComponent(firstAccessible.key);
+                  }
+                }}
+                className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90"
+              >
+                Go to Home
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {activeComponent === 'summary' && <InventorySummaryForm />}
+            {activeComponent === 'selection' && <PhoneSelectionForm />}
+            {activeComponent === 'procurement' && <PhoneProcurementForm />}
+            {activeComponent === 'procurementmgmt' && <ProcurementManagementForm />}
+            {activeComponent === 'stockreceiving' && <StockReceivingForm />}
+            {activeComponent === 'suppliers' && <SupplierManagementForm />}
+            {activeComponent === 'form' && <PhoneSpecForm />}
+            {activeComponent === 'inventory' && <InventoryListForm />}
+            {activeComponent === 'phonelist' && <PhoneListForm />}
+            {activeComponent === 'prices' && <PriceManagementForm />}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
+</file>
+
 <file path="src/components/inventory/InventoryRow.jsx">
 {/* Part 1 Start - Imports */}
 import PropTypes from 'prop-types';
@@ -10526,1223 +11255,6 @@ InventoryRow.propTypes = {
 {/* Part 6 Start - Export */}
 export default InventoryRow;
 {/* Part 6 End - Export */}
-</file>
-
-<file path="src/components/InventorySummaryForm.jsx">
-{/* Part 1 Start - Imports and Initial State */}
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { 
-  Smartphone, 
-  RefreshCw, 
-  ChevronDown, 
-  ChevronRight, 
-  Filter, 
-  X,
-  CircleAlert  // NEW: Added for exclusion info display
-} from 'lucide-react';
-
-const InventorySummaryForm = () => {
-  // Main state
-  const [inventoryData, setInventoryData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [expandedRows, setExpandedRows] = useState(new Set());
-  const [expandedColorSections, setExpandedColorSections] = useState({});
-  const [expandedColorRows, setExpandedColorRows] = useState({}); // NEW: Track expanded color rows
-  
-  // NEW: Add state for excluded models info
-  const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
-  
-  // Filter states
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    manufacturer: '',
-    model: '',
-    ram: '',
-    storage: '',
-    color: ''
-  });
-  
-  // Filter options
-  const [filterOptions, setFilterOptions] = useState({
-    manufacturers: [],
-    models: [],
-    rams: [],
-    storages: [],
-    colors: []
-  });
-  
-  // Filtered options based on selections
-  const [filteredOptions, setFilteredOptions] = useState({
-    models: [],
-    rams: [],
-    storages: [],
-    colors: []
-  });
-
-  // UPDATED: Add this function to fetch excluded models info for display with useCallback
-  const fetchExcludedModelsInfo = useCallback(async () => {
-    try {
-      const phonesRef = collection(db, 'phones');
-      const phonesSnapshot = await getDocs(phonesRef);
-      
-      const excludedList = [];
-      phonesSnapshot.forEach(doc => {
-        const phoneData = doc.data();
-        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
-          excludedList.push({
-            manufacturer: phoneData.manufacturer,
-            model: phoneData.model
-          });
-        }
-      });
-      
-      setExcludedModelsInfo(excludedList.sort((a, b) => {
-        if (a.manufacturer !== b.manufacturer) {
-          return a.manufacturer.localeCompare(b.manufacturer);
-        }
-        return a.model.localeCompare(b.model);
-      }));
-    } catch (error) {
-      console.error("Error fetching excluded models info:", error);
-    }
-  }, []);
-
-  // Toggle row expansion (for base configurations)
-  const toggleRowExpansion = (index) => {
-    const newExpandedRows = new Set(expandedRows);
-    if (newExpandedRows.has(index)) {
-      newExpandedRows.delete(index);
-      setExpandedColorSections(prev => {
-        const newState = { ...prev };
-        delete newState[index];
-        return newState;
-      });
-      setExpandedColorRows(prev => {
-        const newState = { ...prev };
-        delete newState[index];
-        return newState;
-      });
-    } else {
-      newExpandedRows.add(index);
-      setExpandedColorSections(prev => ({
-        ...prev,
-        [index]: {}
-      }));
-      setExpandedColorRows(prev => ({
-        ...prev,
-        [index]: {}
-      }));
-    }
-    setExpandedRows(newExpandedRows);
-  };
-
-  // NEW: Toggle color row expansion (for showing/hiding detail sections)
-  const toggleColorRowExpansion = (rowIndex, colorIndex) => {
-    setExpandedColorRows(prev => ({
-      ...prev,
-      [rowIndex]: {
-        ...prev[rowIndex],
-        [colorIndex]: !prev[rowIndex]?.[colorIndex]
-      }
-    }));
-  };
-
-  // Toggle section expansion for color breakdown
-  const toggleColorSectionExpansion = (rowIndex, colorIndex, section) => {
-    setExpandedColorSections(prev => ({
-      ...prev,
-      [rowIndex]: {
-        ...prev[rowIndex],
-        [`${colorIndex}_${section}`]: !prev[rowIndex]?.[`${colorIndex}_${section}`]
-      }
-    }));
-  };
-{/* Part 1 End - Imports and Initial State */}
-
-{/* Part 2 Start - Helper Functions and Filters */}
-  // Handle filter change
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Clear all filters
-  const clearFilters = () => {
-    setFilters({
-      manufacturer: '',
-      model: '',
-      ram: '',
-      storage: '',
-      color: ''
-    });
-    setFilteredOptions({
-      models: filterOptions.models,
-      rams: filterOptions.rams,
-      storages: filterOptions.storages,
-      colors: filterOptions.colors
-    });
-  };
-
-  // Utility functions
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return dateString;
-      }
-      return date.toLocaleDateString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric'
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatPrice = (price) => {
-    if (!price && price !== 0) return 'N/A';
-    return `₱${price.toLocaleString()}`;
-  };
-
-  const calculateMargin = (dealersPrice, retailPrice) => {
-    if (!dealersPrice || !retailPrice) return 'N/A';
-    const costPrice = typeof dealersPrice === 'string' ? parseFloat(dealersPrice.replace(/[^\d.-]/g, '')) : dealersPrice;
-    const sellPrice = typeof retailPrice === 'string' ? parseFloat(retailPrice.replace(/[^\d.-]/g, '')) : retailPrice;
-    if (costPrice <= 0) return 'N/A';
-    const marginAmount = sellPrice - costPrice;
-    const marginPercentage = (marginAmount / costPrice) * 100;
-    return `${marginPercentage.toFixed(2)}%`;
-  };
-
-  const formatWithGB = (value) => {
-    if (!value) return 'N/A';
-    if (value.includes('GB') || value.includes('TB') || value.includes('gb') || value.includes('tb')) {
-      return value;
-    }
-    return `${value}GB`;
-  };
-
-  // Apply filters to data
-  const applyFilters = () => {
-    if (!inventoryData.length) return;
-    const filtered = inventoryData.filter(item => {
-      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) return false;
-      if (filters.model && item.model !== filters.model) return false;
-      if (filters.ram && item.ram !== filters.ram) return false;
-      if (filters.storage && item.storage !== filters.storage) return false;
-      if (filters.color && !item.colors.some(colorData => colorData.color === filters.color)) return false;
-      return true;
-    });
-    setFilteredData(filtered);
-  };
-  
-  // Update filtered options based on current selections
-  const updateFilteredOptions = () => {
-    if (!inventoryData.length) return;
-    
-    let filteredModels = filterOptions.models;
-    let filteredRams = filterOptions.rams;
-    let filteredStorages = filterOptions.storages;
-    let filteredColors = filterOptions.colors;
-    
-    if (filters.manufacturer) {
-      filteredModels = [...new Set(
-        inventoryData
-          .filter(item => item.manufacturer === filters.manufacturer)
-          .map(item => item.model)
-      )].sort();
-    }
-    
-    if (filters.manufacturer || filters.model) {
-      let filtered = inventoryData;
-      if (filters.manufacturer) {
-        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
-      }
-      if (filters.model) {
-        filtered = filtered.filter(item => item.model === filters.model);
-      }
-      filteredRams = [...new Set(filtered.map(item => item.ram))].sort();
-    }
-    
-    if (filters.manufacturer || filters.model || filters.ram) {
-      let filtered = inventoryData;
-      if (filters.manufacturer) {
-        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
-      }
-      if (filters.model) {
-        filtered = filtered.filter(item => item.model === filters.model);
-      }
-      if (filters.ram) {
-        filtered = filtered.filter(item => item.ram === filters.ram);
-      }
-      filteredStorages = [...new Set(filtered.map(item => item.storage))].sort();
-    }
-{/* Part 2 End - Helper Functions and Filters */}
-
-{/* Part 3 Start - Filter Options Update and Date Helper */}
-    if (filters.manufacturer || filters.model || filters.ram || filters.storage) {
-      let filtered = inventoryData;
-      if (filters.manufacturer) {
-        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
-      }
-      if (filters.model) {
-        filtered = filtered.filter(item => item.model === filters.model);
-      }
-      if (filters.ram) {
-        filtered = filtered.filter(item => item.ram === filters.ram);
-      }
-      if (filters.storage) {
-        filtered = filtered.filter(item => item.storage === filters.storage);
-      }
-      filteredColors = [...new Set(
-        filtered.flatMap(item => item.colors.map(colorData => colorData.color))
-      )].sort();
-    }
-    
-    setFilteredOptions({
-      models: filteredModels,
-      rams: filteredRams,
-      storages: filteredStorages,
-      colors: filteredColors
-    });
-  };
-
-  // NEW: Helper function to check if a date is within the current month
-  const isWithinCurrentMonth = (dateString) => {
-    if (!dateString) return false;
-    
-    try {
-      const itemDate = new Date(dateString);
-      const currentDate = new Date();
-      
-      // Check if dates are valid
-      if (isNaN(itemDate.getTime()) || isNaN(currentDate.getTime())) {
-        return false;
-      }
-      
-      // Compare year and month
-      return itemDate.getFullYear() === currentDate.getFullYear() && 
-             itemDate.getMonth() === currentDate.getMonth();
-    } catch (error) {
-      console.error("Error parsing date:", dateString, error);
-      return false;
-    }
-  };
-
-  // UPDATED: Fetch and process inventory data with exclusion logic, improved sorting, current month sold filter, and useCallback
-  const fetchInventoryData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // NEW: First, get the list of excluded models from the phones collection
-      const phonesRef = collection(db, 'phones');
-      const phonesSnapshot = await getDocs(phonesRef);
-      
-      const excludedModels = new Set();
-      phonesSnapshot.forEach(doc => {
-        const phoneData = doc.data();
-        // If excludeFromSummary is true, add the manufacturer_model combination to excluded set
-        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
-          const modelKey = `${phoneData.manufacturer}_${phoneData.model}`;
-          excludedModels.add(modelKey);
-          console.log(`Excluding model from summary: ${phoneData.manufacturer} ${phoneData.model}`);
-        }
-      });
-      
-      console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
-      
-      // Now fetch inventory data
-      const inventoryRef = collection(db, 'inventory');
-      const snapshot = await getDocs(inventoryRef);
-      
-      // Group inventory by manufacturer, model, ram, storage (excluding color)
-      const groupedData = {};
-      const manufacturers = new Set();
-      const models = new Set();
-      const rams = new Set();
-      const storages = new Set();
-      const colors = new Set();
-{/* Part 3 End - Filter Options Update and Date Helper */}
-
-{/* Part 4 Start - Inventory Data Processing */}
-      snapshot.forEach(doc => {
-        const item = { id: doc.id, ...doc.data() };
-        
-        // NEW: Check if this model should be excluded from summary
-        const modelKey = `${item.manufacturer}_${item.model}`;
-        if (excludedModels.has(modelKey)) {
-          console.log(`Skipping excluded model: ${item.manufacturer} ${item.model}`);
-          return; // Skip this item
-        }
-        
-        const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
-        
-        // Add to filter options
-        if (item.manufacturer) manufacturers.add(item.manufacturer);
-        if (item.model) models.add(item.model);
-        if (item.ram) rams.add(item.ram);
-        if (item.storage) storages.add(item.storage);
-        if (item.color) colors.add(item.color);
-        
-        if (!groupedData[baseKey]) {
-          groupedData[baseKey] = {
-            manufacturer: item.manufacturer,
-            model: item.model,
-            ram: item.ram,
-            storage: item.storage,
-            totalSold: 0,
-            totalOnDisplay: 0,
-            totalOnHand: 0,
-            totalAvailable: 0,
-            totalPending: 0,  // NEW: Added totalPending
-            dealersPrice: item.dealersPrice || 0,
-            retailPrice: item.retailPrice || 0,
-            colors: {}
-          };
-        }
-        
-        // Group by color for color breakdown
-        if (!groupedData[baseKey].colors[item.color]) {
-          groupedData[baseKey].colors[item.color] = {
-            color: item.color,
-            sold: 0,
-            onDisplay: 0,
-            onHand: 0,
-            available: 0,
-            pending: 0,  // NEW: Added pending to color breakdown
-            dealersPrice: item.dealersPrice || 0,
-            retailPrice: item.retailPrice || 0,
-            soldItems: [],
-            onDisplayItems: [],
-            onHandItems: []
-          };
-        }
-        
-        // Update counts based on status
-        if (item.status === 'Sold') {
-          // NEW: Filter sold items by current month
-          if (isWithinCurrentMonth(item.lastUpdated)) {
-            groupedData[baseKey].totalSold++;
-            groupedData[baseKey].colors[item.color].sold++;
-            groupedData[baseKey].colors[item.color].soldItems.push(item);
-          }
-        } else if (item.status === 'On-Display') {
-          groupedData[baseKey].totalOnDisplay++;
-          groupedData[baseKey].totalAvailable++;
-          groupedData[baseKey].colors[item.color].onDisplay++;
-          groupedData[baseKey].colors[item.color].available++;
-          groupedData[baseKey].colors[item.color].onDisplayItems.push(item);
-        } else if (item.status === 'On-Hand' || item.status === 'Stock') {
-          groupedData[baseKey].totalOnHand++;
-          groupedData[baseKey].totalAvailable++;
-          groupedData[baseKey].colors[item.color].onHand++;
-          groupedData[baseKey].colors[item.color].available++;
-          groupedData[baseKey].colors[item.color].onHandItems.push(item);
-        }
-      });
-      
-      // NEW: Fetch procurement data to calculate pending items
-      const procurementsRef = collection(db, 'procurements');
-      const procurementsSnapshot = await getDocs(procurementsRef);
-      
-      procurementsSnapshot.forEach(doc => {
-        const procurement = { id: doc.id, ...doc.data() };
-        
-        // Only process if delivery status is pending
-        if (procurement.deliveryStatus === 'pending' && procurement.items && Array.isArray(procurement.items)) {
-          procurement.items.forEach(item => {
-            // Check if this model should be excluded from summary
-            const modelKey = `${item.manufacturer}_${item.model}`;
-            if (excludedModels.has(modelKey)) {
-              return; // Skip this item
-            }
-            
-            const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
-            
-            // If this configuration exists in grouped data, update pending count
-            if (groupedData[baseKey]) {
-              groupedData[baseKey].totalPending += (item.quantity || 0);
-              
-              // Update color-specific pending count
-              if (groupedData[baseKey].colors[item.color]) {
-                groupedData[baseKey].colors[item.color].pending += (item.quantity || 0);
-              } else {
-                // Create color entry if it doesn't exist yet
-                groupedData[baseKey].colors[item.color] = {
-                  color: item.color,
-                  sold: 0,
-                  onDisplay: 0,
-                  onHand: 0,
-                  available: 0,
-                  pending: item.quantity || 0,
-                  dealersPrice: item.dealersPrice || 0,
-                  retailPrice: item.retailPrice || 0,
-                  soldItems: [],
-                  onDisplayItems: [],
-                  onHandItems: []
-                };
-              }
-            } else {
-              // Create new entry if this configuration doesn't exist yet
-              groupedData[baseKey] = {
-                manufacturer: item.manufacturer,
-                model: item.model,
-                ram: item.ram,
-                storage: item.storage,
-                totalSold: 0,
-                totalOnDisplay: 0,
-                totalOnHand: 0,
-                totalAvailable: 0,
-                totalPending: item.quantity || 0,
-                dealersPrice: item.dealersPrice || 0,
-                retailPrice: item.retailPrice || 0,
-                colors: {
-                  [item.color]: {
-                    color: item.color,
-                    sold: 0,
-                    onDisplay: 0,
-                    onHand: 0,
-                    available: 0,
-                    pending: item.quantity || 0,
-                    soldItems: [],
-                    onDisplayItems: [],
-                    onHandItems: []
-                  }
-                }
-              };
-              
-              // Add to filter options if not already present
-              if (item.manufacturer) manufacturers.add(item.manufacturer);
-              if (item.model) models.add(item.model);
-              if (item.ram) rams.add(item.ram);
-              if (item.storage) storages.add(item.storage);
-              if (item.color) colors.add(item.color);
-            }
-          });
-        }
-      });
-      
-      // Convert colors object to array and sort by color name
-      Object.values(groupedData).forEach(item => {
-        item.colors = Object.values(item.colors).sort((a, b) => 
-          a.color.localeCompare(b.color)
-        );
-      });
-      
-      // Helper function to extract numeric value from RAM/Storage strings
-      const extractNumericValue = (value) => {
-        if (!value) return 0;
-        
-        // Extract numeric value and unit
-        const match = value.match(/(\d+(?:\.\d+)?)/);
-        if (!match) return 0;
-        
-        const num = parseFloat(match[1]);
-        // Convert TB to GB for consistent comparison
-        if (value.toLowerCase().includes('tb')) {
-          return num * 1024;
-        }
-        return num;
-      };
-      
-      // UPDATED: Improved sorting logic with numeric comparison for RAM and storage
-      const inventoryArray = Object.values(groupedData).sort((a, b) => {
-        // 1. Sort by manufacturer (string comparison)
-        if (a.manufacturer !== b.manufacturer) {
-          return a.manufacturer.localeCompare(b.manufacturer);
-        }
-        
-        // 2. Sort by model (string comparison)
-        if (a.model !== b.model) {
-          return a.model.localeCompare(b.model);
-        }
-        
-        // 3. Sort by RAM (numeric comparison - smallest to largest)
-        const ramA = extractNumericValue(a.ram);
-        const ramB = extractNumericValue(b.ram);
-        if (ramA !== ramB) {
-          return ramA - ramB; // Ascending order (smallest to largest)
-        }
-        
-        // 4. Sort by storage (numeric comparison - smallest to largest)
-        const storageA = extractNumericValue(a.storage);
-        const storageB = extractNumericValue(b.storage);
-        return storageA - storageB; // Ascending order (smallest to largest)
-      });
-{/* Part 4 End - Inventory Data Processing */}
-
-{/* Part 5 Start - Final Data Setup and Effects */}
-      const filterOpts = {
-        manufacturers: [...manufacturers].sort(),
-        models: [...models].sort(),
-        rams: [...rams].sort(),
-        storages: [...storages].sort(),
-        colors: [...colors].sort()
-      };
-      setFilterOptions(filterOpts);
-      setFilteredOptions({
-        models: filterOpts.models,
-        rams: filterOpts.rams,
-        storages: filterOpts.storages,
-        colors: filterOpts.colors
-      });
-      
-      setInventoryData(inventoryArray);
-      setFilteredData(inventoryArray);
-      setLoading(false);
-      
-      // NEW: Log summary of excluded models for debugging
-      console.log(`Inventory Summary loaded: ${inventoryArray.length} configurations (${excludedModels.size} models excluded)`);
-      console.log(`Sold items filtered to current month only`);
-      
-    } catch (err) {
-      console.error("Error fetching inventory data:", err);
-      setError(`Error fetching inventory: ${err.message}`);
-      setLoading(false);
-    }
-  }, []); // Empty dependency array since this function doesn't depend on any state or props
-
-  // UPDATED: Effects with proper dependencies to fix React Hook warnings
-  useEffect(() => {
-    fetchInventoryData();
-    fetchExcludedModelsInfo();
-  }, [fetchInventoryData, fetchExcludedModelsInfo]); // Both functions are now memoized with useCallback
-  
-  useEffect(() => {
-    updateFilteredOptions();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryData, filters]);
-  
-  useEffect(() => {
-    applyFilters();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, inventoryData]);
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-[rgb(52,69,157)] py-3">
-            <CardTitle className="text-2xl text-white">Inventory Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
-              <p className="mt-2 text-gray-600">Loading inventory data...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-          <CardHeader className="bg-red-600 py-3">
-            <CardTitle className="text-2xl text-white">Error</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-            <button 
-              onClick={fetchInventoryData}
-              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
-            >
-              Try Again
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-{/* Part 5 End - Final Data Setup and Effects */}
-
-{/* Part 6 Start - Main Return Header and Filter Panel */}
-  return (
-    <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
-        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Smartphone className="h-6 w-6 text-white" />
-            <CardTitle className="text-2xl text-white">Inventory Summary</CardTitle>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1 ${showFilters ? 'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
-            >
-              <Filter className="h-5 w-5 mr-1" />
-              <span>Filters</span>
-            </button>
-            <button
-              onClick={fetchInventoryData}
-              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
-            >
-              <RefreshCw className="h-5 w-5 mr-1" />
-              <span>Refresh</span>
-            </button>
-          </div>
-        </CardHeader>
-
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="bg-gray-50 px-4 py-4 border-b">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
-              <button 
-                onClick={clearFilters}
-                className="text-gray-500 hover:text-red-500 flex items-center"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Clear Filters
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
-                <select name="manufacturer" value={filters.manufacturer} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All Manufacturers</option>
-                  {filterOptions.manufacturers.map(manufacturer => (
-                    <option key={manufacturer} value={manufacturer}>{manufacturer}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                <select name="model" value={filters.model} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All Models</option>
-                  {filteredOptions.models.map(model => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
-                <select name="ram" value={filters.ram} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All RAM</option>
-                  {filteredOptions.rams.map(ram => (
-                    <option key={ram} value={ram}>{ram}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Storage</label>
-                <select name="storage" value={filters.storage} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All Storage</option>
-                  {filteredOptions.storages.map(storage => (
-                    <option key={storage} value={storage}>{storage}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
-                <select name="color" value={filters.color} onChange={handleFilterChange} className="w-full p-2 border rounded">
-                  <option value="">All Colors</option>
-                  {filteredOptions.colors.map(color => (
-                    <option key={color} value={color}>{color}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            {/* Active filters summary */}
-            {Object.values(filters).some(filter => filter !== '') && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {Object.entries(filters).map(([key, value]) => 
-                  value && (
-                    <div key={key} className="bg-gray-200 rounded-full px-3 py-1 text-sm flex items-center">
-                      <span className="font-medium capitalize">{key}:</span>
-                      <span className="ml-1">{value}</span>
-                      <button 
-                        onClick={() => setFilters(prev => ({ ...prev, [key]: '' }))}
-                        className="ml-2 text-gray-500 hover:text-gray-700"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
-          </div>
-        )}
-{/* Part 6 End - Main Return Header and Filter Panel */}
-
-{/* Part 7 Start - Excluded Models Info and Table Start */}
-        {/* NEW: Add Excluded Models Info Display */}
-        <CardContent className="p-4">
-          {excludedModelsInfo.length > 0 && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <CircleAlert className="h-5 w-5 text-yellow-600" />
-                <h4 className="font-medium text-yellow-800">
-                  Excluded Models ({excludedModelsInfo.length})
-                </h4>
-              </div>
-              <div className="text-sm text-yellow-700">
-                The following models are excluded from this summary:
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {excludedModelsInfo.map((model, index) => (
-                  <span 
-                    key={index}
-                    className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
-                  >
-                    {model.manufacturer} {model.model}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {filteredData.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">No inventory data found</h3>
-              {Object.values(filters).some(f => f) ? (
-                <>
-                  <p className="text-gray-500 mb-4">No items match your current filters.</p>
-                  <button onClick={clearFilters} className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-md">
-                    Clear Filters
-                  </button>
-                </>
-              ) : (
-                <p className="text-gray-500">There are no inventory items in the database.</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Inventory list */}
-              <div className="bg-white border rounded-lg overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      <th className="px-3 py-3 text-left">Manufacturer</th>
-                      <th className="px-3 py-3 text-left">Model</th>
-                      <th className="px-3 py-3 text-left">RAM</th>
-                      <th className="px-3 py-3 text-left">Storage</th>
-                      <th className="px-3 py-3 text-left">Colors</th>
-                      <th className="pl-0 pr-1 py-3 text-center">DP</th>
-                      <th className="px-1 py-3 text-center">SRP</th>
-                      <th className="px-1 py-3 text-right">Margin</th>
-                      <th className="pl-12 pr-1 py-3 text-center">Sold</th>
-                      <th className="px-1 py-3 text-center">Display</th>
-                      <th className="px-1 py-3 text-center">Stock</th>
-                      <th className="px-1 py-3 text-center">Available</th>
-                      <th className="px-1 py-3 text-center">Pending</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredData.map((item, index) => (
-                      <React.Fragment key={index}>
-                        {/* Main row */}
-                        <tr 
-                          className={`hover:bg-gray-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                          onClick={() => toggleRowExpansion(index)}
-                        >
-                          <td className="px-3 py-3 text-sm">{item.manufacturer}</td>
-                          <td className="px-3 py-3 text-sm font-medium">{item.model}</td>
-                          <td className="px-3 py-3 text-sm">{formatWithGB(item.ram)}</td>
-                          <td className="px-3 py-3 text-sm">{formatWithGB(item.storage)}</td>
-                          <td className="px-3 py-3 text-sm">
-                            <div className="flex flex-wrap gap-1">
-                              {item.colors.slice(0, 3).map((colorData, colorIndex) => (
-                                <span 
-                                  key={colorIndex} 
-                                  className="inline-block px-2 py-1 text-xs bg-gray-100 rounded"
-                                >
-                                  {colorData.color}
-                                </span>
-                              ))}
-                              {item.colors.length > 3 && (
-                                <span className="inline-block px-2 py-1 text-xs bg-gray-200 rounded">
-                                  +{item.colors.length - 3} more
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
-                          <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
-                          <td className="px-1 py-3 text-sm text-right font-medium">
-                            {calculateMargin(item.dealersPrice, item.retailPrice)}
-                          </td>
-                          <td className="pl-12 pr-1 py-2 text-sm text-center">
-                            <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-                              {item.totalSold}
-                            </span>
-                          </td>
-                          <td className="px-1 py-2 text-sm text-center">
-                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                              {item.totalOnDisplay}
-                            </span>
-                          </td>
-                          <td className="px-1 py-2 text-sm text-center">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                              {item.totalOnHand}
-                            </span>
-                          </td>
-                          <td className="px-1 py-2 text-sm text-center">
-                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                              {item.totalAvailable}
-                            </span>
-                          </td>
-                          <td className="px-1 py-2 text-sm text-center">
-                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">
-                              {item.totalPending}
-                            </span>
-                          </td>
-                        </tr>
-{/* Part 7 End - Excluded Models Info and Table Start */}
-
-{/* Part 8 Start - Expanded Color Breakdown */}
-                        {/* Expanded color breakdown */}
-                        {expandedRows.has(index) && (
-                          <tr>
-                            <td colSpan="13" className="px-0 py-0 border-b border-gray-200">
-                              <div className="px-4 pb-4 pt-2 bg-gray-100">
-                                <div className="space-y-4">
-                                  <h4 className="font-semibold text-gray-700 mb-3">
-                                    Color Breakdown ({item.colors.length} colors)
-                                  </h4>
-                                  
-                                  {item.colors.map((colorData, colorIndex) => (
-                                    <div key={colorIndex} className="border border-gray-200 rounded-lg bg-white">
-                                      {/* Color header - Now clickable to expand/collapse detail sections */}
-                                      <div 
-                                        className="px-4 py-3 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
-                                        onClick={() => toggleColorRowExpansion(index, colorIndex)}
-                                      >
-                                        <div className="flex justify-between items-center">
-                                          <div className="flex items-center gap-4">
-                                            <div className="flex items-center gap-2">
-                                              {expandedColorRows[index]?.[colorIndex] ? (
-                                                <ChevronDown className="h-5 w-5 text-gray-600" />
-                                              ) : (
-                                                <ChevronRight className="h-5 w-5 text-gray-600" />
-                                              )}
-                                              <h5 className="font-bold text-lg text-gray-800">{colorData.color}</h5>
-                                            </div>
-                                            <div className="flex gap-4 text-sm">
-                                              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
-                                                Sold: {colorData.sold}
-                                              </span>
-                                              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
-                                                Display: {colorData.onDisplay}
-                                              </span>
-                                              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                                                Stock: {colorData.onHand}
-                                              </span>
-                                              <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                                                Available: {colorData.available}
-                                              </span>
-                                              <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
-                                                Pending: {colorData.pending}
-                                              </span>
-                                            </div>
-                                          </div>
-                                          <div className="text-sm text-gray-600">
-                                            {formatPrice(colorData.retailPrice)} • {calculateMargin(colorData.dealersPrice, colorData.retailPrice)} margin
-                                          </div>
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Color details sections - Only show when color row is expanded */}
-                                      {expandedColorRows[index]?.[colorIndex] && (
-                                        <div className="p-4 space-y-3">
-                                          {/* Sold Items */}
-                                          {colorData.soldItems.length > 0 && (
-                                            <div>
-                                              <div 
-                                                className="flex items-center justify-between cursor-pointer bg-purple-50 p-2 rounded-t border border-purple-200"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  toggleColorSectionExpansion(index, colorIndex, 'sold');
-                                                }}
-                                              >
-                                                <h6 className="font-semibold text-purple-700">
-                                                  Sold Units ({colorData.sold})
-                                                </h6>
-                                                {expandedColorSections[index]?.[`${colorIndex}_sold`] ? (
-                                                  <ChevronDown className="h-4 w-4 text-purple-500" />
-                                                ) : (
-                                                  <ChevronRight className="h-4 w-4 text-purple-500" />
-                                                )}
-                                              </div>
-                                              
-                                              {expandedColorSections[index]?.[`${colorIndex}_sold`] && (
-                                                <div className="overflow-x-auto border border-t-0 border-purple-200 rounded-b">
-                                                  <table className="min-w-full">
-                                                    <thead className="bg-purple-50">
-                                                      <tr className="text-xs text-purple-800">
-                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white">
-                                                      {colorData.soldItems.map((soldItem, soldIndex) => (
-                                                        <tr key={soldIndex} className={soldIndex % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
-                                                          <td className="py-2 px-3 text-xs">{soldItem.imei1 || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs">{soldItem.imei2 || '-'}</td>
-                                                          <td className="py-2 px-3 text-xs">{soldItem.barcode || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(soldItem.retailPrice)}</td>
-                                                          <td className="py-2 px-3 text-xs">{formatDate(soldItem.lastUpdated)}</td>
-                                                        </tr>
-                                                      ))}
-                                                    </tbody>
-                                                  </table>
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-{/* Part 8 End - Expanded Color Breakdown */}
-
-{/* Part 9 Start - Display and Stock Items Tables */}
-                                          {/* On Display Items */}
-                                          {colorData.onDisplayItems.length > 0 && (
-                                            <div>
-                                              <div 
-                                                className="flex items-center justify-between cursor-pointer bg-yellow-50 p-2 rounded-t border border-yellow-200"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  toggleColorSectionExpansion(index, colorIndex, 'display');
-                                                }}
-                                              >
-                                                <h6 className="font-semibold text-yellow-700">
-                                                  Display Units ({colorData.onDisplay})
-                                                </h6>
-                                                {expandedColorSections[index]?.[`${colorIndex}_display`] ? (
-                                                  <ChevronDown className="h-4 w-4 text-yellow-500" />
-                                                ) : (
-                                                  <ChevronRight className="h-4 w-4 text-yellow-500" />
-                                                )}
-                                              </div>
-                                              
-                                              {expandedColorSections[index]?.[`${colorIndex}_display`] && (
-                                                <div className="overflow-x-auto border border-t-0 border-yellow-200 rounded-b">
-                                                  <table className="min-w-full">
-                                                    <thead className="bg-yellow-50">
-                                                      <tr className="text-xs text-yellow-800">
-                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white">
-                                                      {colorData.onDisplayItems.map((displayItem, displayIndex) => (
-                                                        <tr key={displayIndex} className={displayIndex % 2 === 0 ? 'bg-white' : 'bg-yellow-50'}>
-                                                          <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
-                                                          <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>
-                                                          <td className="py-2 px-3 text-xs">{formatDate(displayItem.lastUpdated)}</td>
-                                                        </tr>
-                                                      ))}
-                                                    </tbody>
-                                                  </table>
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-                                          
-                                          {/* On Hand Items */}
-                                          {colorData.onHandItems.length > 0 && (
-                                            <div>
-                                              <div 
-                                                className="flex items-center justify-between cursor-pointer bg-blue-50 p-2 rounded-t border border-blue-200"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  toggleColorSectionExpansion(index, colorIndex, 'stock');
-                                                }}
-                                              >
-                                                <h6 className="font-semibold text-blue-700">
-                                                  Stock Units ({colorData.onHand})
-                                                </h6>
-                                                {expandedColorSections[index]?.[`${colorIndex}_stock`] ? (
-                                                  <ChevronDown className="h-4 w-4 text-blue-500" />
-                                                ) : (
-                                                  <ChevronRight className="h-4 w-4 text-blue-500" />
-                                                )}
-                                              </div>
-                                              
-                                              {expandedColorSections[index]?.[`${colorIndex}_stock`] && (
-                                                <div className="overflow-x-auto border border-t-0 border-blue-200 rounded-b">
-                                                  <table className="min-w-full">
-                                                    <thead className="bg-blue-50">
-                                                      <tr className="text-xs text-blue-800">
-                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
-                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
-                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
-                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white">
-                                                      {colorData.onHandItems.map((handItem, handIndex) => (
-                                                        <tr key={handIndex} className={handIndex % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                                                          <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
-                                                          <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>
-                                                          <td className="py-2 px-3 text-xs">{formatDate(handItem.lastUpdated)}</td>
-                                                        </tr>
-                                                      ))}
-                                                    </tbody>
-                                                  </table>
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-
-                                          {/* Empty states */}
-                                          {colorData.soldItems.length === 0 && colorData.onDisplayItems.length === 0 && colorData.onHandItems.length === 0 && (
-                                            <div className="text-center py-4 text-gray-500">
-                                              No detailed information available for this color
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-{/* Part 9 End - Display and Stock Items Tables */}
-
-{/* Part 10 Start - Inventory Value Summary and Footer */}
-              {/* Inventory Value Summary */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">{"Total Dealer's Value"}</p>
-                        <p className="text-xs text-gray-500">{"(Available units × Dealer's price)"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-blue-600">
-                          {(() => {
-                            const totalDealerValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.dealersPrice);
-                            }, 0);
-                            return formatPrice(totalDealerValue);
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">Total Retail Value</p>
-                        <p className="text-xs text-gray-500">{"(Available units × Retail price)"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-green-600">
-                          {(() => {
-                            const totalRetailValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.retailPrice);
-                            }, 0);
-                            return formatPrice(totalRetailValue);
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 font-medium">Potential Profit</p>
-                        <p className="text-xs text-gray-500">{"(Retail value - Dealer's value)"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-purple-600">
-                          {(() => {
-                            const totalDealerValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.dealersPrice);
-                            }, 0);
-                            const totalRetailValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.retailPrice);
-                            }, 0);
-                            const potentialProfit = totalRetailValue - totalDealerValue;
-                            return formatPrice(potentialProfit);
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(() => {
-                            const totalDealerValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.dealersPrice);
-                            }, 0);
-                            const totalRetailValue = filteredData.reduce((total, item) => {
-                              return total + (item.totalAvailable * item.retailPrice);
-                            }, 0);
-                            const marginPercentage = totalDealerValue > 0 ? 
-                              ((totalRetailValue - totalDealerValue) / totalDealerValue * 100) : 0;
-                            return `${marginPercentage.toFixed(3)}% margin`;
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Summary footer */}
-              <div className="text-center text-gray-600">
-                {Object.values(filters).some(f => f) 
-                  ? `Showing ${filteredData.length} of ${inventoryData.length} inventory configurations (filtered)`
-                  : `Showing ${filteredData.length} inventory configurations`}
-                {expandedRows.size > 0 && ` • ${expandedRows.size} rows expanded`}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-export default InventorySummaryForm;
-{/* Part 10 End - Inventory Value Summary and Footer */}
 </file>
 
 <file path="src/components/phone-selection/PhoneSelectionForm.jsx">
@@ -13707,6 +13219,1238 @@ InventoryTable.propTypes = {
 {/* Part 8 Start - Export */}
 export default InventoryTable;
 {/* Part 8 End - Export */}
+</file>
+
+<file path="src/components/InventorySummaryForm.jsx">
+{/* Part 1 Start - Imports and Initial State */}
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { useAuth } from '../context/AuthContext'; // NEW: Added useAuth import
+import { 
+  Smartphone, 
+  RefreshCw, 
+  ChevronDown, 
+  ChevronRight, 
+  Filter, 
+  X,
+  CircleAlert  // NEW: Added for exclusion info display
+} from 'lucide-react';
+
+const InventorySummaryForm = () => {
+  // Get user role for conditional rendering
+  const { userRole } = useAuth(); // NEW: Get userRole from auth context
+  const isAdmin = userRole === 'admin'; // NEW: Check if user is admin
+  
+  // Main state
+  const [inventoryData, setInventoryData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [expandedColorSections, setExpandedColorSections] = useState({});
+  const [expandedColorRows, setExpandedColorRows] = useState({}); // NEW: Track expanded color rows
+  
+  // NEW: Add state for excluded models info
+  const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
+  
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    manufacturer: '',
+    model: '',
+    ram: '',
+    storage: '',
+    color: ''
+  });
+  
+  // Filter options
+  const [filterOptions, setFilterOptions] = useState({
+    manufacturers: [],
+    models: [],
+    rams: [],
+    storages: [],
+    colors: []
+  });
+  
+  // Filtered options based on selections
+  const [filteredOptions, setFilteredOptions] = useState({
+    models: [],
+    rams: [],
+    storages: [],
+    colors: []
+  });
+
+  // UPDATED: Add this function to fetch excluded models info for display with useCallback
+  const fetchExcludedModelsInfo = useCallback(async () => {
+    try {
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedList = [];
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          excludedList.push({
+            manufacturer: phoneData.manufacturer,
+            model: phoneData.model
+          });
+        }
+      });
+      
+      setExcludedModelsInfo(excludedList.sort((a, b) => {
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        return a.model.localeCompare(b.model);
+      }));
+    } catch (error) {
+      console.error("Error fetching excluded models info:", error);
+    }
+  }, []);
+
+  // Toggle row expansion (for base configurations)
+  const toggleRowExpansion = (index) => {
+    const newExpandedRows = new Set(expandedRows);
+    if (newExpandedRows.has(index)) {
+      newExpandedRows.delete(index);
+      setExpandedColorSections(prev => {
+        const newState = { ...prev };
+        delete newState[index];
+        return newState;
+      });
+      setExpandedColorRows(prev => {
+        const newState = { ...prev };
+        delete newState[index];
+        return newState;
+      });
+    } else {
+      newExpandedRows.add(index);
+      setExpandedColorSections(prev => ({
+        ...prev,
+        [index]: {}
+      }));
+      setExpandedColorRows(prev => ({
+        ...prev,
+        [index]: {}
+      }));
+    }
+    setExpandedRows(newExpandedRows);
+  };
+
+  // NEW: Toggle color row expansion (for showing/hiding detail sections)
+  const toggleColorRowExpansion = (rowIndex, colorIndex) => {
+    setExpandedColorRows(prev => ({
+      ...prev,
+      [rowIndex]: {
+        ...prev[rowIndex],
+        [colorIndex]: !prev[rowIndex]?.[colorIndex]
+      }
+    }));
+  };
+
+  // Toggle section expansion for color breakdown
+  const toggleColorSectionExpansion = (rowIndex, colorIndex, section) => {
+    setExpandedColorSections(prev => ({
+      ...prev,
+      [rowIndex]: {
+        ...prev[rowIndex],
+        [`${colorIndex}_${section}`]: !prev[rowIndex]?.[`${colorIndex}_${section}`]
+      }
+    }));
+  };
+{/* Part 1 End - Imports and Initial State */}
+
+{/* Part 2 Start - Helper Functions and Filters */}
+  // Handle filter change
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      manufacturer: '',
+      model: '',
+      ram: '',
+      storage: '',
+      color: ''
+    });
+    setFilteredOptions({
+      models: filterOptions.models,
+      rams: filterOptions.rams,
+      storages: filterOptions.storages,
+      colors: filterOptions.colors
+    });
+  };
+
+  // Utility functions
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString;
+      }
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatPrice = (price) => {
+    if (!price && price !== 0) return 'N/A';
+    return `₱${price.toLocaleString()}`;
+  };
+
+  const calculateMargin = (dealersPrice, retailPrice) => {
+    if (!dealersPrice || !retailPrice) return 'N/A';
+    const costPrice = typeof dealersPrice === 'string' ? parseFloat(dealersPrice.replace(/[^\d.-]/g, '')) : dealersPrice;
+    const sellPrice = typeof retailPrice === 'string' ? parseFloat(retailPrice.replace(/[^\d.-]/g, '')) : retailPrice;
+    if (costPrice <= 0) return 'N/A';
+    const marginAmount = sellPrice - costPrice;
+    const marginPercentage = (marginAmount / costPrice) * 100;
+    return `${marginPercentage.toFixed(2)}%`;
+  };
+
+  const formatWithGB = (value) => {
+    if (!value) return 'N/A';
+    if (value.includes('GB') || value.includes('TB') || value.includes('gb') || value.includes('tb')) {
+      return value;
+    }
+    return `${value}GB`;
+  };
+
+  // Apply filters to data
+  const applyFilters = () => {
+    if (!inventoryData.length) return;
+    const filtered = inventoryData.filter(item => {
+      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) return false;
+      if (filters.model && item.model !== filters.model) return false;
+      if (filters.ram && item.ram !== filters.ram) return false;
+      if (filters.storage && item.storage !== filters.storage) return false;
+      if (filters.color && !item.colors.some(colorData => colorData.color === filters.color)) return false;
+      return true;
+    });
+    setFilteredData(filtered);
+  };
+  
+  // Update filtered options based on current selections
+  const updateFilteredOptions = () => {
+    if (!inventoryData.length) return;
+    
+    let filteredModels = filterOptions.models;
+    let filteredRams = filterOptions.rams;
+    let filteredStorages = filterOptions.storages;
+    let filteredColors = filterOptions.colors;
+    
+    if (filters.manufacturer) {
+      filteredModels = [...new Set(
+        inventoryData
+          .filter(item => item.manufacturer === filters.manufacturer)
+          .map(item => item.model)
+      )].sort();
+    }
+    
+    if (filters.manufacturer || filters.model) {
+      let filtered = inventoryData;
+      if (filters.manufacturer) {
+        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
+      }
+      if (filters.model) {
+        filtered = filtered.filter(item => item.model === filters.model);
+      }
+      filteredRams = [...new Set(filtered.map(item => item.ram))].sort();
+    }
+    
+    if (filters.manufacturer || filters.model || filters.ram) {
+      let filtered = inventoryData;
+      if (filters.manufacturer) {
+        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
+      }
+      if (filters.model) {
+        filtered = filtered.filter(item => item.model === filters.model);
+      }
+      if (filters.ram) {
+        filtered = filtered.filter(item => item.ram === filters.ram);
+      }
+      filteredStorages = [...new Set(filtered.map(item => item.storage))].sort();
+    }
+{/* Part 2 End - Helper Functions and Filters */}
+
+{/* Part 3 Start - Filter Options Update and Date Helper */}
+    if (filters.manufacturer || filters.model || filters.ram || filters.storage) {
+      let filtered = inventoryData;
+      if (filters.manufacturer) {
+        filtered = filtered.filter(item => item.manufacturer === filters.manufacturer);
+      }
+      if (filters.model) {
+        filtered = filtered.filter(item => item.model === filters.model);
+      }
+      if (filters.ram) {
+        filtered = filtered.filter(item => item.ram === filters.ram);
+      }
+      if (filters.storage) {
+        filtered = filtered.filter(item => item.storage === filters.storage);
+      }
+      filteredColors = [...new Set(
+        filtered.flatMap(item => item.colors.map(colorData => colorData.color))
+      )].sort();
+    }
+    
+    setFilteredOptions({
+      models: filteredModels,
+      rams: filteredRams,
+      storages: filteredStorages,
+      colors: filteredColors
+    });
+  };
+
+  // NEW: Helper function to check if a date is within the current month
+  const isWithinCurrentMonth = (dateString) => {
+    if (!dateString) return false;
+    
+    try {
+      const itemDate = new Date(dateString);
+      const currentDate = new Date();
+      
+      // Check if dates are valid
+      if (isNaN(itemDate.getTime()) || isNaN(currentDate.getTime())) {
+        return false;
+      }
+      
+      // Compare year and month
+      return itemDate.getFullYear() === currentDate.getFullYear() && 
+             itemDate.getMonth() === currentDate.getMonth();
+    } catch (error) {
+      console.error("Error parsing date:", dateString, error);
+      return false;
+    }
+  };
+
+  // UPDATED: Fetch and process inventory data with exclusion logic, improved sorting, current month sold filter, and useCallback
+  const fetchInventoryData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // NEW: First, get the list of excluded models from the phones collection
+      const phonesRef = collection(db, 'phones');
+      const phonesSnapshot = await getDocs(phonesRef);
+      
+      const excludedModels = new Set();
+      phonesSnapshot.forEach(doc => {
+        const phoneData = doc.data();
+        // If excludeFromSummary is true, add the manufacturer_model combination to excluded set
+        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+          const modelKey = `${phoneData.manufacturer}_${phoneData.model}`;
+          excludedModels.add(modelKey);
+          console.log(`Excluding model from summary: ${phoneData.manufacturer} ${phoneData.model}`);
+        }
+      });
+      
+      console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
+      
+      // Now fetch inventory data
+      const inventoryRef = collection(db, 'inventory');
+      const snapshot = await getDocs(inventoryRef);
+      
+      // Group inventory by manufacturer, model, ram, storage (excluding color)
+      const groupedData = {};
+      const manufacturers = new Set();
+      const models = new Set();
+      const rams = new Set();
+      const storages = new Set();
+      const colors = new Set();
+{/* Part 3 End - Filter Options Update and Date Helper */}
+
+{/* Part 4 Start - Inventory Data Processing */}
+      snapshot.forEach(doc => {
+        const item = { id: doc.id, ...doc.data() };
+        
+        // NEW: Check if this model should be excluded from summary
+        const modelKey = `${item.manufacturer}_${item.model}`;
+        if (excludedModels.has(modelKey)) {
+          console.log(`Skipping excluded model: ${item.manufacturer} ${item.model}`);
+          return; // Skip this item
+        }
+        
+        const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
+        
+        // Add to filter options
+        if (item.manufacturer) manufacturers.add(item.manufacturer);
+        if (item.model) models.add(item.model);
+        if (item.ram) rams.add(item.ram);
+        if (item.storage) storages.add(item.storage);
+        if (item.color) colors.add(item.color);
+        
+        if (!groupedData[baseKey]) {
+          groupedData[baseKey] = {
+            manufacturer: item.manufacturer,
+            model: item.model,
+            ram: item.ram,
+            storage: item.storage,
+            totalSold: 0,
+            totalOnDisplay: 0,
+            totalOnHand: 0,
+            totalAvailable: 0,
+            totalPending: 0,  // NEW: Added totalPending
+            dealersPrice: item.dealersPrice || 0,
+            retailPrice: item.retailPrice || 0,
+            colors: {}
+          };
+        }
+        
+        // Group by color for color breakdown
+        if (!groupedData[baseKey].colors[item.color]) {
+          groupedData[baseKey].colors[item.color] = {
+            color: item.color,
+            sold: 0,
+            onDisplay: 0,
+            onHand: 0,
+            available: 0,
+            pending: 0,  // NEW: Added pending to color breakdown
+            dealersPrice: item.dealersPrice || 0,
+            retailPrice: item.retailPrice || 0,
+            soldItems: [],
+            onDisplayItems: [],
+            onHandItems: []
+          };
+        }
+        
+        // Update counts based on status
+        if (item.status === 'Sold') {
+          // NEW: Filter sold items by current month
+          if (isWithinCurrentMonth(item.lastUpdated)) {
+            groupedData[baseKey].totalSold++;
+            groupedData[baseKey].colors[item.color].sold++;
+            groupedData[baseKey].colors[item.color].soldItems.push(item);
+          }
+        } else if (item.status === 'On-Display') {
+          groupedData[baseKey].totalOnDisplay++;
+          groupedData[baseKey].totalAvailable++;
+          groupedData[baseKey].colors[item.color].onDisplay++;
+          groupedData[baseKey].colors[item.color].available++;
+          groupedData[baseKey].colors[item.color].onDisplayItems.push(item);
+        } else if (item.status === 'On-Hand' || item.status === 'Stock') {
+          groupedData[baseKey].totalOnHand++;
+          groupedData[baseKey].totalAvailable++;
+          groupedData[baseKey].colors[item.color].onHand++;
+          groupedData[baseKey].colors[item.color].available++;
+          groupedData[baseKey].colors[item.color].onHandItems.push(item);
+        }
+      });
+      
+      // NEW: Fetch procurement data to calculate pending items
+      const procurementsRef = collection(db, 'procurements');
+      const procurementsSnapshot = await getDocs(procurementsRef);
+      
+      procurementsSnapshot.forEach(doc => {
+        const procurement = { id: doc.id, ...doc.data() };
+        
+        // Only process if delivery status is pending
+        if (procurement.deliveryStatus === 'pending' && procurement.items && Array.isArray(procurement.items)) {
+          procurement.items.forEach(item => {
+            // Check if this model should be excluded from summary
+            const modelKey = `${item.manufacturer}_${item.model}`;
+            if (excludedModels.has(modelKey)) {
+              return; // Skip this item
+            }
+            
+            const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
+            
+            // If this configuration exists in grouped data, update pending count
+            if (groupedData[baseKey]) {
+              groupedData[baseKey].totalPending += (item.quantity || 0);
+              
+              // Update color-specific pending count
+              if (groupedData[baseKey].colors[item.color]) {
+                groupedData[baseKey].colors[item.color].pending += (item.quantity || 0);
+              } else {
+                // Create color entry if it doesn't exist yet
+                groupedData[baseKey].colors[item.color] = {
+                  color: item.color,
+                  sold: 0,
+                  onDisplay: 0,
+                  onHand: 0,
+                  available: 0,
+                  pending: item.quantity || 0,
+                  dealersPrice: item.dealersPrice || 0,
+                  retailPrice: item.retailPrice || 0,
+                  soldItems: [],
+                  onDisplayItems: [],
+                  onHandItems: []
+                };
+              }
+            } else {
+              // Create new entry if this configuration doesn't exist yet
+              groupedData[baseKey] = {
+                manufacturer: item.manufacturer,
+                model: item.model,
+                ram: item.ram,
+                storage: item.storage,
+                totalSold: 0,
+                totalOnDisplay: 0,
+                totalOnHand: 0,
+                totalAvailable: 0,
+                totalPending: item.quantity || 0,
+                dealersPrice: item.dealersPrice || 0,
+                retailPrice: item.retailPrice || 0,
+                colors: {
+                  [item.color]: {
+                    color: item.color,
+                    sold: 0,
+                    onDisplay: 0,
+                    onHand: 0,
+                    available: 0,
+                    pending: item.quantity || 0,
+                    soldItems: [],
+                    onDisplayItems: [],
+                    onHandItems: []
+                  }
+                }
+              };
+              
+              // Add to filter options if not already present
+              if (item.manufacturer) manufacturers.add(item.manufacturer);
+              if (item.model) models.add(item.model);
+              if (item.ram) rams.add(item.ram);
+              if (item.storage) storages.add(item.storage);
+              if (item.color) colors.add(item.color);
+            }
+          });
+        }
+      });
+      
+      // Convert colors object to array and sort by color name
+      Object.values(groupedData).forEach(item => {
+        item.colors = Object.values(item.colors).sort((a, b) => 
+          a.color.localeCompare(b.color)
+        );
+      });
+      
+      // Helper function to extract numeric value from RAM/Storage strings
+      const extractNumericValue = (value) => {
+        if (!value) return 0;
+        
+        // Extract numeric value and unit
+        const match = value.match(/(\d+(?:\.\d+)?)/);
+        if (!match) return 0;
+        
+        const num = parseFloat(match[1]);
+        // Convert TB to GB for consistent comparison
+        if (value.toLowerCase().includes('tb')) {
+          return num * 1024;
+        }
+        return num;
+      };
+      
+      // UPDATED: Improved sorting logic with numeric comparison for RAM and storage
+      const inventoryArray = Object.values(groupedData).sort((a, b) => {
+        // 1. Sort by manufacturer (string comparison)
+        if (a.manufacturer !== b.manufacturer) {
+          return a.manufacturer.localeCompare(b.manufacturer);
+        }
+        
+        // 2. Sort by model (string comparison)
+        if (a.model !== b.model) {
+          return a.model.localeCompare(b.model);
+        }
+        
+        // 3. Sort by RAM (numeric comparison - smallest to largest)
+        const ramA = extractNumericValue(a.ram);
+        const ramB = extractNumericValue(b.ram);
+        if (ramA !== ramB) {
+          return ramA - ramB; // Ascending order (smallest to largest)
+        }
+        
+        // 4. Sort by storage (numeric comparison - smallest to largest)
+        const storageA = extractNumericValue(a.storage);
+        const storageB = extractNumericValue(b.storage);
+        return storageA - storageB; // Ascending order (smallest to largest)
+      });
+{/* Part 4 End - Inventory Data Processing */}
+
+{/* Part 5 Start - Final Data Setup and Effects */}
+      const filterOpts = {
+        manufacturers: [...manufacturers].sort(),
+        models: [...models].sort(),
+        rams: [...rams].sort(),
+        storages: [...storages].sort(),
+        colors: [...colors].sort()
+      };
+      setFilterOptions(filterOpts);
+      setFilteredOptions({
+        models: filterOpts.models,
+        rams: filterOpts.rams,
+        storages: filterOpts.storages,
+        colors: filterOpts.colors
+      });
+      
+      setInventoryData(inventoryArray);
+      setFilteredData(inventoryArray);
+      setLoading(false);
+      
+      // NEW: Log summary of excluded models for debugging
+      console.log(`Inventory Summary loaded: ${inventoryArray.length} configurations (${excludedModels.size} models excluded)`);
+      console.log(`Sold items filtered to current month only`);
+      
+    } catch (err) {
+      console.error("Error fetching inventory data:", err);
+      setError(`Error fetching inventory: ${err.message}`);
+      setLoading(false);
+    }
+  }, []); // Empty dependency array since this function doesn't depend on any state or props
+
+  // UPDATED: Effects with proper dependencies to fix React Hook warnings
+  useEffect(() => {
+    fetchInventoryData();
+    fetchExcludedModelsInfo();
+  }, [fetchInventoryData, fetchExcludedModelsInfo]); // Both functions are now memoized with useCallback
+  
+  useEffect(() => {
+    updateFilteredOptions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryData, filters]);
+  
+  useEffect(() => {
+    applyFilters();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, inventoryData]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-[rgb(52,69,157)] py-3">
+            <CardTitle className="text-2xl text-white">Inventory Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(52,69,157)]"></div>
+              <p className="mt-2 text-gray-600">Loading inventory data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+          <CardHeader className="bg-red-600 py-3">
+            <CardTitle className="text-2xl text-white">Error</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={fetchInventoryData}
+              className="mt-4 px-4 py-2 bg-[rgb(52,69,157)] text-white rounded"
+            >
+              Try Again
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+{/* Part 5 End - Final Data Setup and Effects */}
+
+{/* Part 6 Start - Main Return Header and Filter Panel */}
+  return (
+    <div className="min-h-screen bg-white p-4">
+      <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Smartphone className="h-6 w-6 text-white" />
+            <CardTitle className="text-2xl text-white">Inventory Summary</CardTitle>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1 ${showFilters ? 'bg-white/20 text-white' : 'bg-white text-[rgb(52,69,157)]'} px-4 py-2 rounded text-base font-medium`}
+            >
+              <Filter className="h-5 w-5 mr-1" />
+              <span>Filters</span>
+            </button>
+            <button
+              onClick={fetchInventoryData}
+              className="flex items-center gap-1 bg-white text-[rgb(52,69,157)] px-4 py-2 rounded text-base font-medium"
+            >
+              <RefreshCw className="h-5 w-5 mr-1" />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </CardHeader>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="bg-gray-50 px-4 py-4 border-b">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-lg text-[rgb(52,69,157)]">Filters</h3>
+              <button 
+                onClick={clearFilters}
+                className="text-gray-500 hover:text-red-500 flex items-center"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filters
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
+                <select name="manufacturer" value={filters.manufacturer} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Manufacturers</option>
+                  {filterOptions.manufacturers.map(manufacturer => (
+                    <option key={manufacturer} value={manufacturer}>{manufacturer}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                <select name="model" value={filters.model} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Models</option>
+                  {filteredOptions.models.map(model => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
+                <select name="ram" value={filters.ram} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All RAM</option>
+                  {filteredOptions.rams.map(ram => (
+                    <option key={ram} value={ram}>{ram}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Storage</label>
+                <select name="storage" value={filters.storage} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Storage</option>
+                  {filteredOptions.storages.map(storage => (
+                    <option key={storage} value={storage}>{storage}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                <select name="color" value={filters.color} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Colors</option>
+                  {filteredOptions.colors.map(color => (
+                    <option key={color} value={color}>{color}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            {/* Active filters summary */}
+            {Object.values(filters).some(filter => filter !== '') && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {Object.entries(filters).map(([key, value]) => 
+                  value && (
+                    <div key={key} className="bg-gray-200 rounded-full px-3 py-1 text-sm flex items-center">
+                      <span className="font-medium capitalize">{key}:</span>
+                      <span className="ml-1">{value}</span>
+                      <button 
+                        onClick={() => setFilters(prev => ({ ...prev, [key]: '' }))}
+                        className="ml-2 text-gray-500 hover:text-gray-700"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        )}
+{/* Part 6 End - Main Return Header and Filter Panel */}
+
+{/* Part 7 Start - Excluded Models Info and Table Start */}
+        {/* NEW: Add Excluded Models Info Display */}
+        <CardContent className="p-4">
+          {excludedModelsInfo.length > 0 && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CircleAlert className="h-5 w-5 text-yellow-600" />
+                <h4 className="font-medium text-yellow-800">
+                  Excluded Models ({excludedModelsInfo.length})
+                </h4>
+              </div>
+              <div className="text-sm text-yellow-700">
+                The following models are excluded from this summary:
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {excludedModelsInfo.map((model, index) => (
+                  <span 
+                    key={index}
+                    className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
+                  >
+                    {model.manufacturer} {model.model}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredData.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-700 mb-2">No inventory data found</h3>
+              {Object.values(filters).some(f => f) ? (
+                <>
+                  <p className="text-gray-500 mb-4">No items match your current filters.</p>
+                  <button onClick={clearFilters} className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-md">
+                    Clear Filters
+                  </button>
+                </>
+              ) : (
+                <p className="text-gray-500">There are no inventory items in the database.</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Inventory list */}
+              <div className="bg-white border rounded-lg overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left">Manufacturer</th>
+                      <th className="px-3 py-3 text-left">Model</th>
+                      <th className="px-3 py-3 text-left">RAM</th>
+                      <th className="px-3 py-3 text-left">Storage</th>
+                      <th className="px-3 py-3 text-left">Colors</th>
+                      {isAdmin && (
+                        <>
+                          <th className="pl-0 pr-1 py-3 text-center">DP</th>
+                          <th className="px-1 py-3 text-center">SRP</th>
+                          <th className="px-1 py-3 text-right">Margin</th>
+                        </>
+                      )}
+                      <th className="pl-12 pr-1 py-3 text-center">Sold</th>
+                      <th className="px-1 py-3 text-center">Display</th>
+                      <th className="px-1 py-3 text-center">Stock</th>
+                      <th className="px-1 py-3 text-center">Available</th>
+                      <th className="px-1 py-3 text-center">Pending</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredData.map((item, index) => (
+                      <React.Fragment key={index}>
+                        {/* Main row */}
+                        <tr 
+                          className={`hover:bg-gray-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          onClick={() => toggleRowExpansion(index)}
+                        >
+                          <td className="px-3 py-3 text-sm">{item.manufacturer}</td>
+                          <td className="px-3 py-3 text-sm font-medium">{item.model}</td>
+                          <td className="px-3 py-3 text-sm">{formatWithGB(item.ram)}</td>
+                          <td className="px-3 py-3 text-sm">{formatWithGB(item.storage)}</td>
+                          <td className="px-3 py-3 text-sm">
+                            <div className="flex flex-wrap gap-1">
+                              {item.colors.slice(0, 3).map((colorData, colorIndex) => (
+                                <span 
+                                  key={colorIndex} 
+                                  className="inline-block px-2 py-1 text-xs bg-gray-100 rounded"
+                                >
+                                  {colorData.color}
+                                </span>
+                              ))}
+                              {item.colors.length > 3 && (
+                                <span className="inline-block px-2 py-1 text-xs bg-gray-200 rounded">
+                                  +{item.colors.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          {isAdmin && (
+                            <>
+                              <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
+                              <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
+                              <td className="px-1 py-3 text-sm text-right font-medium">
+                                {calculateMargin(item.dealersPrice, item.retailPrice)}
+                              </td>
+                            </>
+                          )}
+                          <td className="pl-12 pr-1 py-2 text-sm text-center">
+                            <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                              {item.totalSold}
+                            </span>
+                          </td>
+                          <td className="px-1 py-2 text-sm text-center">
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                              {item.totalOnDisplay}
+                            </span>
+                          </td>
+                          <td className="px-1 py-2 text-sm text-center">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                              {item.totalOnHand}
+                            </span>
+                          </td>
+                          <td className="px-1 py-2 text-sm text-center">
+                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                              {item.totalAvailable}
+                            </span>
+                          </td>
+                          <td className="px-1 py-2 text-sm text-center">
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">
+                              {item.totalPending}
+                            </span>
+                          </td>
+                        </tr>
+{/* Part 7 End - Excluded Models Info and Table Start */}
+
+{/* Part 8 Start - Expanded Color Breakdown */}
+                        {/* Expanded color breakdown */}
+                        {expandedRows.has(index) && (
+                          <tr>
+                            <td colSpan="13" className="px-0 py-0 border-b border-gray-200">
+                              <div className="px-4 pb-4 pt-2 bg-gray-100">
+                                <div className="space-y-4">
+                                  <h4 className="font-semibold text-gray-700 mb-3">
+                                    Color Breakdown ({item.colors.length} colors)
+                                  </h4>
+                                  
+                                  {item.colors.map((colorData, colorIndex) => (
+                                    <div key={colorIndex} className="border border-gray-200 rounded-lg bg-white">
+                                      {/* Color header - Now clickable to expand/collapse detail sections */}
+                                      <div 
+                                        className="px-4 py-3 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                                        onClick={() => toggleColorRowExpansion(index, colorIndex)}
+                                      >
+                                        <div className="flex justify-between items-center">
+                                          <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-2">
+                                              {expandedColorRows[index]?.[colorIndex] ? (
+                                                <ChevronDown className="h-5 w-5 text-gray-600" />
+                                              ) : (
+                                                <ChevronRight className="h-5 w-5 text-gray-600" />
+                                              )}
+                                              <h5 className="font-bold text-lg text-gray-800">{colorData.color}</h5>
+                                            </div>
+                                            <div className="flex gap-4 text-sm">
+                                              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                                                Sold: {colorData.sold}
+                                              </span>
+                                              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+                                                Display: {colorData.onDisplay}
+                                              </span>
+                                              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                                                Stock: {colorData.onHand}
+                                              </span>
+                                              <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                                                Available: {colorData.available}
+                                              </span>
+                                              <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                                                Pending: {colorData.pending}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="text-sm text-gray-600">
+                                            {formatPrice(colorData.retailPrice)} • {calculateMargin(colorData.dealersPrice, colorData.retailPrice)} margin
+                                          </div>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Color details sections - Only show when color row is expanded */}
+                                      {expandedColorRows[index]?.[colorIndex] && (
+                                        <div className="p-4 space-y-3">
+                                          {/* Sold Items */}
+                                          {colorData.soldItems.length > 0 && (
+                                            <div>
+                                              <div 
+                                                className="flex items-center justify-between cursor-pointer bg-purple-50 p-2 rounded-t border border-purple-200"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleColorSectionExpansion(index, colorIndex, 'sold');
+                                                }}
+                                              >
+                                                <h6 className="font-semibold text-purple-700">
+                                                  Sold Units ({colorData.sold})
+                                                </h6>
+                                                {expandedColorSections[index]?.[`${colorIndex}_sold`] ? (
+                                                  <ChevronDown className="h-4 w-4 text-purple-500" />
+                                                ) : (
+                                                  <ChevronRight className="h-4 w-4 text-purple-500" />
+                                                )}
+                                              </div>
+                                              
+                                              {expandedColorSections[index]?.[`${colorIndex}_sold`] && (
+                                                <div className="overflow-x-auto border border-t-0 border-purple-200 rounded-b">
+                                                  <table className="min-w-full">
+                                                    <thead className="bg-purple-50">
+                                                      <tr className="text-xs text-purple-800">
+                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white">
+                                                      {colorData.soldItems.map((soldItem, soldIndex) => (
+                                                        <tr key={soldIndex} className={soldIndex % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
+                                                          <td className="py-2 px-3 text-xs">{soldItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{soldItem.imei2 || '-'}</td>
+                                                          <td className="py-2 px-3 text-xs">{soldItem.barcode || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(soldItem.retailPrice)}</td>
+                                                          <td className="py-2 px-3 text-xs">{formatDate(soldItem.lastUpdated)}</td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+{/* Part 8 End - Expanded Color Breakdown */}
+
+{/* Part 9 Start - Display and Stock Items Tables */}
+                                          {/* On Display Items */}
+                                          {colorData.onDisplayItems.length > 0 && (
+                                            <div>
+                                              <div 
+                                                className="flex items-center justify-between cursor-pointer bg-yellow-50 p-2 rounded-t border border-yellow-200"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleColorSectionExpansion(index, colorIndex, 'display');
+                                                }}
+                                              >
+                                                <h6 className="font-semibold text-yellow-700">
+                                                  Display Units ({colorData.onDisplay})
+                                                </h6>
+                                                {expandedColorSections[index]?.[`${colorIndex}_display`] ? (
+                                                  <ChevronDown className="h-4 w-4 text-yellow-500" />
+                                                ) : (
+                                                  <ChevronRight className="h-4 w-4 text-yellow-500" />
+                                                )}
+                                              </div>
+                                              
+                                              {expandedColorSections[index]?.[`${colorIndex}_display`] && (
+                                                <div className="overflow-x-auto border border-t-0 border-yellow-200 rounded-b">
+                                                  <table className="min-w-full">
+                                                    <thead className="bg-yellow-50">
+                                                      <tr className="text-xs text-yellow-800">
+                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white">
+                                                      {colorData.onDisplayItems.map((displayItem, displayIndex) => (
+                                                        <tr key={displayIndex} className={displayIndex % 2 === 0 ? 'bg-white' : 'bg-yellow-50'}>
+                                                          <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
+                                                          <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>
+                                                          <td className="py-2 px-3 text-xs">{formatDate(displayItem.lastUpdated)}</td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                          
+                                          {/* On Hand Items */}
+                                          {colorData.onHandItems.length > 0 && (
+                                            <div>
+                                              <div 
+                                                className="flex items-center justify-between cursor-pointer bg-blue-50 p-2 rounded-t border border-blue-200"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleColorSectionExpansion(index, colorIndex, 'stock');
+                                                }}
+                                              >
+                                                <h6 className="font-semibold text-blue-700">
+                                                  Stock Units ({colorData.onHand})
+                                                </h6>
+                                                {expandedColorSections[index]?.[`${colorIndex}_stock`] ? (
+                                                  <ChevronDown className="h-4 w-4 text-blue-500" />
+                                                ) : (
+                                                  <ChevronRight className="h-4 w-4 text-blue-500" />
+                                                )}
+                                              </div>
+                                              
+                                              {expandedColorSections[index]?.[`${colorIndex}_stock`] && (
+                                                <div className="overflow-x-auto border border-t-0 border-blue-200 rounded-b">
+                                                  <table className="min-w-full">
+                                                    <thead className="bg-blue-50">
+                                                      <tr className="text-xs text-blue-800">
+                                                        <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">IMEI2</th>
+                                                        <th className="py-2 px-3 text-left border-b">Barcode</th>
+                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        <th className="py-2 px-3 text-left border-b">Last Updated</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white">
+                                                      {colorData.onHandItems.map((handItem, handIndex) => (
+                                                        <tr key={handIndex} className={handIndex % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                                          <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
+                                                          <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>
+                                                          <td className="py-2 px-3 text-xs">{formatDate(handItem.lastUpdated)}</td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* Empty states */}
+                                          {colorData.soldItems.length === 0 && colorData.onDisplayItems.length === 0 && colorData.onHandItems.length === 0 && (
+                                            <div className="text-center py-4 text-gray-500">
+                                              No detailed information available for this color
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+{/* Part 9 End - Display and Stock Items Tables */}
+
+{/* Part 10 Start - Inventory Value Summary and Footer */}
+              {/* Inventory Value Summary - Only show for admins */}
+              {isAdmin && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Inventory Value Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600 font-medium">{"Total Dealer's Value"}</p>
+                          <p className="text-xs text-gray-500">{"(Available units × Dealer's price)"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-blue-600">
+                            {(() => {
+                              const totalDealerValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.dealersPrice);
+                              }, 0);
+                              return formatPrice(totalDealerValue);
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600 font-medium">Total Retail Value</p>
+                          <p className="text-xs text-gray-500">{"(Available units × Retail price)"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-green-600">
+                            {(() => {
+                              const totalRetailValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.retailPrice);
+                              }, 0);
+                              return formatPrice(totalRetailValue);
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {filteredData.reduce((total, item) => total + item.totalAvailable, 0)} units
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600 font-medium">Potential Profit</p>
+                          <p className="text-xs text-gray-500">{"(Retail value - Dealer's value)"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-purple-600">
+                            {(() => {
+                              const totalDealerValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.dealersPrice);
+                              }, 0);
+                              const totalRetailValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.retailPrice);
+                              }, 0);
+                              const potentialProfit = totalRetailValue - totalDealerValue;
+                              return formatPrice(potentialProfit);
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {(() => {
+                              const totalDealerValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.dealersPrice);
+                              }, 0);
+                              const totalRetailValue = filteredData.reduce((total, item) => {
+                                return total + (item.totalAvailable * item.retailPrice);
+                              }, 0);
+                              const marginPercentage = totalDealerValue > 0 ? 
+                                ((totalRetailValue - totalDealerValue) / totalDealerValue * 100) : 0;
+                              return `${marginPercentage.toFixed(3)}% margin`;
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Summary footer */}
+              <div className="text-center text-gray-600">
+                {Object.values(filters).some(f => f) 
+                  ? `Showing ${filteredData.length} of ${inventoryData.length} inventory configurations (filtered)`
+                  : `Showing ${filteredData.length} inventory configurations`}
+                {expandedRows.size > 0 && ` • ${expandedRows.size} rows expanded`}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default InventorySummaryForm;
+{/* Part 10 End - Inventory Value Summary and Footer */}
 </file>
 
 <file path="src/components/InventoryListForm.jsx">
