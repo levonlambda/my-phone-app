@@ -815,12 +815,10 @@ const InventorySummaryForm = () => {
                       <th className="px-3 py-3 text-left">RAM</th>
                       <th className="px-3 py-3 text-left">Storage</th>
                       <th className="px-3 py-3 text-left">Colors</th>
+                      <th className="pl-0 pr-1 py-3 text-center">DP</th>
+                      <th className="px-1 py-3 text-center">SRP</th>
                       {isAdmin && (
-                        <>
-                          <th className="pl-0 pr-1 py-3 text-center">DP</th>
-                          <th className="px-1 py-3 text-center">SRP</th>
-                          <th className="px-1 py-3 text-right">Margin</th>
-                        </>
+                        <th className="px-1 py-3 text-right">Margin</th>
                       )}
                       <th className="pl-12 pr-1 py-3 text-center">Sold</th>
                       <th className="px-1 py-3 text-center">Display</th>
@@ -858,14 +856,12 @@ const InventorySummaryForm = () => {
                               )}
                             </div>
                           </td>
+                          <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
+                          <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
                           {isAdmin && (
-                            <>
-                              <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
-                              <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
-                              <td className="px-1 py-3 text-sm text-right font-medium">
-                                {calculateMargin(item.dealersPrice, item.retailPrice)}
-                              </td>
-                            </>
+                            <td className="px-1 py-3 text-sm text-right font-medium">
+                              {calculateMargin(item.dealersPrice, item.retailPrice)}
+                            </td>
                           )}
                           <td className="pl-12 pr-1 py-2 text-sm text-center">
                             <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
@@ -899,7 +895,7 @@ const InventorySummaryForm = () => {
                         {/* Expanded color breakdown */}
                         {expandedRows.has(index) && (
                           <tr>
-                            <td colSpan="13" className="px-0 py-0 border-b border-gray-200">
+                            <td colSpan={isAdmin ? "13" : "12"} className="px-0 py-0 border-b border-gray-200">
                               <div className="px-4 pb-4 pt-2 bg-gray-100">
                                 <div className="space-y-4">
                                   <h4 className="font-semibold text-gray-700 mb-3">
@@ -942,7 +938,10 @@ const InventorySummaryForm = () => {
                                             </div>
                                           </div>
                                           <div className="text-sm text-gray-600">
-                                            {formatPrice(colorData.retailPrice)} • {calculateMargin(colorData.dealersPrice, colorData.retailPrice)} margin
+                                            {formatPrice(colorData.retailPrice)}
+                                            {isAdmin && (
+                                              <> • {calculateMargin(colorData.dealersPrice, colorData.retailPrice)} margin</>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -1029,7 +1028,7 @@ const InventorySummaryForm = () => {
                                                         <th className="py-2 px-3 text-left border-b">IMEI1</th>
                                                         <th className="py-2 px-3 text-left border-b">IMEI2</th>
                                                         <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        {isAdmin && <th className="py-2 px-3 text-right border-b">Retail Price</th>}
                                                         <th className="py-2 px-3 text-left border-b">Last Updated</th>
                                                       </tr>
                                                     </thead>
@@ -1039,7 +1038,7 @@ const InventorySummaryForm = () => {
                                                           <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
                                                           <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>
+                                                          {isAdmin && <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>}
                                                           <td className="py-2 px-3 text-xs">{formatDate(displayItem.lastUpdated)}</td>
                                                         </tr>
                                                       ))}
@@ -1078,7 +1077,7 @@ const InventorySummaryForm = () => {
                                                         <th className="py-2 px-3 text-left border-b">IMEI1</th>
                                                         <th className="py-2 px-3 text-left border-b">IMEI2</th>
                                                         <th className="py-2 px-3 text-left border-b">Barcode</th>
-                                                        <th className="py-2 px-3 text-right border-b">Retail Price</th>
+                                                        {isAdmin && <th className="py-2 px-3 text-right border-b">Retail Price</th>}
                                                         <th className="py-2 px-3 text-left border-b">Last Updated</th>
                                                       </tr>
                                                     </thead>
@@ -1088,7 +1087,7 @@ const InventorySummaryForm = () => {
                                                           <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
                                                           <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
-                                                          <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>
+                                                          {isAdmin && <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>}
                                                           <td className="py-2 px-3 text-xs">{formatDate(handItem.lastUpdated)}</td>
                                                         </tr>
                                                       ))}

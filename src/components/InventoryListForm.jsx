@@ -268,7 +268,17 @@ const InventoryListForm = () => {
 
   // Load filter options from data
   const loadFilterOptions = useCallback((data) => {
-    const manufacturers = [...new Set(data.map(item => item.manufacturer))].sort();
+    // FIXED: Never overwrite manufacturers if we already have them from initial load
+    // This preserves the full manufacturer list even when filtered data is passed
+    let manufacturers;
+    if (filterOptions.manufacturers.length > 0) {
+      // If we already have manufacturers loaded, keep them
+      manufacturers = filterOptions.manufacturers;
+    } else {
+      // Otherwise, extract from the data provided
+      manufacturers = [...new Set(data.map(item => item.manufacturer))].sort();
+    }
+    
     const models = [...new Set(data.map(item => item.model))].sort();
     const rams = [...new Set(data.map(item => item.ram))].sort();
     const storages = [...new Set(data.map(item => item.storage))].sort();
@@ -293,7 +303,7 @@ const InventoryListForm = () => {
       colors,
       statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
     }));
-  }, [filters.manufacturer, filters.model]);
+  }, [filters.manufacturer, filters.model, filterOptions.manufacturers]);
 
   // Handle filter change - UPDATED: Added date field handling and supplier as dropdown
   const handleFilterChange = (e) => {
