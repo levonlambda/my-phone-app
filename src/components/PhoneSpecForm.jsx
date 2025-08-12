@@ -1,6 +1,6 @@
 {/* Part 1 Start - State and Form Data Updates */}
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Battery, Camera, Cpu, Monitor, Palette, Smartphone } from 'lucide-react';
+import { Battery, Camera, Cpu, Monitor, Palette, Smartphone, Tablet, Laptop } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
@@ -179,7 +179,8 @@ const PhoneSpecForm = () => {
     wiredCharging: "",
     wirelessCharging: "",
     colors: "",
-    excludeFromSummary: false // NEW: Add exclude checkbox state
+    excludeFromSummary: false, // NEW: Add exclude checkbox state
+    deviceType: "phone" // NEW: Add device type with default value "phone"
   });
   
   // State to track if we're editing an existing phone
@@ -213,7 +214,10 @@ const PhoneSpecForm = () => {
         chipset_extra: phoneToEdit.chipset_extra?.toString() || '',
         
         // NEW: Handle exclude from summary field (default to false if not present)
-        excludeFromSummary: phoneToEdit.excludeFromSummary || false
+        excludeFromSummary: phoneToEdit.excludeFromSummary || false,
+        
+        // NEW: Handle device type field (default to "phone" if not present for backward compatibility)
+        deviceType: phoneToEdit.deviceType || 'phone'
       };
       
       setFormData(formattedData);
@@ -334,7 +338,10 @@ const PhoneSpecForm = () => {
           : [],
           
         // NEW: Include exclude from summary boolean
-        excludeFromSummary: formData.excludeFromSummary
+        excludeFromSummary: formData.excludeFromSummary,
+        
+        // NEW: Include device type (will be "phone" by default for backward compatibility)
+        deviceType: formData.deviceType
       };
   
       if (isEditing && editId) {
@@ -372,7 +379,8 @@ const PhoneSpecForm = () => {
         wiredCharging: "",
         wirelessCharging: "",
         colors: "",
-        excludeFromSummary: false // NEW: Reset exclude checkbox
+        excludeFromSummary: false, // NEW: Reset exclude checkbox
+        deviceType: "phone" // NEW: Reset device type to default
       });
       
       // Reset edit state
@@ -415,7 +423,8 @@ const PhoneSpecForm = () => {
       wiredCharging: "",
       wirelessCharging: "",
       colors: "",
-      excludeFromSummary: false // NEW: Reset exclude checkbox
+      excludeFromSummary: false, // NEW: Reset exclude checkbox
+      deviceType: "phone" // NEW: Reset device type to default
     });
     
     setIsEditing(false);
@@ -437,10 +446,30 @@ const PhoneSpecForm = () => {
             {/* Device Info Section */}
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <Smartphone className="w-6 h-6 text-[rgb(52,69,157)]" />
+                {formData.deviceType === 'tablet' ? (
+                  <Tablet className="w-6 h-6 text-[rgb(52,69,157)]" />
+                ) : formData.deviceType === 'laptop' ? (
+                  <Laptop className="w-6 h-6 text-[rgb(52,69,157)]" />
+                ) : (
+                  <Smartphone className="w-6 h-6 text-[rgb(52,69,157)]" />
+                )}
                 <h3 className="text-xl font-semibold">Device Info</h3>
               </div>
               <div>
+                {/* Device Type Dropdown - NEW */}
+                <div className="flex items-center py-0.5">
+                  <p className="text-[rgb(52,69,157)] w-40 text-base">Device Type:</p>
+                  <select
+                    name="deviceType"
+                    value={formData.deviceType}
+                    onChange={handleInputChange}
+                    className="text-base flex-1 border rounded px-2 py-1"
+                  >
+                    <option value="phone">Phone</option>
+                    <option value="tablet">Tablet</option>
+                    <option value="laptop">Laptop</option>
+                  </select>
+                </div>
                 <InputField label="Manufacturer" name="manufacturer" value={formData.manufacturer} onChange={handleInputChange} />
                 <InputField label="Model" name="model" value={formData.model} onChange={handleInputChange} />
                 <InputField label="Release Date" name="released" value={formData.released} onChange={handleInputChange} />
