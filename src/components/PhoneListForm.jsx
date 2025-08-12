@@ -292,7 +292,7 @@ const PhoneListForm = () => {
         <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <Smartphone className="h-6 w-6 text-white" />
-            <CardTitle className="text-2xl text-white">Phone Models</CardTitle>
+            <CardTitle className="text-2xl text-white">Device Models</CardTitle>
           </div>
           <div className="flex gap-2">
             <button
@@ -385,13 +385,13 @@ const PhoneListForm = () => {
               {phones.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                   <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-700 mb-2">No phones found</h3>
-                  <p className="text-gray-500 mb-4">There are no phone models in the database yet.</p>
+                  <h3 className="text-lg font-medium text-gray-700 mb-2">No devices found</h3>
+                  <p className="text-gray-500 mb-4">There are no device models in the database yet.</p>
                   <button
                     onClick={() => window.location.href = '#form'}
                     className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-md"
                   >
-                    Add New Phone
+                    Add New Device
                   </button>
                 </div>
               ) : filteredPhones.length === 0 ? (

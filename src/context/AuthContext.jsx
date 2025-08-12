@@ -113,8 +113,8 @@ export const AuthProvider = ({ children }) => {
       { key: 'procurementmgmt', label: 'Procurement Management', requiredRole: 'admin' },
       { key: 'stockreceiving', label: 'Stock Receiving', requiredRole: 'admin' },
       { key: 'suppliers', label: 'Supplier Management', requiredRole: 'admin' },
-      { key: 'form', label: 'Add Phone Model', requiredRole: 'admin' },
-      { key: 'phonelist', label: 'Phone Models', requiredRole: 'admin' },
+      { key: 'form', label: 'Add Device Model', requiredRole: 'admin' },
+      { key: 'phonelist', label: 'Device Models', requiredRole: 'admin' },
       { key: 'prices', label: 'Price Management', requiredRole: 'admin' }
     ];
 

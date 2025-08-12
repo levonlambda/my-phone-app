@@ -388,10 +388,10 @@ const PhoneSpecForm = () => {
       setEditId(null);
       clearPhoneToEdit();
   
-      alert(`Phone ${isEditing ? 'updated' : 'added'} successfully!`);
+      alert(`Device ${isEditing ? 'updated' : 'added'} successfully!`);
     } catch (error) {
       console.error("Error adding/updating document: ", error);
-      alert(`Error ${isEditing ? 'updating' : 'adding'} phone. Please try again.`);
+      alert(`Error ${isEditing ? 'updating' : 'adding'} device. Please try again.`);
     }
   };
 {/* Part 3 End - Submit Handler */}
@@ -438,7 +438,7 @@ const PhoneSpecForm = () => {
         <Card className="w-full max-w-[640px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
           <CardHeader className="bg-[rgb(52,69,157)] py-3">
             <CardTitle className="text-2xl text-white">
-              {isEditing ? 'Edit Phone' : 'Add New Phone'}
+              {isEditing ? 'Edit Device' : 'Add New Device'}
             </CardTitle>
           </CardHeader>
 
@@ -631,7 +631,7 @@ const PhoneSpecForm = () => {
                 type="submit"
                 className={`${isEditing ? 'w-2/3' : 'w-full'} py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90`}
               >
-                {isEditing ? 'Update Phone' : 'Save Phone'}
+                {isEditing ? 'Update Device' : 'Save Device'}
               </button>
             </div>
           </CardContent>
