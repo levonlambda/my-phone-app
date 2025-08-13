@@ -108,7 +108,7 @@ export const AuthProvider = ({ children }) => {
     const allComponents = [
       { key: 'summary', label: 'Inventory Summary', requiredRole: 'user' },
       { key: 'inventory', label: 'Inventory List', requiredRole: 'admin' },
-      { key: 'selection', label: 'Add Phone Inventory', requiredRole: 'admin' },
+      { key: 'selection', label: 'Add Device to Inventory', requiredRole: 'admin' },
       { key: 'procurement', label: 'Phone Procurement', requiredRole: 'admin' },
       { key: 'procurementmgmt', label: 'Procurement Management', requiredRole: 'admin' },
       { key: 'stockreceiving', label: 'Stock Receiving', requiredRole: 'admin' },
