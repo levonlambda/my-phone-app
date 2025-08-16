@@ -142,10 +142,30 @@ const InventorySummaryForm = () => {
   // Handle filter change
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // FIX: Clear model filter when manufacturer changes to a different value
+    if (name === 'manufacturer') {
+      // If changing to a different manufacturer (not empty/all), clear the model filter
+      if (value !== '' && value !== filters.manufacturer) {
+        setFilters(prev => ({
+          ...prev,
+          manufacturer: value,
+          model: '' // Clear the model selection
+        }));
+      } else {
+        // If changing to "All Manufacturers" or same manufacturer, just update manufacturer
+        setFilters(prev => ({
+          ...prev,
+          manufacturer: value
+        }));
+      }
+    } else {
+      // For all other filter changes, update normally
+      setFilters(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   // Clear all filters
@@ -975,6 +995,7 @@ const InventorySummaryForm = () => {
                                                     <thead className="bg-purple-50">
                                                       <tr className="text-xs text-purple-800">
                                                         <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">Serial Number</th>
                                                         <th className="py-2 px-3 text-left border-b">IMEI2</th>
                                                         <th className="py-2 px-3 text-left border-b">Barcode</th>
                                                         <th className="py-2 px-3 text-right border-b">Retail Price</th>
@@ -985,6 +1006,7 @@ const InventorySummaryForm = () => {
                                                       {colorData.soldItems.map((soldItem, soldIndex) => (
                                                         <tr key={soldIndex} className={soldIndex % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
                                                           <td className="py-2 px-3 text-xs">{soldItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{soldItem.serialNumber || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{soldItem.imei2 || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{soldItem.barcode || 'N/A'}</td>
                                                           <td className="py-2 px-3 text-xs text-right">{formatPrice(soldItem.retailPrice)}</td>
@@ -1026,6 +1048,7 @@ const InventorySummaryForm = () => {
                                                     <thead className="bg-yellow-50">
                                                       <tr className="text-xs text-yellow-800">
                                                         <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">Serial Number</th>
                                                         <th className="py-2 px-3 text-left border-b">IMEI2</th>
                                                         <th className="py-2 px-3 text-left border-b">Barcode</th>
                                                         {isAdmin && <th className="py-2 px-3 text-right border-b">Retail Price</th>}
@@ -1036,6 +1059,7 @@ const InventorySummaryForm = () => {
                                                       {colorData.onDisplayItems.map((displayItem, displayIndex) => (
                                                         <tr key={displayIndex} className={displayIndex % 2 === 0 ? 'bg-white' : 'bg-yellow-50'}>
                                                           <td className="py-2 px-3 text-xs">{displayItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{displayItem.serialNumber || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{displayItem.imei2 || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{displayItem.barcode || 'N/A'}</td>
                                                           {isAdmin && <td className="py-2 px-3 text-xs text-right">{formatPrice(displayItem.retailPrice)}</td>}
@@ -1075,6 +1099,7 @@ const InventorySummaryForm = () => {
                                                     <thead className="bg-blue-50">
                                                       <tr className="text-xs text-blue-800">
                                                         <th className="py-2 px-3 text-left border-b">IMEI1</th>
+                                                        <th className="py-2 px-3 text-left border-b">Serial Number</th>
                                                         <th className="py-2 px-3 text-left border-b">IMEI2</th>
                                                         <th className="py-2 px-3 text-left border-b">Barcode</th>
                                                         {isAdmin && <th className="py-2 px-3 text-right border-b">Retail Price</th>}
@@ -1085,6 +1110,7 @@ const InventorySummaryForm = () => {
                                                       {colorData.onHandItems.map((handItem, handIndex) => (
                                                         <tr key={handIndex} className={handIndex % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
                                                           <td className="py-2 px-3 text-xs">{handItem.imei1 || 'N/A'}</td>
+                                                          <td className="py-2 px-3 text-xs">{handItem.serialNumber || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{handItem.imei2 || '-'}</td>
                                                           <td className="py-2 px-3 text-xs">{handItem.barcode || 'N/A'}</td>
                                                           {isAdmin && <td className="py-2 px-3 text-xs text-right">{formatPrice(handItem.retailPrice)}</td>}
