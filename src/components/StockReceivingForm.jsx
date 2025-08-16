@@ -505,11 +505,12 @@ const StockReceivingForm = () => {
     
     // Check each item
     for (const item of receivingItems) {
-      // Check IMEI1
-      if (!item.imei1) {
-        errors[`imei1-${item.id}`] = 'IMEI1 is required';
+      // CHANGED: Check IMEI1 OR Serial Number (at least one is required)
+      if (!item.imei1 && !item.serialNumber) {
+        errors[`imei1-${item.id}`] = 'Either IMEI1 or Serial Number is required';
         hasErrors = true;
-      } else if (item.imei1.length !== 15) {
+      } else if (item.imei1 && item.imei1.length !== 15) {
+        // CHANGED: Only validate IMEI1 length if it's provided
         errors[`imei1-${item.id}`] = 'IMEI1 must be exactly 15 digits';
         hasErrors = true;
       }
@@ -537,16 +538,18 @@ const StockReceivingForm = () => {
     // Check for duplicate IMEIs and serial numbers
     if (!hasErrors) {
       for (const item of receivingItems) {
-        // Check IMEI duplicates
-        const imeiCheck = await checkDuplicateImeis(item.imei1, item.imei2);
-        if (!imeiCheck.isValid) {
-          if (imeiCheck.imei1Error) {
-            errors[`imei1-${item.id}`] = imeiCheck.imei1Error;
-            hasErrors = true;
-          }
-          if (imeiCheck.imei2Error) {
-            errors[`imei2-${item.id}`] = imeiCheck.imei2Error;
-            hasErrors = true;
+        // CHANGED: Only check IMEI duplicates if IMEI1 is provided
+        if (item.imei1) {
+          const imeiCheck = await checkDuplicateImeis(item.imei1, item.imei2);
+          if (!imeiCheck.isValid) {
+            if (imeiCheck.imei1Error) {
+              errors[`imei1-${item.id}`] = imeiCheck.imei1Error;
+              hasErrors = true;
+            }
+            if (imeiCheck.imei2Error) {
+              errors[`imei2-${item.id}`] = imeiCheck.imei2Error;
+              hasErrors = true;
+            }
           }
         }
         
@@ -614,7 +617,7 @@ const StockReceivingForm = () => {
           color: item.color,
           dealersPrice: item.dealersPrice,
           retailPrice: item.retailPrice,
-          imei1: item.imei1,
+          imei1: item.imei1 || '', // CHANGED: Allow empty IMEI1
           imei2: item.imei2 || '',
           serialNumber: item.serialNumber || '',
           barcode: groupBarcodes[item.groupId] || '',
@@ -1017,8 +1020,7 @@ const StockReceivingForm = () => {
                                   data-field="imei1"
                                   className={`w-full px-2 py-1.5 border rounded text-sm ${fieldErrors[`imei1-${item.id}`] ? 'border-red-500' : ''}`}
                                   placeholder="15-digit IMEI"
-                                  maxLength={15}
-                                  required
+                                  maxLength={15}                                  
                                   disabled={isViewOnly}
                                 />
                                 {fieldErrors[`imei1-${item.id}`] && (

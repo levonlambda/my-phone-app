@@ -1,6 +1,6 @@
 {/* Part 1 Start - Imports and Dependencies */}
 import { useGlobalState } from '../../context/GlobalStateContext'; // NEW: Import global state
-import { updatePhoneInInventory } from './services/inventoryService'; // NEW: Import update function
+import { updatePhoneInInventory } from './services/InventoryService'; // NEW: Import update function
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PhoneBasicInfo from './PhoneBasicInfo';
@@ -21,7 +21,7 @@ import {
 import { 
   checkDuplicateImeis, 
   addPhoneToInventory 
-} from './services/inventoryService';
+} from './services/InventoryService';
 import supplierService from '../../services/supplierService'; // NEW: Import supplier service
 import { Search, ArrowRight, CircleAlert } from 'lucide-react';
 {/* Part 1 End - Imports and Dependencies */}
@@ -152,7 +152,12 @@ const PhoneSelectionForm = () => {
   const handleImei1Change = (e) => {
     const newImei = validateImei(e.target.value);
     setImei1(newImei);
-    setImei1Error(''); // Clear error on change
+    // Clear error if either IMEI1 or Serial Number now has value
+    if ((newImei || serialNumber) && imei1Error === 'Either IMEI1 or Serial Number is required') {
+      setImei1Error('');
+    } else {
+      setImei1Error(''); // Clear error on change
+    }
   };
 
   const handleImei2Change = (e) => {
@@ -172,6 +177,10 @@ const PhoneSelectionForm = () => {
     const newSerialNumber = e.target.value.toUpperCase();
     console.log('Serial number changing to:', newSerialNumber); // ADD THIS
     setSerialNumber(newSerialNumber);
+    // Clear IMEI1 error if serial number now has value
+    if (newSerialNumber && imei1Error === 'Either IMEI1 or Serial Number is required') {
+      setImei1Error('');
+    }
   };
 
   const handleLocationChange = (e) => {
@@ -312,10 +321,14 @@ const PhoneSelectionForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Basic form validation - UPDATED to include location and supplier
+    // Basic form validation - UPDATED to check IMEI1 OR Serial Number
     if (!selectedManufacturer || !selectedModel || !selectedRam || 
-        !selectedStorage || !selectedColor || !imei1 || !barcode || 
+        !selectedStorage || !selectedColor || (!imei1 && !serialNumber) || !barcode || 
         !dealersPrice || !retailPrice || !location || !supplier) {
+      // Set specific error message for IMEI1/Serial Number requirement
+      if (!imei1 && !serialNumber) {
+        setImei1Error('Either IMEI1 or Serial Number is required');
+      }
       alert('Please fill in all required fields');
       return;
     }
@@ -327,15 +340,44 @@ const PhoneSelectionForm = () => {
     setImei2Error('');
     
     // Check for duplicate IMEIs before submitting (skip if editing same item)
-    const imeisCheck = await checkDuplicateImeis(imei1, imei2, isEditMode ? editItemId : null);
+    // Only check if IMEI1 is provided
+    if (imei1) {
+      const imeisCheck = await checkDuplicateImeis(imei1, imei2, isEditMode ? editItemId : null);
+      
+      setIsCheckingImei(false);
+      
+      if (!imeisCheck.isValid) {
+        setImei1Error(imeisCheck.imei1Error);
+        setImei2Error(imeisCheck.imei2Error);
+        setIsSubmitting(false);
+        return; // Don't proceed if IMEIs are invalid
+      }
+    } else {
+      setIsCheckingImei(false);
+    }
     
-    setIsCheckingImei(false);
-    
-    if (!imeisCheck.isValid) {
-      setImei1Error(imeisCheck.imei1Error);
-      setImei2Error(imeisCheck.imei2Error);
-      setIsSubmitting(false);
-      return; // Don't proceed if IMEIs are invalid
+    // Check for duplicate serial number if provided and not in edit mode for same item
+    if (serialNumber) {
+      try {
+        const serialQuery = query(
+          collection(db, 'inventory'),
+          where("serialNumber", "==", serialNumber)
+        );
+        const serialSnapshot = await getDocs(serialQuery);
+        
+        // Check if found document is not the current item being edited
+        const foundDocs = serialSnapshot.docs.filter(doc => doc.id !== (isEditMode ? editItemId : null));
+        if (foundDocs.length > 0) {
+          alert('This Serial Number already exists in inventory');
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking serial number:", error);
+        alert('Error checking serial number uniqueness');
+        setIsSubmitting(false);
+        return;
+      }
     }
     
     // Update lastUpdated on submit
@@ -352,10 +394,10 @@ const PhoneSelectionForm = () => {
       color: selectedColor,
       ram: selectedRam,
       storage: selectedStorage,
-      imei1,
-      imei2,
+      imei1: imei1 || '', // Allow empty IMEI1
+      imei2: imei2 || '',
       barcode,
-      serialNumber, // NEW: Added serial number to phone data
+      serialNumber: serialNumber || '', // Include serial number
       location, // NEW: Added location to phone data
       supplier, // NEW: Added supplier to phone data
       dealersPrice: dPrice,

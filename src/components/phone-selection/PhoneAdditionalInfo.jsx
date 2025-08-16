@@ -33,7 +33,9 @@ const PhoneAdditionalInfo = ({
       {/* IMEI Fields */}
       <div className="flex gap-4">
         <div className="flex-1 space-y-2">
-          <label className="block text-[rgb(52,69,157)] font-semibold">IMEI 1:</label>
+          <label className="block text-[rgb(52,69,157)] font-semibold">
+            IMEI 1: <span className="text-gray-500 font-normal text-sm">(Required if no Serial Number)</span>
+          </label>
           <input 
             type="text" 
             className={`w-full p-2 border rounded ${imei1Error ? 'border-red-500' : ''}`}
@@ -41,7 +43,6 @@ const PhoneAdditionalInfo = ({
             onChange={handleImei1Change}
             placeholder="15-digit IMEI number"
             maxLength={15}
-            required
           />
           {imei1Error && (
             <p className="text-red-500 text-sm mt-1">{imei1Error}</p>
@@ -77,13 +78,15 @@ const PhoneAdditionalInfo = ({
           />
         </div>
         <div className="flex-1 space-y-2">
-          <label className="block text-[rgb(52,69,157)] font-semibold">Serial Number:</label>
+          <label className="block text-[rgb(52,69,157)] font-semibold">
+            Serial Number: <span className="text-gray-500 font-normal text-sm">(Required if no IMEI1)</span>
+          </label>
           <input 
             type="text" 
             className="w-full p-2 border rounded"
             value={serialNumber}
             onChange={handleSerialNumberChange}
-            placeholder="Serial number (optional)"
+            placeholder="Device serial number"
           />
         </div>
       </div>
