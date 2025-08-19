@@ -423,24 +423,62 @@ const InventoryFilters = ({
         )}
       </div>
       
-      {/* Status filter */}
+      {/* Status filter - COLLAPSIBLE CHECKBOXES */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Status
         </label>
-        <select
-          name="status"
-          value={filters.status}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-        >
-          <option value="">All Statuses</option>
-          {filterOptions.statuses.map(status => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
+        <div className="w-full p-2 border rounded bg-white" style={{ minHeight: '42px' }}>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="status-all"
+              checked={filters.status.length === filterOptions.statuses.length}
+              onChange={(e) => {
+                handleFilterChange({
+                  target: {
+                    name: 'status',
+                    value: e.target.checked ? filterOptions.statuses : [],
+                    type: 'select-all'
+                  }
+                });
+              }}
+              className="h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+            />
+            <label htmlFor="status-all" className="ml-1.5 text-sm font-medium text-gray-700 cursor-pointer select-none">
+              All Statuses
+            </label>
+            {filters.status.length > 0 && filters.status.length < filterOptions.statuses.length && (
+              <span className="ml-auto text-xs text-gray-500">
+                {filters.status.length} selected
+              </span>
+            )}
+          </div>
+          {/* Only show individual checkboxes when not all are selected */}
+          {filters.status.length < filterOptions.statuses.length && (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 pt-2 border-t">
+              {filterOptions.statuses.map(status => (
+                <div key={status} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`status-${status}`}
+                    name="status"
+                    value={status}
+                    checked={filters.status.includes(status)}
+                    onChange={handleFilterChange}
+                    className="h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                  />
+                  <label 
+                    htmlFor={`status-${status}`} 
+                    className="ml-1.5 text-sm text-gray-600 cursor-pointer select-none"
+                  >
+                    {status}
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Color filter */}
@@ -457,7 +495,7 @@ const InventoryFilters = ({
         >
           <option value="">All Colors</option>
           {isLoadingColors ? (
-            <option value="" disabled>Loading color options...</option>
+            <option value="" disabled>Loading colors...</option>
           ) : (
             filteredColors.map(color => (
               <option key={color} value={color}>

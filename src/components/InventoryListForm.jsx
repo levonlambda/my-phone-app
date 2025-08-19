@@ -17,13 +17,13 @@ const InventoryListForm = () => {
   const [sortDirection, setSortDirection] = useState('asc');
   const [initialLoad, setInitialLoad] = useState(true); // Track if data has been loaded
   
-  // State for filters - UPDATED: Added startDate and endDate
+  // State for filters - UPDATED: Changed status to array with all statuses selected by default
   const [filters, setFilters] = useState({
     manufacturer: '',
     model: '',
     ram: '',
     storage: '',
-    status: '',
+    status: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective'], // Changed to array with all selected
     minPrice: '',
     maxPrice: '',
     color: '',
@@ -166,10 +166,11 @@ const InventoryListForm = () => {
         return false;
       }
       
-      // Apply status filter - handle both 'Stock' and 'On-Hand'
-      if (filters.status) {
-        const filterStatus = filters.status === 'Stock' ? 'On-Hand' : filters.status;
-        if (item.status !== filterStatus) {
+      // Apply status filter - UPDATED to handle array of selected statuses
+      if (filters.status && filters.status.length > 0 && filters.status.length < 5) {
+        // Only filter if some (not all) statuses are selected
+        const itemStatus = item.status === 'On-Hand' ? 'Stock' : item.status;
+        if (!filters.status.includes(itemStatus)) {
           return false;
         }
       }
@@ -305,12 +306,28 @@ const InventoryListForm = () => {
     }));
   }, [filters.manufacturer, filters.model, filterOptions.manufacturers]);
 
-  // Handle filter change - UPDATED: Added date field handling and supplier as dropdown
+  // Handle filter change - UPDATED: Added checkbox handling for status
   const handleFilterChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     
+    // Handle checkbox changes for status filter
+    if (name === 'status' && type === 'checkbox') {
+      setFilters(prev => ({
+        ...prev,
+        status: checked 
+          ? [...prev.status, value]
+          : prev.status.filter(s => s !== value)
+      }));
+    }
+    // Handle special case for setting all statuses at once
+    else if (name === 'status' && type === 'select-all') {
+      setFilters(prev => ({
+        ...prev,
+        status: value
+      }));
+    }
     // For debounced text inputs (price fields, imei, barcode, dates, serial number)
-    if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'startDate' || name === 'endDate') {
+    else if (name === 'minPrice' || name === 'maxPrice' || name === 'imei1' || name === 'barcode' || name === 'serialNumber' || name === 'startDate' || name === 'endDate') {
       // For price fields, handle numeric input
       if (name === 'minPrice' || name === 'maxPrice') {
         // Allow only numbers and commas
@@ -395,7 +412,7 @@ const InventoryListForm = () => {
     }
   };
 
-  // Clear all filters - UPDATED: Added date fields and supplier
+  // Clear all filters - UPDATED: Reset status to all selected
   const clearFilters = () => {
     // Clear both actual filters and pending filters
     setFilters({
@@ -403,7 +420,7 @@ const InventoryListForm = () => {
       model: '',
       ram: '',
       storage: '',
-      status: '',
+      status: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective'], // Reset to all selected
       minPrice: '',
       maxPrice: '',
       color: '',
