@@ -623,7 +623,8 @@ const StockReceivingForm = () => {
           barcode: groupBarcodes[item.groupId] || '',
           location: item.location,
           status: item.status,
-          supplier: procurementData.supplierName,
+          // FIX: Ensure supplier fields are properly saved from procurementData
+          supplier: procurementData.supplierName || '',
           supplierId: procurementData.supplierId || '',
           lastUpdated: dateDelivered,
           dateAdded: dateDelivered
