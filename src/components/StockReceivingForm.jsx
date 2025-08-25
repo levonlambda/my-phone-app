@@ -134,15 +134,50 @@ const StockReceivingForm = () => {
         
         try {
           // Query inventory for items from this procurement
+          // FIX: First try to query by procurementId, then fallback to date-based query
           const inventoryRef = collection(db, 'inventory');
-          const q = query(
+          
+          // First try: Query by procurementId (for new items)
+          let q = query(
             inventoryRef,
-            where("supplierId", "==", procurementData.supplierId || ''),
-            where("supplier", "==", procurementData.supplierName)
+            where("procurementId", "==", procurementData.id)
           );
           
-          const snapshot = await getDocs(q);
-          console.log(`📋 Found ${snapshot.size} inventory items from this supplier`);
+          let snapshot = await getDocs(q);
+          console.log(`📋 Query by procurementId found ${snapshot.size} items`);
+          
+          // If no items found with procurementId, try fallback query
+          if (snapshot.size === 0 && procurementData.dateDelivered) {
+            console.log('📋 Trying fallback query by date and supplier...');
+            
+            // Convert the date to both possible formats for matching
+            const deliveryDate = procurementData.dateDelivered;
+            const dateUS = new Date(deliveryDate).toLocaleDateString('en-US'); // M/D/YYYY format
+            
+            // Fallback: Query by supplier and delivery date
+            q = query(
+              inventoryRef,
+              where("supplierId", "==", procurementData.supplierId || ''),
+              where("dateAdded", "==", dateUS)
+            );
+            
+            snapshot = await getDocs(q);
+            console.log(`📋 Fallback query by date found ${snapshot.size} items`);
+            
+            // If still no results, try with the original date format
+            if (snapshot.size === 0) {
+              q = query(
+                inventoryRef,
+                where("supplierId", "==", procurementData.supplierId || ''),
+                where("dateAdded", "==", deliveryDate)
+              );
+              
+              snapshot = await getDocs(q);
+              console.log(`📋 Fallback query with original date format found ${snapshot.size} items`);
+            }
+          }
+          
+          console.log(`📋 Final result: Found ${snapshot.size} inventory items`);
           
           // Filter items by matching them to procurement items
           const receivedItems = [];
@@ -227,7 +262,7 @@ const StockReceivingForm = () => {
     
     // Helper function to create empty rows
     const createEmptyRows = async () => {
-      console.log('📝 Creating empty rows for receiving');
+      console.log('🔍 Creating empty rows for receiving');
       const rows = [];
       let rowId = 1;
       const newGroupBarcodes = {};
@@ -605,6 +640,12 @@ const StockReceivingForm = () => {
       const batch = writeBatch(db);
       let itemsSaved = 0;
 
+      // Debug log to check supplier data
+      console.log('🔍 Procurement supplier data:', {
+        supplierName: procurementData.supplierName,
+        supplierId: procurementData.supplierId
+      });
+
       // 1. Add items to inventory collection
       setSaveProgress('Adding items to inventory...');
       
@@ -623,12 +664,23 @@ const StockReceivingForm = () => {
           barcode: groupBarcodes[item.groupId] || '',
           location: item.location,
           status: item.status,
-          // FIX: Ensure supplier fields are properly saved from procurementData
-          supplier: procurementData.supplierName || '',
+          // FIX: Save supplierId in supplier field to match inventory edit form expectation
+          supplier: procurementData.supplierId || '',  // The edit form expects supplier ID here
           supplierId: procurementData.supplierId || '',
-          lastUpdated: dateDelivered,
-          dateAdded: dateDelivered
+          // FIX: Add procurementId to link items to specific procurement
+          procurementId: procurementData.id || '',
+          // FIX: Convert date format to M/D/YYYY to match inventory edit form
+          lastUpdated: new Date(dateDelivered).toLocaleDateString('en-US'),
+          dateAdded: new Date(dateDelivered).toLocaleDateString('en-US')
         };
+
+        // Debug log first item to verify supplier is being saved
+        if (itemsSaved === 0) {
+          console.log('📦 First inventory item being saved:', {
+            supplier: inventoryData.supplier,
+            supplierId: inventoryData.supplierId
+          });
+        }
 
         const docRef = doc(collection(db, 'inventory'));
         batch.set(docRef, inventoryData);
