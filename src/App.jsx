@@ -14,6 +14,7 @@ import Login from './components/Login';
 import { useGlobalState } from './context/GlobalStateContext';
 import { useAuth } from './context/AuthContext';
 import { LogOut, User, Shield } from 'lucide-react';
+import ArchivePreview from './components/ArchivePreview';
 
 function App() {
   const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
@@ -73,7 +74,8 @@ function App() {
     'suppliers': 'admin',
     'form': 'user',
     'phonelist': 'user',
-    'prices': 'admin'
+    'prices': 'admin',
+    'archive-preview': 'admin'
   };
 
   // Check if user has permission for current component
@@ -165,6 +167,7 @@ function App() {
             {activeComponent === 'inventory' && <InventoryListForm />}
             {activeComponent === 'phonelist' && <PhoneListForm />}
             {activeComponent === 'prices' && <PriceManagementForm />}
+            {activeComponent === 'archive-preview' && <ArchivePreview />}
           </>
         )}
       </div>

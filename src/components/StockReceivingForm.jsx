@@ -359,7 +359,7 @@ const StockReceivingForm = () => {
     
     // Call the async function
     initializeItemsWithBarcodes();
-  }, [procurementData.id, procurementData.deliveryStatus, procurementData.isReceived, procurementData.items, procurementData.supplierId, procurementData.supplierName]); // Include all dependencies used inside
+  }, [procurementData.id, procurementData.deliveryStatus, procurementData.isReceived, procurementData.items, procurementData.supplierId, procurementData.supplierName, procurementData.dateDelivered]); // Include all dependencies used inside
   
   // Group items by product model
   const groupedItems = useMemo(() => {

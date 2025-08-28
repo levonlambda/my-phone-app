@@ -115,7 +115,8 @@ export const AuthProvider = ({ children }) => {
       { key: 'suppliers', label: 'Supplier Management', requiredRole: 'admin' },
       { key: 'form', label: 'Add Device Model', requiredRole: 'admin' },
       { key: 'phonelist', label: 'Device Models', requiredRole: 'admin' },
-      { key: 'prices', label: 'Price Management', requiredRole: 'admin' }
+      { key: 'prices', label: 'Price Management', requiredRole: 'admin' },
+      { key: 'archive-preview', label: 'Archive Preview', requiredRole: 'admin' }
     ];
 
     if (userRole === 'admin') {
