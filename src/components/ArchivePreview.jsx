@@ -1,4 +1,7 @@
 // ArchivePreview.jsx - Read-Only Archive Preview Component
+// Divided into sections for easy maintenance and updates
+
+{/* Part 1 Start - Imports and Dependencies */}
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -12,21 +15,30 @@ import {
   DollarSign
 } from 'lucide-react';
 import archiveService from '../services/archiveService';
+{/* Part 1 End - Imports and Dependencies */}
 
+{/* Part 2 Start - Component Definition and State */}
 const ArchivePreview = () => {
+  // Main data states
   const [loading, setLoading] = useState(true);
   const [eligibleItems, setEligibleItems] = useState([]);
   const [ineligibleItems, setIneligibleItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [stats, setStats] = useState(null);
   const [previewResult, setPreviewResult] = useState(null);
+  
+  // UI states
   const [activeTab, setActiveTab] = useState('eligible');
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredEligibleItems, setFilteredEligibleItems] = useState([]);
+  
+  // Sorting states
   const [sortField, setSortField] = useState('daysSinceUpdate');
   const [sortDirection, setSortDirection] = useState('desc');
+{/* Part 2 End - Component Definition and State */}
 
+{/* Part 3 Start - Effects and Data Loading */}
   // Load eligible items on component mount
   useEffect(() => {
     console.log('ArchivePreview component mounted');
@@ -48,6 +60,38 @@ const ArchivePreview = () => {
     setFilteredEligibleItems(filtered);
   }, [searchTerm, eligibleItems]);
 
+  // Calculate stats whenever selection changes
+  useEffect(() => {
+    if (selectedItems.length > 0) {
+      const selectedStats = archiveService.calculateArchiveStats(selectedItems);
+      setStats(selectedStats);
+    } else {
+      setStats(null);
+    }
+  }, [selectedItems]);
+
+  const loadEligibleItems = async () => {
+    try {
+      console.log('Starting to load eligible items...');
+      setLoading(true);
+      setError(null);
+      const result = await archiveService.getEligibleItems();
+      console.log('Loaded items result:', result);
+      console.log('Eligible items count:', result.eligible.length);
+      console.log('Ineligible items count:', result.ineligible.length);
+      setEligibleItems(result.eligible);
+      setIneligibleItems(result.ineligible);
+      setFilteredEligibleItems(result.eligible);
+    } catch (err) {
+      console.error('Error loading items:', err);
+      setError(`Failed to load items: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+{/* Part 3 End - Effects and Data Loading */}
+
+{/* Part 4 Start - Sorting and Selection Handlers */}
   // Sort items
   const sortItems = (items, field, direction) => {
     return [...items].sort((a, b) => {
@@ -92,36 +136,6 @@ const ArchivePreview = () => {
     return sortItems(filteredEligibleItems, sortField, sortDirection);
   };
 
-  // Calculate stats whenever selection changes
-  useEffect(() => {
-    if (selectedItems.length > 0) {
-      const selectedStats = archiveService.calculateArchiveStats(selectedItems);
-      setStats(selectedStats);
-    } else {
-      setStats(null);
-    }
-  }, [selectedItems]);
-
-  const loadEligibleItems = async () => {
-    try {
-      console.log('Starting to load eligible items...');
-      setLoading(true);
-      setError(null);
-      const result = await archiveService.getEligibleItems();
-      console.log('Loaded items result:', result);
-      console.log('Eligible items count:', result.eligible.length);
-      console.log('Ineligible items count:', result.ineligible.length);
-      setEligibleItems(result.eligible);
-      setIneligibleItems(result.ineligible);
-      setFilteredEligibleItems(result.eligible);
-    } catch (err) {
-      console.error('Error loading items:', err);
-      setError(`Failed to load items: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSelectItem = (item) => {
     setSelectedItems(prev => {
       const isSelected = prev.some(i => i.id === item.id);
@@ -153,7 +167,9 @@ const ArchivePreview = () => {
     const result = archiveService.previewArchive(selectedItems);
     setPreviewResult(result);
   };
+{/* Part 4 End - Sorting and Selection Handlers */}
 
+{/* Part 5 Start - Utility Functions */}
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return '₱0.00';
     return `₱${amount.toLocaleString('en-US', {
@@ -171,7 +187,9 @@ const ArchivePreview = () => {
       day: 'numeric'
     });
   };
+{/* Part 5 End - Utility Functions */}
 
+{/* Part 6 Start - Loading and Error States */}
   // Show loading state
   if (loading) {
     return (
@@ -219,10 +237,14 @@ const ArchivePreview = () => {
       </div>
     );
   }
+{/* Part 6 End - Loading and Error States */}
 
+{/* Part 7 Start - Main Component Render */}
   return (
     <div className="min-h-screen bg-white p-4">
       <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        
+{/* Part 7.1 Start - Card Header */}
         <CardHeader className="bg-[rgb(52,69,157)] py-3">
           <CardTitle className="text-2xl text-white flex items-center justify-between">
             <div className="flex items-center">
@@ -234,9 +256,11 @@ const ArchivePreview = () => {
             </span>
           </CardTitle>
         </CardHeader>
+{/* Part 7.1 End - Card Header */}
 
         <CardContent className="bg-white p-4 space-y-6">
           
+{/* Part 8 Start - Archive Summary Section */}
           {/* Archive Summary - Enhanced Design */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
             <div className="flex justify-between items-center mb-4">
@@ -299,7 +323,9 @@ const ArchivePreview = () => {
               </div>
             </div>
           </div>
+{/* Part 8 End - Archive Summary Section */}
 
+{/* Part 9 Start - Search and Filter Controls */}
           {/* Search and Filter Section */}
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row gap-4">
@@ -369,7 +395,9 @@ const ArchivePreview = () => {
               </div>
             )}
           </div>
+{/* Part 9 End - Search and Filter Controls */}
 
+{/* Part 10 Start - Tab Navigation */}
           {/* Tabs */}
           <div className="flex space-x-4 border-b">
             <button
@@ -405,9 +433,13 @@ const ArchivePreview = () => {
               </button>
             )}
           </div>
+{/* Part 10 End - Tab Navigation */}
 
+{/* Part 11 Start - Tab Content Container */}
           {/* Tab Content */}
           <div className="min-h-[400px]">
+            
+{/* Part 11.1 Start - Eligible Items Table */}
             {activeTab === 'eligible' && (
               <div className="overflow-x-auto">
                 {filteredEligibleItems.length === 0 ? (
@@ -564,7 +596,9 @@ const ArchivePreview = () => {
                 )}
               </div>
             )}
+{/* Part 11.1 End - Eligible Items Table */}
 
+{/* Part 11.2 Start - Ineligible Items Table */}
             {activeTab === 'ineligible' && (
               <div className="overflow-x-auto">
                 {ineligibleItems.length === 0 ? (
@@ -610,7 +644,9 @@ const ArchivePreview = () => {
                 )}
               </div>
             )}
+{/* Part 11.2 End - Ineligible Items Table */}
 
+{/* Part 11.3 Start - Archive Preview Results */}
             {activeTab === 'preview' && previewResult && (
               <div className="space-y-6">
                 {previewResult.success ? (
@@ -700,7 +736,10 @@ const ArchivePreview = () => {
                 )}
               </div>
             )}
+{/* Part 11.3 End - Archive Preview Results */}
+
           </div>
+{/* Part 11 End - Tab Content Container */}
 
         </CardContent>
       </Card>
@@ -709,3 +748,4 @@ const ArchivePreview = () => {
 };
 
 export default ArchivePreview;
+{/* Component End */}
