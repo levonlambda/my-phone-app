@@ -610,6 +610,33 @@ const InventoryListForm = () => {
         filterSummary.push(`End Date: ${new Date(filters.endDate).toLocaleDateString('en-US')}`);
       }
 
+      // Helper function to determine device type based on model name
+      const getDeviceType = (manufacturer, model) => {
+        const modelLower = (model || '').toLowerCase();
+        const manufacturerLower = (manufacturer || '').toLowerCase();
+        
+        // Check for tablets
+        if (modelLower.includes('ipad') || modelLower.includes('tab') || 
+            modelLower.includes('tablet') || modelLower.includes('pad')) {
+          return 'Tablet';
+        }
+        
+        // Check for laptops
+        if (modelLower.includes('book') || modelLower.includes('laptop') || 
+            modelLower.includes('notebook') || manufacturerLower.includes('dell') ||
+            manufacturerLower.includes('hp') || manufacturerLower.includes('lenovo') ||
+            manufacturerLower.includes('asus') || manufacturerLower.includes('acer')) {
+          // Additional check - if it's a known computer manufacturer but model doesn't indicate phone/tablet
+          if (!modelLower.includes('phone') && !modelLower.includes('galaxy') && 
+              !modelLower.includes('iphone') && !modelLower.includes('pixel')) {
+            return 'Laptop';
+          }
+        }
+        
+        // Default to Phone for everything else
+        return 'Phone';
+      };
+
       // Create HTML content with Word-specific namespace and minimal margins
       let htmlContent = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" 
@@ -703,7 +730,7 @@ const InventoryListForm = () => {
             th.center, td.center {
               text-align: center;
             }
-            .phone-cell {
+            .type-cell {
               font-weight: bold;
               text-align: center;
               vertical-align: middle;
@@ -761,7 +788,7 @@ const InventoryListForm = () => {
               </colgroup>
               <thead>
                 <tr>
-                  <th class="center">Phone</th>
+                  <th class="center">Type</th>
                   <th>Brand</th>
                   <th>Model</th>
                   <th>Color</th>
@@ -772,10 +799,10 @@ const InventoryListForm = () => {
               <tbody>
       `;
 
-      // Group items by manufacturer, model, storage, and color
+      // Group items by manufacturer, model, RAM, storage, and color (FIXED: Added RAM to grouping)
       const groupedItems = {};
       inventoryItems.forEach(item => {
-        const key = `${item.manufacturer}_${item.model}_${item.storage}_${item.color}`;
+        const key = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}_${item.color}`;
         if (!groupedItems[key]) {
           groupedItems[key] = {
             manufacturer: item.manufacturer,
@@ -797,6 +824,13 @@ const InventoryListForm = () => {
         if (a.model !== b.model) {
           return a.model.localeCompare(b.model);
         }
+        // Sort by RAM numerically
+        const ramA = parseInt(a.ram) || 0;
+        const ramB = parseInt(b.ram) || 0;
+        if (ramA !== ramB) {
+          return ramA - ramB;
+        }
+        // Sort by storage numerically
         if (a.storage !== b.storage) {
           const storageA = parseInt(a.storage) || 0;
           const storageB = parseInt(b.storage) || 0;
@@ -810,23 +844,37 @@ const InventoryListForm = () => {
       sortedGroups.forEach(group => {
         const rowspan = group.items.length;
         const rowClass = groupIndex % 2 === 0 ? 'white-row' : 'gray-row';
-        const phoneCountBg = groupIndex % 2 === 0 ? 'white' : '#f0f0f0';
+        const typeColumnBg = groupIndex % 2 === 0 ? 'white' : '#f0f0f0';
+        
+        // Determine device type
+        const deviceType = getDeviceType(group.manufacturer, group.model);
         
         // Format RAM and storage with GB
         const ramDisplay = group.ram ? `${group.ram}GB` : 'N/A';
         const storageDisplay = group.storage ? `${group.storage}GB` : 'N/A';
         const modelDisplay = `${group.model} (${ramDisplay}+${storageDisplay})`;
         
+        // Get identifier - use IMEI1 if available, otherwise use Serial Number
+        const getIdentifier = (item) => {
+          if (item.imei1 && item.imei1 !== 'N/A' && item.imei1 !== '') {
+            return item.imei1;
+          } else if (item.serialNumber && item.serialNumber !== '') {
+            return item.serialNumber;
+          } else {
+            return 'N/A';
+          }
+        };
+        
         // First row of the group
         htmlContent += `
           <tr class="${rowClass}">
-            <td rowspan="${rowspan}" class="phone-cell" style="background-color: ${phoneCountBg}; white-space: nowrap;">
-              Phone ${group.items.length}
+            <td rowspan="${rowspan}" class="type-cell" style="background-color: ${typeColumnBg}; white-space: nowrap;">
+              ${deviceType}
             </td>
             <td rowspan="${rowspan}" style="vertical-align: middle;">${group.manufacturer}</td>
             <td rowspan="${rowspan}" class="model-cell" style="vertical-align: middle;">${modelDisplay}</td>
             <td rowspan="${rowspan}" style="vertical-align: middle;">${group.color}</td>
-            <td class="imei-cell">${group.items[0].imei1 || 'N/A'}</td>
+            <td class="imei-cell">${getIdentifier(group.items[0])}</td>
             <td class="center status-cell" style="white-space: nowrap !important; width: 80pt;">${group.items[0].status === 'On-Hand' ? 'Stock' : group.items[0].status}</td>
           </tr>
         `;
@@ -836,7 +884,7 @@ const InventoryListForm = () => {
           const item = group.items[i];
           htmlContent += `
             <tr class="${rowClass}">
-              <td class="imei-cell">${item.imei1 || 'N/A'}</td>
+              <td class="imei-cell">${getIdentifier(item)}</td>
               <td class="center status-cell" style="white-space: nowrap !important; width: 80pt;">${item.status === 'On-Hand' ? 'Stock' : item.status}</td>
             </tr>
           `;
