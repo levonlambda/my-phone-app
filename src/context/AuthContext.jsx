@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }) => {
       { key: 'procurementmgmt', label: 'Procurement Management', requiredRole: 'admin' },
       { key: 'stockreceiving', label: 'Stock Receiving', requiredRole: 'admin' },
       { key: 'suppliers', label: 'Supplier Management', requiredRole: 'admin' },
-      { key: 'form', label: 'Add Device Model', requiredRole: 'admin' },
+      { key: 'form', label: 'Add Device Model', requiredRole: 'user' }, // Changed from 'admin' to 'user'
       { key: 'phonelist', label: 'Device Models', requiredRole: 'admin' },
       { key: 'prices', label: 'Price Management', requiredRole: 'admin' },
       { key: 'archive-preview', label: 'Archive Preview', requiredRole: 'admin' }
@@ -123,8 +123,8 @@ export const AuthProvider = ({ children }) => {
       return allComponents;
     }
 
-    // Regular users can only see Inventory Summary
-    return allComponents.filter(component => component.key === 'summary');
+    // Regular users can see components with requiredRole: 'user'
+    return allComponents.filter(component => component.requiredRole === 'user');
   };
 
   // Listen for auth state changes
