@@ -277,10 +277,10 @@ class ExportInventoryService {
         counts: {
           backup: backupMap.size,
           current: currentMap.size,
-          matching: 0,
-          modified: 0,
-          added: 0,
-          deleted: 0
+          matching: 0,      // Items that are truly identical (not modified)
+          modified: 0,      // Items that exist in both but have changes
+          added: 0,         // Items in current but not in backup
+          deleted: 0        // Items in backup but not in current
         },
         details: {
           matching: [],
@@ -308,9 +308,11 @@ class ExportInventoryService {
           const fieldsMatch = this.compareItems(backupItem, currentItem);
           
           if (fieldsMatch.identical) {
+            // Item is truly identical (not modified)
             comparison.counts.matching++;
             comparison.details.matching.push(id);
           } else {
+            // Item exists but has been modified
             comparison.counts.modified++;
             comparison.details.modified.push({
               id,
@@ -346,7 +348,8 @@ class ExportInventoryService {
       
       // Determine overall status
       if (comparison.counts.matching === comparison.counts.backup && 
-          comparison.counts.backup === comparison.counts.current) {
+          comparison.counts.backup === comparison.counts.current &&
+          comparison.counts.modified === 0) {
         comparison.status = 'PERFECT_MATCH';
         comparison.message = '✅ Backup perfectly matches current database';
       } else if (comparison.counts.deleted > 0 || comparison.counts.added > 0) {
@@ -357,14 +360,22 @@ class ExportInventoryService {
         comparison.message = `⚠️ ${comparison.counts.modified} items have been modified since backup`;
       }
       
-      // Calculate integrity score
+      // FIXED: Calculate integrity score based on truly identical items
+      // Integrity score should reflect the percentage of items that are completely unchanged
       const totalItems = Math.max(comparison.counts.backup, comparison.counts.current);
-      comparison.integrityScore = totalItems > 0 
-        ? Math.round((comparison.counts.matching / totalItems) * 100)
-        : 0;
+      if (totalItems > 0) {
+        // Only items that are truly identical (not modified) count toward integrity
+        const identicalItems = comparison.counts.matching; // This is now truly identical items only
+        // Use toFixed(1) to show one decimal place instead of rounding to whole number
+        const score = (identicalItems / totalItems) * 100;
+        comparison.integrityScore = parseFloat(score.toFixed(1));
+      } else {
+        comparison.integrityScore = 0;
+      }
       
       console.log('📊 Comparison complete:', comparison.message);
       console.log(`🎯 Integrity Score: ${comparison.integrityScore}%`);
+      console.log(`📊 Details: ${comparison.counts.matching} identical, ${comparison.counts.modified} modified, ${comparison.counts.added} added, ${comparison.counts.deleted} deleted`);
       
       return comparison;
       
@@ -449,106 +460,106 @@ class ExportInventoryService {
 
   // Generate a detailed comparison report
   generateComparisonReport(comparison) {
-  const report = [];
-  
-  // Use supplier names from comparison if available
-  const supplierNames = comparison.supplierNames || {};
-  
-  report.push('=== BACKUP COMPARISON REPORT ===');
-  report.push(`Generated: ${comparison.timestamp}`);
-  report.push(`Backup Created: ${comparison.backupDate}`);
-  report.push(`Status: ${comparison.status}`);
-  report.push(`Integrity Score: ${comparison.integrityScore}%`);
-  report.push('');
-  
-  report.push('=== SUMMARY ===');
-  report.push(`Items in Backup: ${comparison.counts.backup}`);
-  report.push(`Items in Current DB: ${comparison.counts.current}`);
-  report.push(`Matching Items: ${comparison.counts.matching}`);
-  report.push(`Modified Items: ${comparison.counts.modified}`);
-  report.push(`New Items: ${comparison.counts.added}`);
-  report.push(`Deleted Items: ${comparison.counts.deleted}`);
-  report.push('');
-  
-  if (comparison.counts.modified > 0) {
-    report.push('=== MODIFIED ITEMS ===');
-    comparison.details.modified.slice(0, 10).forEach(item => {
-      report.push(`- ${item.id} (${item.model})`);
-      item.differences.forEach(diff => {
-        let backupValue = diff.backup;
-        let currentValue = diff.current;
-        
-        // Resolve supplier IDs to names
-        if (diff.field === 'supplier' || diff.field === 'supplierId') {
-          // Check if currentValue is a supplier ID (20+ char alphanumeric)
-          if (typeof currentValue === 'string' && currentValue.length >= 20 && /^[a-zA-Z0-9]+$/.test(currentValue)) {
-            if (supplierNames[currentValue]) {
-              currentValue = supplierNames[currentValue];
-            } else {
-              currentValue = `Unknown Supplier (${currentValue.substring(0, 8)}...)`;
+    const report = [];
+    
+    // Use supplier names from comparison if available
+    const supplierNames = comparison.supplierNames || {};
+    
+    report.push('=== BACKUP COMPARISON REPORT ===');
+    report.push(`Generated: ${comparison.timestamp}`);
+    report.push(`Backup Created: ${comparison.backupDate}`);
+    report.push(`Status: ${comparison.status}`);
+    report.push(`Integrity Score: ${comparison.integrityScore}%`);
+    report.push('');
+    
+    report.push('=== SUMMARY ===');
+    report.push(`Items in Backup: ${comparison.counts.backup}`);
+    report.push(`Items in Current DB: ${comparison.counts.current}`);
+    report.push(`Truly Identical Items: ${comparison.counts.matching}`);
+    report.push(`Modified Items: ${comparison.counts.modified}`);
+    report.push(`New Items: ${comparison.counts.added}`);
+    report.push(`Deleted Items: ${comparison.counts.deleted}`);
+    report.push('');
+    
+    if (comparison.counts.modified > 0) {
+      report.push('=== MODIFIED ITEMS ===');
+      comparison.details.modified.slice(0, 10).forEach(item => {
+        report.push(`- ${item.id} (${item.model})`);
+        item.differences.forEach(diff => {
+          let backupValue = diff.backup;
+          let currentValue = diff.current;
+          
+          // Resolve supplier IDs to names
+          if (diff.field === 'supplier' || diff.field === 'supplierId') {
+            // Check if currentValue is a supplier ID (20+ char alphanumeric)
+            if (typeof currentValue === 'string' && currentValue.length >= 20 && /^[a-zA-Z0-9]+$/.test(currentValue)) {
+              if (supplierNames[currentValue]) {
+                currentValue = supplierNames[currentValue];
+              } else {
+                currentValue = `Unknown Supplier (${currentValue.substring(0, 8)}...)`;
+              }
+            }
+            
+            // Check if backupValue is a supplier ID
+            if (typeof backupValue === 'string' && backupValue.length >= 20 && /^[a-zA-Z0-9]+$/.test(backupValue)) {
+              if (supplierNames[backupValue]) {
+                backupValue = supplierNames[backupValue];
+              } else {
+                backupValue = `Unknown Supplier (${backupValue.substring(0, 8)}...)`;
+              }
             }
           }
           
-          // Check if backupValue is a supplier ID
-          if (typeof backupValue === 'string' && backupValue.length >= 20 && /^[a-zA-Z0-9]+$/.test(backupValue)) {
-            if (supplierNames[backupValue]) {
-              backupValue = supplierNames[backupValue];
-            } else {
-              backupValue = `Unknown Supplier (${backupValue.substring(0, 8)}...)`;
-            }
+          // Clean up undefined values
+          if (backupValue === 'undefined' || backupValue === undefined || backupValue === null || backupValue === '') {
+            backupValue = '(not set)';
           }
-        }
-        
-        // Clean up undefined values
-        if (backupValue === 'undefined' || backupValue === undefined || backupValue === null || backupValue === '') {
-          backupValue = '(not set)';
-        }
-        if (currentValue === 'undefined' || currentValue === undefined || currentValue === null || currentValue === '') {
-          currentValue = '(not set)';
-        }
-        
-        report.push(`  * ${diff.field}: "${backupValue}" → "${currentValue}"`);
+          if (currentValue === 'undefined' || currentValue === undefined || currentValue === null || currentValue === '') {
+            currentValue = '(not set)';
+          }
+          
+          report.push(`  * ${diff.field}: "${backupValue}" → "${currentValue}"`);
+        });
       });
-    });
-    if (comparison.counts.modified > 10) {
-      report.push(`... and ${comparison.counts.modified - 10} more`);
+      if (comparison.counts.modified > 10) {
+        report.push(`... and ${comparison.counts.modified - 10} more`);
+      }
+      report.push('');
     }
-    report.push('');
-  }
-  
-  if (comparison.counts.added > 0) {
-    report.push('=== NEW ITEMS (not in backup) ===');
-    comparison.details.added.slice(0, 10).forEach(item => {
-      report.push(`- ${item.id} (${item.model}) - Added: ${item.dateAdded || 'Unknown'}`);
-    });
-    if (comparison.counts.added > 10) {
-      report.push(`... and ${comparison.counts.added - 10} more`);
-    }
-    report.push('');
-  }
-  
-  if (comparison.counts.deleted > 0) {
-    report.push('=== DELETED ITEMS (only in backup) ===');
-    comparison.details.deleted.slice(0, 10).forEach(item => {
-      report.push(`- ${item.id} (${item.model})`);
-    });
-    if (comparison.counts.deleted > 10) {
-      report.push(`... and ${comparison.counts.deleted - 10} more`);
-    }
-    report.push('');
-  }
-  
-  if (comparison.fieldMismatches.length > 0) {
-    report.push('=== FIELD CHANGE FREQUENCY ===');
-    comparison.fieldMismatches
-      .sort((a, b) => b.count - a.count)
-      .forEach(field => {
-        report.push(`- ${field.field}: ${field.count} changes`);
+    
+    if (comparison.counts.added > 0) {
+      report.push('=== NEW ITEMS (not in backup) ===');
+      comparison.details.added.slice(0, 10).forEach(item => {
+        report.push(`- ${item.id} (${item.model}) - Added: ${item.dateAdded || 'Unknown'}`);
       });
+      if (comparison.counts.added > 10) {
+        report.push(`... and ${comparison.counts.added - 10} more`);
+      }
+      report.push('');
+    }
+    
+    if (comparison.counts.deleted > 0) {
+      report.push('=== DELETED ITEMS (only in backup) ===');
+      comparison.details.deleted.slice(0, 10).forEach(item => {
+        report.push(`- ${item.id} (${item.model})`);
+      });
+      if (comparison.counts.deleted > 10) {
+        report.push(`... and ${comparison.counts.deleted - 10} more`);
+      }
+      report.push('');
+    }
+    
+    if (comparison.fieldMismatches.length > 0) {
+      report.push('=== FIELD CHANGE FREQUENCY ===');
+      comparison.fieldMismatches
+        .sort((a, b) => b.count - a.count)
+        .forEach(field => {
+          report.push(`- ${field.field}: ${field.count} changes`);
+        });
+    }
+    
+    return report.join('\n');
   }
-  
-  return report.join('\n');
-}
   
   // Export comparison report as text file
   downloadComparisonReport(comparison) {
