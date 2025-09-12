@@ -36,14 +36,26 @@ const ArchivePreview = () => {
   // Sorting states
   const [sortField, setSortField] = useState('daysSinceUpdate');
   const [sortDirection, setSortDirection] = useState('desc');
+  
+  // Archive operation states (Phase 3)
+  const [archiveInProgress, setArchiveInProgress] = useState(false);
+  const [archiveResult, setArchiveResult] = useState(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // ADD THIS NEW LINE HERE - Test mode state
+  const [testMode, setTestMode] = useState(true);
 {/* Part 2 End - Component Definition and State */}
 
 {/* Part 3 Start - Effects and Data Loading */}
   // Load eligible items on component mount
   useEffect(() => {
     console.log('ArchivePreview component mounted');
+    // CRITICAL: Set initial test mode for safety
+    archiveService.setTestMode(true);
     loadEligibleItems();
   }, []);
+
+  // Rest of your existing Part 3 code remains the same...
 
   // Filter items based on search
   useEffect(() => {
@@ -92,30 +104,11 @@ const ArchivePreview = () => {
 {/* Part 3 End - Effects and Data Loading */}
 
 {/* Part 4 Start - Sorting and Selection Handlers */}
-  // Sort items
+  // Sort items by field
   const sortItems = (items, field, direction) => {
     return [...items].sort((a, b) => {
-      let aValue = a[field];
-      let bValue = b[field];
-      
-      // Handle numeric fields
-      if (field === 'daysSinceUpdate' || field === 'retailPrice' || field === 'estimatedSize') {
-        aValue = parseFloat(aValue) || 0;
-        bValue = parseFloat(bValue) || 0;
-      }
-      
-      // Handle date fields
-      if (field === 'lastUpdated') {
-        aValue = new Date(aValue).getTime();
-        bValue = new Date(bValue).getTime();
-      }
-      
-      // Handle string fields
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
-      }
-      
+      const aValue = a[field];
+      const bValue = b[field];
       if (direction === 'asc') {
         return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
       } else {
@@ -166,6 +159,64 @@ const ArchivePreview = () => {
   const handlePreviewArchive = () => {
     const result = archiveService.previewArchive(selectedItems);
     setPreviewResult(result);
+  };
+
+  // Phase 3: Handle actual archive operation
+  const handleArchiveSelected = async () => {
+    setShowConfirmDialog(true);
+  };
+
+  const confirmArchive = async () => {
+    setShowConfirmDialog(false);
+    setArchiveInProgress(true);
+    setError(null);
+    setArchiveResult(null);
+    
+    try {
+      // CRITICAL SAFETY LOGGING
+      console.log('=====================================');
+      console.log(`🎯 ARCHIVE MODE: ${testMode ? 'TEST' : 'LIVE'}`);
+      console.log(`📂 Will use collection: ${testMode ? 'inventory_test' : 'inventory'}`);
+      console.log(`📦 Will archive to: ${testMode ? 'inventory_archives_test' : 'inventory_archives'}`);
+      console.log('=====================================');
+      console.log('Starting archive operation for', selectedItems.length, 'items');
+      
+      // Call the validateAndExecute method with safety parameters
+      const result = await archiveService.validateAndExecute(
+        selectedItems,
+        'admin',
+        { 
+          skipConfirmation: true,
+          confirmedLiveMode: !testMode // This skips extra warning in test mode
+        }
+      );
+      
+      if (result.success) {
+        console.log('Archive successful:', result);
+        setArchiveResult(result);
+        setSelectedItems([]);
+        setPreviewResult(null);
+        await loadEligibleItems();
+        
+        // Show success message WITH MODE
+        alert(`Success! Archived ${result.details.itemsArchived} items in ${result.details.batchesCreated} batch(es) to ${testMode ? 'TEST' : 'LIVE'} collection.`);
+      } else if (result.cancelled) {
+        console.log('Archive cancelled by user');
+      } else {
+        throw new Error(result.message || 'Archive operation failed');
+      }
+      
+    } catch (error) {
+      console.error('Archive operation failed:', error);
+      setError(`Archive failed: ${error.message}`);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setArchiveInProgress(false);
+    }
+  };
+
+  const cancelArchive = () => {
+    setShowConfirmDialog(false);
   };
 {/* Part 4 End - Sorting and Selection Handlers */}
 
@@ -251,9 +302,33 @@ const ArchivePreview = () => {
               <Archive className="h-6 w-6 mr-2" />
               Archive Preview System
             </div>
-            <span className="text-sm font-normal bg-yellow-500 text-white px-3 py-1 rounded">
-              READ-ONLY MODE
-            </span>
+            <div className="flex items-center gap-3">
+              {/* Test Mode Toggle Button */}
+              <button
+                onClick={() => {
+                  const newTestMode = !testMode;
+                  setTestMode(newTestMode);
+                  archiveService.setTestMode(newTestMode);
+                  loadEligibleItems(); // Reload data with new mode
+                }}
+                className={`px-4 py-1 rounded-lg text-sm font-bold transition-all ${
+                  testMode 
+                    ? 'bg-green-500 hover:bg-green-600 text-white' 
+                    : 'bg-orange-500 hover:bg-orange-600 text-white'
+                }`}
+              >
+                {testMode ? '🧪 TEST MODE' : '🔴 LIVE MODE'}
+              </button>
+              
+              {/* Status Badge */}
+              <span className={`text-sm font-normal px-3 py-1 rounded ${
+                testMode 
+                  ? 'bg-green-500/30 text-white border border-green-400' 
+                  : 'bg-red-500/30 text-white border border-red-400'
+              }`}>
+                {testMode ? 'Using: inventory_test' : 'Using: inventory (LIVE)'}
+              </span>
+            </div>
           </CardTitle>
         </CardHeader>
 {/* Part 7.1 End - Card Header */}
@@ -326,75 +401,192 @@ const ArchivePreview = () => {
 {/* Part 8 End - Archive Summary Section */}
 
 {/* Part 9 Start - Search and Filter Controls */}
-          {/* Search and Filter Section */}
+          {/* Search and Action Buttons */}
           <div className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Search Input */}
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Search by ID, model, manufacturer, or IMEI..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
-                  />
-                </div>
+            {/* Search Input */}
+            <div className="flex items-center space-x-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Search by ID, Model, Manufacturer, or IMEI..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:border-[rgb(52,69,157)]"
+                />
               </div>
-
-              {/* Quick Select Buttons */}
-              <button
-                onClick={handleSelectAll}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-              >
-                {selectedItems.length === filteredEligibleItems.length ? 'Deselect All' : 'Select All'}
-              </button>
-              
-              <button
-                onClick={() => handleSelectByAge(60, 90)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-              >
-                60-90 days
-              </button>
-              
-              <button
-                onClick={() => handleSelectByAge(90, 120)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-              >
-                90-120 days
-              </button>
-              
-              <button
-                onClick={() => handleSelectByAge(120)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-              >
-                120+ days
-              </button>
-
-              {/* Refresh Button */}
-              <button
-                onClick={loadEligibleItems}
-                className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-lg hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </button>
+              <span className="text-sm text-gray-600">
+                {selectedItems.length} of {filteredEligibleItems.length} selected
+              </span>
             </div>
 
-            {/* Preview Archive Button */}
-            {selectedItems.length > 0 && (
-              <div className="flex justify-end">
+            {/* Action Buttons Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {/* Selection Buttons */}
                 <button
-                  onClick={handlePreviewArchive}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+                  onClick={handleSelectAll}
+                  className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-lg hover:bg-[rgb(52,69,157)]/90 text-sm"
                 >
-                  <Archive className="h-4 w-4 mr-2" />
-                  Preview Archive ({selectedItems.length} items)
+                  {selectedItems.length === filteredEligibleItems.length ? 'Deselect All' : 'Select All'}
+                </button>
+                
+                <button
+                  onClick={() => handleSelectByAge(60, 90)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                >
+                  60-90 days
+                </button>
+                
+                <button
+                  onClick={() => handleSelectByAge(90, 120)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                >
+                  90-120 days
+                </button>
+                
+                <button
+                  onClick={() => handleSelectByAge(120)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                >
+                  120+ days
+                </button>
+
+                {/* Refresh Button */}
+                <button
+                  onClick={loadEligibleItems}
+                  disabled={archiveInProgress}
+                  className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded-lg hover:bg-[rgb(52,69,157)]/90 flex items-center justify-center disabled:opacity-50"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
                 </button>
               </div>
-            )}
+
+              {/* Archive Action Buttons */}
+              {selectedItems.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  {/* Preview Button */}
+                  <button
+                    onClick={handlePreviewArchive}
+                    disabled={archiveInProgress}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center disabled:opacity-50"
+                  >
+                    <Archive className="h-4 w-4 mr-2" />
+                    Preview ({selectedItems.length})
+                  </button>
+                  
+                  {/* Archive Button - WITH FULL SAFETY INDICATORS */}
+                  <button
+                    onClick={handleArchiveSelected}
+                    disabled={archiveInProgress}
+                    className={`px-6 py-2 text-white rounded-lg flex items-center disabled:opacity-50 ${
+                      testMode 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : 'bg-red-600 hover:bg-red-700 animate-pulse'
+                    }`}
+                    title={testMode 
+                      ? 'Archive to TEST collection (inventory_archives_test)' 
+                      : '⚠️ Archive to LIVE collection (inventory_archives)'
+                    }
+                  >
+                    {archiveInProgress ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></div>
+                        Archiving...
+                      </>
+                    ) : (
+                      <>
+                        <Package className="h-4 w-4 mr-2" />
+                        {testMode ? (
+                          <>Archive Selected (TEST) ({selectedItems.length})</>
+                        ) : (
+                          <>⚠️ Archive Selected (LIVE!) ({selectedItems.length})</>
+                        )}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
+          
+          {/* Confirmation Dialog - WITH FULL MODE INDICATORS */}
+          {showConfirmDialog && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <AlertCircle className={`h-5 w-5 mr-2 ${testMode ? 'text-green-600' : 'text-red-600'}`} />
+                  Confirm Archive Operation ({testMode ? 'TEST MODE' : '⚠️ LIVE MODE'})
+                </h3>
+                
+                {/* Mode Indicator */}
+                <div className={`mb-4 p-3 rounded-lg ${
+                  testMode 
+                    ? 'bg-green-50 border border-green-200' 
+                    : 'bg-red-50 border border-red-200'
+                }`}>
+                  <p className={`font-bold ${testMode ? 'text-green-800' : 'text-red-800'}`}>
+                    {testMode ? '✅ TEST MODE - Safe to proceed' : '⚠️ LIVE MODE - This will affect PRODUCTION data!'}
+                  </p>
+                  <p className={`text-sm mt-1 ${testMode ? 'text-green-700' : 'text-red-700'}`}>
+                    Reading from: <code className="font-mono bg-white px-1 rounded">
+                      {testMode ? 'inventory_test' : 'inventory (LIVE)'}
+                    </code>
+                    <br/>
+                    Writing to: <code className="font-mono bg-white px-1 rounded">
+                      {testMode ? 'inventory_archives_test' : 'inventory_archives (LIVE)'}
+                    </code>
+                  </p>
+                </div>
+                
+                <div className="mb-4 space-y-2">
+                  <p className="text-gray-700">
+                    You are about to archive <strong>{selectedItems.length} items</strong>.
+                  </p>
+                  
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm">
+                    <p className="font-semibold text-yellow-800 mb-1">This will:</p>
+                    <ul className="list-disc list-inside text-yellow-700 space-y-1">
+                      <li>Move items to {testMode ? 'TEST' : 'LIVE'} archive collection</li>
+                      <li>Remove them from {testMode ? 'TEST' : 'LIVE'} inventory</li>
+                      <li>Create archive batch document(s)</li>
+                    </ul>
+                  </div>
+                  
+                  {!testMode && (
+                    <div className="bg-red-100 border-2 border-red-500 rounded p-3">
+                      <p className="text-red-600 font-bold text-lg animate-pulse">
+                        ⚠️ THIS IS LIVE MODE - PERMANENT CHANGES!
+                      </p>
+                      <p className="text-red-600 text-sm mt-1">
+                        This will modify your PRODUCTION database!
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={cancelArchive}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmArchive}
+                    className={`px-4 py-2 text-white rounded-lg ${
+                      testMode 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : 'bg-red-600 hover:bg-red-700 animate-pulse'
+                    }`}
+                  >
+                    {testMode ? 'Yes, Archive (TEST)' : '⚠️ Yes, Archive (LIVE!)'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 {/* Part 9 End - Search and Filter Controls */}
 
 {/* Part 10 Start - Tab Navigation */}
@@ -710,13 +902,33 @@ const ArchivePreview = () => {
                       </div>
                     </div>
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                      <Archive className="h-12 w-12 text-blue-600 mx-auto mb-3" />
-                      <p className="text-blue-800 font-medium">
-                        This is a preview only. When the actual archive feature is implemented,
-                        these items would be moved to the archive collection.
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                      <Archive className="h-12 w-12 text-green-600 mx-auto mb-3" />
+                      <p className="text-green-800 font-medium mb-3">
+                        ✅ Archive functionality is now active!
+                      </p>
+                      <p className="text-green-700 text-sm">
+                        Use the "Archive Selected" button above to permanently move these items to the archive collection.
+                      </p>
+                      <p className="text-orange-600 text-sm mt-2 font-semibold">
+                        ⚠️ Remember: Always ensure you have a backup before archiving!
                       </p>
                     </div>
+
+                    {/* Show Archive Result if Available */}
+                    {archiveResult && archiveResult.success && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="h-5 w-5 text-blue-600 mr-2" />
+                          <h4 className="text-lg font-semibold text-blue-800">Last Archive Operation</h4>
+                        </div>
+                        <div className="text-sm text-blue-700 space-y-1">
+                          <p>✓ Archived {archiveResult.details.itemsArchived} items</p>
+                          <p>✓ Created {archiveResult.details.batchesCreated} batch(es)</p>
+                          <p>✓ Operation took {archiveResult.details.duration}ms</p>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">

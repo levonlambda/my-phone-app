@@ -61,8 +61,17 @@ const InventoryRow = ({
   
   {/* Part 4 Start - Component Render */}
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.manufacturer}</td>
+    <tr className={`hover:bg-gray-50 ${item.isArchived ? 'bg-amber-50/30' : ''}`}>
+      <td className="border px-2 py-3 whitespace-nowrap text-sm">
+        <div className="flex items-center gap-2">
+          {item.manufacturer}
+          {item.isArchived && (
+            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded" title={`Archived in batch: ${item.archiveBatch}`}>
+              📦 Archived
+            </span>
+          )}
+        </div>
+      </td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.model}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.ram}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.storage}</td>
@@ -86,7 +95,7 @@ const InventoryRow = ({
       </td>
       <td className="border px-2 py-3 text-center whitespace-nowrap">
         <span className={`px-2 py-1 text-sm rounded-full ${
-          item.status === 'On-Hand' ? 'bg-blue-100 text-blue-800' :
+          item.status === 'On-Hand' || item.status === 'Stock' ? 'bg-blue-100 text-blue-800' :
           item.status === 'On-Display' ? 'bg-yellow-100 text-yellow-800' :
           item.status === 'Sold' ? 'bg-purple-100 text-purple-800' :
           item.status === 'Reserved' ? 'bg-orange-100 text-orange-800' :
@@ -97,27 +106,33 @@ const InventoryRow = ({
       </td>
       <td className="border px-2 py-3 text-center whitespace-nowrap">
         <div className="flex justify-center space-x-2">
-          <button
-            onClick={() => handleEditClick(item)}
-            className="p-1 text-blue-600 hover:text-blue-800"
-            title="Quick edit"
-          >
-            <Edit className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => handleEditDetailsClick(item)}
-            className="p-1 text-green-600 hover:text-green-800"
-            title="Edit full details"
-          >
-            <FileEdit className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => handleDeleteClick(item.id)}
-            className="p-1 text-red-600 hover:text-red-800"
-            title="Delete item"
-          >
-            <Trash2 className="h-5 w-5" />
-          </button>
+          {!item.isArchived ? (
+            <>
+              <button
+                onClick={() => handleEditClick(item)}
+                className="p-1 text-blue-600 hover:text-blue-800"
+                title="Quick edit"
+              >
+                <Edit className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => handleEditDetailsClick(item)}
+                className="p-1 text-green-600 hover:text-green-800"
+                title="Edit full details"
+              >
+                <FileEdit className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => handleDeleteClick(item.id)}
+                className="p-1 text-red-600 hover:text-red-800"
+                title="Delete item"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-amber-600 italic">Archived - Read Only</span>
+          )}
         </div>
       </td>
     </tr>
