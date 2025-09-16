@@ -1,5 +1,7 @@
 // archiveService.js - Archive Service with Write Functionality (Phase 3)
 // This service now includes both read-only preview AND actual archive capabilities
+
+// ==================== Part 1 Start - Imports ====================
 import { db } from '../firebase/config';
 import { 
   collection, 
@@ -9,16 +11,23 @@ import {
   Timestamp, 
   doc,
   writeBatch,
-  runTransaction
+  runTransaction,
+  getDoc,
+  updateDoc,
+  deleteDoc
 } from 'firebase/firestore';
+// ==================== Part 1 End - Imports ====================
 
+// ==================== Part 2 Start - Class Definition and Constructor ====================
 class ArchiveService {
   constructor() {
     // Phase 3: Changed to allow actual archive operations
     this.isDryRunMode = false; // Now allows actual write operations
     this.archiveInProgress = false;
   }
+// ==================== Part 2 End - Class Definition and Constructor ====================
 
+// ==================== Part 3 Start - Utility Methods ====================
   // Calculate how many days since a date
   getDaysSince(dateValue) {
     if (!dateValue) return 0;
@@ -57,7 +66,9 @@ class ArchiveService {
       archives: 'inventory_archives'
     };
   }
+// ==================== Part 3 End - Utility Methods ====================
 
+// ==================== Part 4 Start - Read-Only Methods ====================
   // Get all items eligible for archiving (READ ONLY)
   async getEligibleItems() {
     try {
@@ -300,7 +311,9 @@ class ArchiveService {
       }
     };
   }
+// ==================== Part 4 End - Read-Only Methods ====================
 
+// ==================== Part 5 Start - Phase 3 Write Functionality ====================
   // ==================== PHASE 3: WRITE FUNCTIONALITY ====================
 
   // Generate batch document ID with timestamp
@@ -452,7 +465,7 @@ class ArchiveService {
       testMode: options.testMode || false,
       batchPrefix: options.batchPrefix || new Date().getFullYear() + '_' + String(new Date().getMonth() + 1).padStart(2, '0'),
       maxBatchSize: options.maxBatchSize || 700 * 1024,
-      verbose: options.verbose !== false, // Default to true
+      verbose: options.verbose !== false, // Default to true      
       ...options
     };
     
@@ -691,8 +704,378 @@ class ArchiveService {
       };
     }
   }
+// ==================== Part 5 End - Phase 3 Write Functionality ====================
+
+// ==================== Part 6 Start - Phase 4 Restore Functionality ====================
+  // ==================== PHASE 4: RESTORE FUNCTIONALITY ====================
+  
+  // Find an item in the archives by ID
+  async findItemInArchives(itemId) {
+    if (!itemId) {
+      throw new Error('Item ID is required');
+    }
+    
+    try {
+      const collections = this.getCollectionNames();
+      console.log(`🔍 Searching for item ${itemId} in ${collections.archives}...`);
+      
+      // Query all archive batches
+      const archivesRef = collection(db, collections.archives);
+      const querySnapshot = await getDocs(archivesRef);
+      
+      console.log(`Found ${querySnapshot.size} archive batches to search`);
+      
+      // Search through each batch for the item
+      for (const docSnapshot of querySnapshot.docs) {
+        const batchData = docSnapshot.data();
+        const batchId = docSnapshot.id;
+        
+        // Check if this batch contains the item
+        if (batchData.metadata?.documentIds?.includes(itemId)) {
+          console.log(`✅ Found item ${itemId} in batch ${batchId}`);
+          
+          // Find the actual item data
+          const item = batchData.items?.find(item => item.id === itemId);
+          
+          if (item) {
+            return {
+              found: true,
+              item: item,
+              batchId: batchId,
+              batchMetadata: batchData.metadata
+            };
+          }
+        }
+      }
+      
+      console.log(`❌ Item ${itemId} not found in archives`);
+      return {
+        found: false,
+        item: null,
+        batchId: null,
+        batchMetadata: null
+      };
+      
+    } catch (error) {
+      console.error('Error searching archives:', error);
+      throw error;
+    }
+  }
+  
+  // Restore a single item from archives to inventory
+  async restoreToInventory(item, options = {}) {
+    if (!item || !item.id) {
+      throw new Error('Valid item with ID is required for restore');
+    }
+    
+    const collections = this.getCollectionNames();
+    
+    // Safety check for live mode
+    if (!this.useTestCollections && !options.confirmedLiveMode) {
+      const confirmLive = window.confirm(
+        '⚠️ WARNING: You are in LIVE MODE!\n\n' +
+        `This will restore item to the LIVE inventory collection.\n` +
+        `From: ${collections.archives} (PRODUCTION)\n` +
+        `To: ${collections.inventory} (PRODUCTION)\n\n` +
+        'Are you ABSOLUTELY SURE you want to restore to LIVE inventory?'
+      );
+      
+      if (!confirmLive) {
+        console.log('✅ Restore cancelled - Live mode operation aborted for safety');
+        return {
+          success: false,
+          message: 'Restore cancelled - Live mode operation aborted',
+          cancelled: true
+        };
+      }
+    }
+    
+    try {
+      console.log(`🔄 Restoring item ${item.id} to ${collections.inventory}...`);
+      
+      // First, find the item in archives OUTSIDE the transaction
+      const searchResult = await this.findItemInArchives(item.id);
+      
+      if (!searchResult.found) {
+        throw new Error(`Item ${item.id} not found in archives`);
+      }
+      
+      // Now use transaction for the actual restore operation
+      const result = await runTransaction(db, async (transaction) => {
+        // Get the archive batch document
+        const archiveRef = doc(db, collections.archives, searchResult.batchId);
+        const batchDoc = await transaction.get(archiveRef);
+        
+        if (!batchDoc.exists()) {
+          throw new Error(`Archive batch ${searchResult.batchId} not found`);
+        }
+        
+        const batchData = batchDoc.data();
+        
+        // Filter out the restored item
+        const remainingItems = batchData.items.filter(i => i.id !== item.id);
+        const remainingIds = batchData.metadata.documentIds.filter(id => id !== item.id);
+        
+        // Prepare item data for restoration
+        const restoredItem = {
+          ...searchResult.item,
+          restoredAt: Timestamp.now(),
+          restoredFrom: searchResult.batchId
+        };
+        
+        // Remove fields that shouldn't be in inventory
+        delete restoredItem.daysSinceUpdate;
+        delete restoredItem.estimatedSize;
+        
+        // Add item back to inventory
+        const inventoryRef = doc(db, collections.inventory, item.id);
+        console.log(`  - Restoring to ${collections.inventory}:`, item.id);
+        transaction.set(inventoryRef, restoredItem);
+        
+        if (remainingItems.length === 0) {
+          // If batch is now empty, delete it
+          console.log(`  - Deleting empty batch ${searchResult.batchId}`);
+          transaction.delete(archiveRef);
+        } else {
+          // Update batch with remaining items
+          console.log(`  - Updating batch ${searchResult.batchId} (${remainingItems.length} items remaining)`);
+          
+          const updatedMetadata = {
+            ...batchData.metadata,
+            itemCount: remainingItems.length,
+            documentIds: remainingIds,
+            totalValue: remainingItems.reduce((sum, item) => sum + (item.retailPrice || 0), 0),
+            totalCost: remainingItems.reduce((sum, item) => sum + (item.dealersPrice || 0), 0),
+            lastModified: Timestamp.now(),
+            lastModifiedReason: `Item ${item.id} restored`
+          };
+          
+          transaction.update(archiveRef, {
+            metadata: updatedMetadata,
+            items: remainingItems
+          });
+        }
+        
+        return {
+          restoredItem: restoredItem,
+          batchId: searchResult.batchId,
+          batchEmptied: remainingItems.length === 0
+        };
+      });
+      
+      console.log(`✅ Successfully restored item ${item.id} to inventory`);
+      
+      return {
+        success: true,
+        message: `Successfully restored item ${item.id}`,
+        details: {
+          itemId: item.id,
+          restoredFrom: result.batchId,
+          batchEmptied: result.batchEmptied,
+          collections: collections
+        }
+      };
+      
+    } catch (error) {
+      console.error('❌ Restore operation failed:', error);
+      return {
+        success: false,
+        message: error.message,
+        error: error
+      };
+    }
+  }
+  
+  // Remove an item from an archive batch (without restoring to inventory)
+  async removeFromArchiveBatch(batchId, itemId) {
+    if (!batchId || !itemId) {
+      throw new Error('Both batchId and itemId are required');
+    }
+    
+    try {
+      const collections = this.getCollectionNames();
+      console.log(`🗑️ Removing item ${itemId} from batch ${batchId}...`);
+      
+      const batchRef = doc(db, collections.archives, batchId);
+      const batchDoc = await getDoc(batchRef);
+      
+      if (!batchDoc.exists()) {
+        throw new Error(`Batch ${batchId} not found`);
+      }
+      
+      const batchData = batchDoc.data();
+      
+      // Filter out the item
+      const remainingItems = batchData.items.filter(item => item.id !== itemId);
+      
+      if (remainingItems.length === batchData.items.length) {
+        throw new Error(`Item ${itemId} not found in batch ${batchId}`);
+      }
+      
+      if (remainingItems.length === 0) {
+        // Delete empty batch
+        await deleteDoc(batchRef);
+        console.log(`✅ Deleted empty batch ${batchId}`);
+        
+        return {
+          success: true,
+          batchDeleted: true,
+          remainingItems: 0
+        };
+      } else {
+        // Update batch
+        const updatedMetadata = this.recalculateBatchMetadata(remainingItems, batchData.metadata);
+        
+        await updateDoc(batchRef, {
+          items: remainingItems,
+          metadata: {
+            ...updatedMetadata,
+            lastModified: Timestamp.now(),
+            lastModifiedReason: `Item ${itemId} removed`
+          }
+        });
+        
+        console.log(`✅ Updated batch ${batchId} (${remainingItems.length} items remaining)`);
+        
+        return {
+          success: true,
+          batchDeleted: false,
+          remainingItems: remainingItems.length
+        };
+      }
+      
+    } catch (error) {
+      console.error('Error removing from batch:', error);
+      throw error;
+    }
+  }
+  
+  // Update batch metadata after modifications
+  async updateBatchMetadata(batchId) {
+    if (!batchId) {
+      throw new Error('Batch ID is required');
+    }
+    
+    try {
+      const collections = this.getCollectionNames();
+      console.log(`📊 Updating metadata for batch ${batchId}...`);
+      
+      const batchRef = doc(db, collections.archives, batchId);
+      const batchDoc = await getDoc(batchRef);
+      
+      if (!batchDoc.exists()) {
+        throw new Error(`Batch ${batchId} not found`);
+      }
+      
+      const batchData = batchDoc.data();
+      const updatedMetadata = this.recalculateBatchMetadata(batchData.items, batchData.metadata);
+      
+      await updateDoc(batchRef, {
+        metadata: {
+          ...updatedMetadata,
+          lastModified: Timestamp.now()
+        }
+      });
+      
+      console.log(`✅ Successfully updated metadata for batch ${batchId}`);
+      
+      return {
+        success: true,
+        metadata: updatedMetadata
+      };
+      
+    } catch (error) {
+      console.error('Error updating batch metadata:', error);
+      throw error;
+    }
+  }
+  
+  // Helper method to recalculate batch metadata
+  recalculateBatchMetadata(items, existingMetadata) {
+    return {
+      ...existingMetadata,
+      itemCount: items.length,
+      totalValue: items.reduce((sum, item) => sum + (item.retailPrice || 0), 0),
+      totalCost: items.reduce((sum, item) => sum + (item.dealersPrice || 0), 0),
+      documentIds: items.map(item => item.id)
+    };
+  }
+  
+  // Search for an item by model or other criteria in archives  
+  // Search for an item by model or other criteria in archives
+  async searchInArchives(searchCriteria, options = {}) {
+    try {
+      const collections = this.getCollectionNames();
+      console.log(`🔍 Searching archives with criteria:`, searchCriteria);
+      
+      const archivesRef = collection(db, collections.archives);
+      const querySnapshot = await getDocs(archivesRef);
+      
+      const results = [];
+      
+      // Search through all batches
+      for (const docSnapshot of querySnapshot.docs) {
+        const batchData = docSnapshot.data();
+        const batchId = docSnapshot.id;
+        
+        // If getting all items (no search criteria), add all items from this batch
+        if (options.getAllItems || Object.keys(searchCriteria).length === 0) {
+          if (batchData.items && batchData.items.length > 0) {
+            results.push({
+              batchId: batchId,
+              batchMetadata: batchData.metadata,
+              items: batchData.items
+            });
+          }
+        } else {
+          // Search items in this batch with criteria
+          const matchingItems = batchData.items.filter(item => {
+            // Search by multiple fields - FIX: check for imei1 field specifically
+            if (searchCriteria.id && item.id === searchCriteria.id) return true;
+            if (searchCriteria.imei1 && item.imei1 === searchCriteria.imei1) return true;
+            if (searchCriteria.imei && (item.imei1 === searchCriteria.imei || item.imei2 === searchCriteria.imei)) return true;
+            if (searchCriteria.model && item.model?.toLowerCase().includes(searchCriteria.model.toLowerCase())) return true;
+            if (searchCriteria.brand && item.brand?.toLowerCase().includes(searchCriteria.brand.toLowerCase())) return true;
+            if (searchCriteria.manufacturer && item.manufacturer?.toLowerCase().includes(searchCriteria.manufacturer.toLowerCase())) return true;
+            
+            return false;
+          });
+          
+          if (matchingItems.length > 0) {
+            results.push({
+              batchId: batchId,
+              batchMetadata: batchData.metadata,
+              items: matchingItems
+            });
+          }
+        }
+      }
+      
+      console.log(`Found ${results.reduce((sum, r) => sum + r.items.length, 0)} matching items in ${results.length} batches`);
+      
+      return {
+        success: true,
+        results: results,
+        totalItems: results.reduce((sum, r) => sum + r.items.length, 0)
+      };
+      
+    } catch (error) {
+      console.error('Error searching archives:', error);
+      return {
+        success: false,
+        message: error.message,
+        error: error,
+        results: [],
+        totalItems: 0
+      };
+    }
+  }
+// ==================== Part 6 End - Phase 4 Restore Functionality ====================
+
+// ==================== Part 7 Start - Class Closing and Export ====================
 }
 
 // Export singleton instance
 const archiveService = new ArchiveService();
 export default archiveService;
+// ==================== Part 7 End - Class Closing and Export ====================

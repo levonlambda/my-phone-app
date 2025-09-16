@@ -3,11 +3,21 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Smartphone, RefreshCw, Filter, X, Search, FileText } from 'lucide-react';
+import { Smartphone, RefreshCw, Filter, X, Search, FileText, FlaskConical } from 'lucide-react';
 import InventoryTable from './inventory/InventoryTable';
 import InventoryFilters from './inventory/InventoryFilters';
+import { useAuth } from '../context/AuthContext'; // Added for admin check
 
 const InventoryListForm = () => {
+  // Get user role for test mode access
+  const { userRole } = useAuth();
+  const isAdmin = userRole === 'admin';
+  
+  // TEST MODE STATE - NEW
+  const [testMode, setTestMode] = useState(false);
+  const [includeArchives, setIncludeArchives] = useState(true); // Include archives by default when in test mode
+  const [archiveStats, setArchiveStats] = useState(null); // Store archive statistics
+  
   // State for inventory data
   const [inventoryItems, setInventoryItems] = useState([]);
   const [allItems, setAllItems] = useState([]); // Store all unfiltered items
@@ -451,13 +461,64 @@ const InventoryListForm = () => {
 {/* Part 3 End - Filter Logic and Handlers */}
 
 {/* Part 4 Start - Data Fetching Functions */}
-  // Fetch inventory data - modified to handle search constraints
+  // Fetch archived items from test collection - NEW
+  const fetchArchivedItems = useCallback(async () => {
+    if (!testMode || !includeArchives) return [];
+    
+    try {
+      console.log('📦 Fetching archived items from inventory_archives_test...');
+      const archivesRef = collection(db, 'inventory_archives_test');
+      const snapshot = await getDocs(archivesRef);
+      
+      const archivedItems = [];
+      let totalArchivedCount = 0;
+      let batchCount = 0;
+      
+      snapshot.forEach(doc => {
+        const batchData = doc.data();
+        batchCount++;
+        
+        if (batchData.items && Array.isArray(batchData.items)) {
+          console.log(`Processing batch ${doc.id} with ${batchData.items.length} items`);
+          totalArchivedCount += batchData.items.length;
+          
+          // Extract individual items from the batch
+          batchData.items.forEach(item => {
+            archivedItems.push({
+              ...item,
+              id: item.id || `${doc.id}_${Math.random()}`, // Ensure each item has an ID
+              isArchived: true, // Flag to identify archived items
+              archiveBatch: doc.id,
+              archiveDate: batchData.metadata?.archivedAt
+            });
+          });
+        }
+      });
+      
+      console.log(`✅ Fetched ${totalArchivedCount} archived items from ${batchCount} batches`);
+      setArchiveStats({
+        totalItems: totalArchivedCount,
+        batchCount: batchCount
+      });
+      
+      return archivedItems;
+    } catch (error) {
+      console.error('Error fetching archived items:', error);
+      return [];
+    }
+  }, [testMode, includeArchives]);
+
+  // Fetch inventory data - modified to handle test collections
   const fetchInventoryData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const inventoryRef = collection(db, 'inventory');
+      // Determine which collection to use based on test mode
+      const collectionName = testMode ? 'inventory_test' : 'inventory';
+      console.log(`🔍 Fetching from ${collectionName} collection...`);
+      
+      const inventoryRef = collection(db, collectionName);
       
       // Build query constraints
       let queryConstraints = [orderBy(sortField, sortDirection)];
@@ -498,27 +559,47 @@ const InventoryListForm = () => {
           supplier: data.supplier || '', // FIXED: Added supplier field
           status: data.status || 'On-Hand',
           dateAdded: data.dateAdded || '',
-          lastUpdated: data.lastUpdated || ''
+          lastUpdated: data.lastUpdated || '',
+          isArchived: false // Flag for active inventory items
         });
       });
       
+      console.log(`✅ Fetched ${items.length} items from ${collectionName}`);
+      
+      // Fetch archived items if in test mode and archives are included
+      let archivedItems = [];
+      if (testMode && includeArchives) {
+        archivedItems = await fetchArchivedItems();
+      }
+      
+      // Combine active and archived items
+      const allFetchedItems = [...items, ...archivedItems];
+      
       // Store all items
-      setAllItems(items);
+      setAllItems(allFetchedItems);
       
       // Load filter options from the fetched data
-      loadFilterOptions(items);
+      loadFilterOptions(allFetchedItems);
       
       // Apply all filters client-side
-      const filteredItems = applyFilters(items);
+      const filteredItems = applyFilters(allFetchedItems);
       setInventoryItems(filteredItems);
       setInitialLoad(false);
       setLoading(false);
+      
+      // Log summary for test mode
+      if (testMode) {
+        console.log('📊 Test Mode Summary:');
+        console.log(`   Active items: ${items.length}`);
+        console.log(`   Archived items: ${archivedItems.length}`);
+        console.log(`   Total items: ${allFetchedItems.length}`);
+      }
     } catch (error) {
       console.error("Error fetching inventory data:", error);
       setError(`Error fetching inventory: ${error.message}`);
       setLoading(false);
     }
-  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters]);
+  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters, testMode, fetchArchivedItems]);
 {/* Part 4 End - Data Fetching Functions */}
 
 {/* Part 5 Start - Event Handlers */}
@@ -938,6 +1019,24 @@ const InventoryListForm = () => {
             )}
           </div>
           <div className="flex gap-2">
+            {/* TEST MODE TOGGLE - NEW */}
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  setTestMode(!testMode);
+                  setIncludeArchives(true); // Reset to include archives when toggling
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
+                  testMode 
+                    ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+                title={testMode ? 'Switch to Production Mode' : 'Switch to Test Mode'}
+              >
+                <FlaskConical className="h-5 w-5" />
+                <span>{testMode ? 'TEST MODE' : 'Test Mode'}</span>
+              </button>
+            )}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1 ${showFilters ? 
@@ -976,6 +1075,39 @@ const InventoryListForm = () => {
         </CardHeader>
 
         <CardContent className="p-4">
+          {/* Test Mode Info Banner - NEW */}
+          {testMode && (
+            <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <FlaskConical className="h-6 w-6 text-orange-600 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-orange-900 mb-2">Test Mode Active</h3>
+                  <p className="text-sm text-orange-800 mb-3">
+                    Currently viewing data from: <strong>inventory_test</strong> 
+                    {includeArchives && ' and '} 
+                    {includeArchives && <strong>inventory_archives_test</strong>}
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeArchives}
+                        onChange={(e) => setIncludeArchives(e.target.checked)}
+                        className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-orange-800">Include archived items</span>
+                    </label>
+                    {archiveStats && includeArchives && (
+                      <div className="text-sm text-orange-700 bg-orange-100 px-3 py-1 rounded">
+                        📦 {archiveStats.totalItems} archived items from {archiveStats.batchCount} batch(es)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Filters panel */}
           {showFilters && (
             <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
@@ -999,11 +1131,14 @@ const InventoryListForm = () => {
               />
             </div>
           )}
-          {/* Inventory Summary Section */}
+          
+          {/* Inventory Summary Section - Modified for Test Mode */}
           {!initialLoad && inventoryItems.length > 0 && (
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Inventory Summary</h3>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Inventory Summary {testMode && <span className="text-orange-600 text-sm ml-2">(Test Mode)</span>}
+                </h3>
               </div>
               
               <div className="flex flex-col md:flex-row gap-4">
@@ -1019,7 +1154,11 @@ const InventoryListForm = () => {
                         {inventoryItems.length.toLocaleString()}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {inventoryItems.length === 1 ? 'item' : 'items'}
+                        {testMode && archiveStats && includeArchives ? (
+                          <span>{inventoryItems.filter(i => !i.isArchived).length} active, {inventoryItems.filter(i => i.isArchived).length} archived</span>
+                        ) : (
+                          <span>{inventoryItems.length === 1 ? 'item' : 'items'}</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1098,6 +1237,7 @@ const InventoryListForm = () => {
               </div>
             </div>
           )}
+          
           <div className="overflow-x-auto">
             {initialLoad ? (
               <div className="text-center py-12">
@@ -1136,12 +1276,14 @@ const InventoryListForm = () => {
               />
             )}
           </div>
-          <div className="overflow-x-auto"></div>
+          
           {/* Show loading state */}
           {loading && (
             <div className="text-center py-4">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto text-[rgb(52,69,157)]" />
-              <p className="text-gray-600 mt-2">Loading inventory items...</p>
+              <p className="text-gray-600 mt-2">
+                Loading inventory items{testMode ? ' from test collections' : ''}...
+              </p>
             </div>
           )}
           

@@ -12,7 +12,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  DollarSign
+  DollarSign,
+  RotateCcw  // Added for restore functionality
 } from 'lucide-react';
 import archiveService from '../services/archiveService';
 {/* Part 1 End - Imports and Dependencies */}
@@ -42,8 +43,20 @@ const ArchivePreview = () => {
   const [archiveResult, setArchiveResult] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  // ADD THIS NEW LINE HERE - Test mode state
+  // Test mode state
   const [testMode, setTestMode] = useState(true);
+  
+  // Phase 4: Restore operation states
+  const [showRestoreSearch, setShowRestoreSearch] = useState(false);
+  const [restoreSearchTerm, setRestoreSearchTerm] = useState('');
+  const [restoreSearchResults, setRestoreSearchResults] = useState(null);
+  const [restoreInProgress, setRestoreInProgress] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [itemToRestore, setItemToRestore] = useState(null);
+  
+  // Phase 4: Archive table sorting states
+  const [archiveSortField, setArchiveSortField] = useState('id');
+  const [archiveSortDirection, setArchiveSortDirection] = useState('asc');
 {/* Part 2 End - Component Definition and State */}
 
 {/* Part 3 Start - Effects and Data Loading */}
@@ -219,6 +232,191 @@ const ArchivePreview = () => {
     setShowConfirmDialog(false);
   };
 {/* Part 4 End - Sorting and Selection Handlers */}
+
+{/* Part 4.5 Start - Phase 4 Restore Handlers */}
+  // Load all archived items
+  const loadAllArchivedItems = async () => {
+    setRestoreInProgress(true);
+    setRestoreSearchResults(null);
+    
+    try {
+      console.log('Loading all archived items...');
+      
+      // Search with empty criteria to get all items
+      const result = await archiveService.searchInArchives({}, { getAllItems: true });
+      
+      if (result.success) {
+        console.log(`Found ${result.totalItems} total items in archives`);
+        setRestoreSearchResults(result);
+        
+        if (result.totalItems === 0) {
+          console.log('No items in archives yet');
+        }
+      } else {
+        throw new Error(result.message || 'Failed to load archived items');
+      }
+      
+    } catch (error) {
+      console.error('Failed to load archived items:', error);
+      alert(`Failed to load archives: ${error.message}`);
+    } finally {
+      setRestoreInProgress(false);
+    }
+  };
+
+  // Search for specific items in archives
+  const handleSearchArchives = async () => {
+    if (!restoreSearchTerm.trim()) {
+      // If search is empty, load all items
+      await loadAllArchivedItems();
+      return;
+    }
+    
+    setRestoreInProgress(true);
+    setRestoreSearchResults(null);
+    
+    try {
+      console.log('Searching archives for:', restoreSearchTerm);
+      
+      // Build search criteria - FIX the IMEI field name
+      const searchCriteria = {};
+      
+      // Determine what type of search this is
+      if (restoreSearchTerm.includes('FPH') || restoreSearchTerm.length > 20) {
+        // Likely an ID search
+        searchCriteria.id = restoreSearchTerm;
+      } else if (restoreSearchTerm.length === 15 && /^\d+$/.test(restoreSearchTerm)) {
+        // Likely an IMEI search - use imei1 field name to match the actual field
+        searchCriteria.imei1 = restoreSearchTerm;
+      } else {
+        // Generic model/brand search
+        searchCriteria.model = restoreSearchTerm;
+      }
+      
+      const result = await archiveService.searchInArchives(searchCriteria);
+      
+      if (result.success) {
+        console.log(`Found ${result.totalItems} items in archives`);
+        setRestoreSearchResults(result);
+        
+        if (result.totalItems === 0) {
+          alert('No items found in archives matching your search');
+        }
+      } else {
+        throw new Error(result.message || 'Search failed');
+      }
+      
+    } catch (error) {
+      console.error('Archive search failed:', error);
+      alert(`Search failed: ${error.message}`);
+    } finally {
+      setRestoreInProgress(false);
+    }
+  };
+  
+  // Toggle restore search and load all items when opened
+  const toggleRestoreSearch = async () => {
+    const newState = !showRestoreSearch;
+    setShowRestoreSearch(newState);
+    
+    // When opening, automatically load all archived items
+    if (newState) {
+      await loadAllArchivedItems();
+    } else {
+      // When closing, clear the results
+      clearRestoreSearch();
+    }
+  };
+  
+  // Initiate restore for a specific item
+  const handleRestoreItem = (item, batchId) => {
+    setItemToRestore({ item, batchId });
+    setShowRestoreConfirm(true);
+  };
+  
+  // Confirm and execute restore
+  const confirmRestore = async () => {
+    if (!itemToRestore) return;
+    
+    setShowRestoreConfirm(false);
+    setRestoreInProgress(true);
+    
+    try {
+      console.log('=====================================');
+      console.log(`🔄 RESTORE MODE: ${testMode ? 'TEST' : 'LIVE'}`);
+      console.log(`📂 Will restore to: ${testMode ? 'inventory_test' : 'inventory (LIVE)'}`);
+      console.log(`📦 Will remove from: ${testMode ? 'inventory_archives_test' : 'inventory_archives'}`);
+      console.log('=====================================');
+      console.log('Restoring item:', itemToRestore.item.id);
+      
+      const result = await archiveService.restoreToInventory(
+        itemToRestore.item,
+        {
+          confirmedLiveMode: !testMode
+        }
+      );
+      
+      if (result.success) {
+        console.log('Restore successful:', result);
+        
+        // Remove restored item from search results
+        if (restoreSearchResults) {
+          const updatedResults = {
+            ...restoreSearchResults,
+            results: restoreSearchResults.results.map(batch => ({
+              ...batch,
+              items: batch.items.filter(item => item.id !== itemToRestore.item.id)
+            })).filter(batch => batch.items.length > 0),
+            totalItems: restoreSearchResults.totalItems - 1
+          };
+          setRestoreSearchResults(updatedResults);
+        }
+        
+        // Refresh eligible items
+        await loadEligibleItems();
+        
+        alert(`Success! Restored item ${itemToRestore.item.id} to ${testMode ? 'TEST' : 'LIVE'} inventory.`);
+      } else if (result.cancelled) {
+        console.log('Restore cancelled by user');
+      } else {
+        throw new Error(result.message || 'Restore operation failed');
+      }
+      
+    } catch (error) {
+      console.error('Restore operation failed:', error);
+      alert(`Restore failed: ${error.message}`);
+    } finally {
+      setRestoreInProgress(false);
+      setItemToRestore(null);
+    }
+  };
+  
+  // Cancel restore operation
+  const cancelRestore = () => {
+    setShowRestoreConfirm(false);
+    setItemToRestore(null);
+  };
+  
+  // Clear restore search
+  const clearRestoreSearch = () => {
+    setRestoreSearchTerm('');
+    setRestoreSearchResults(null);
+    // Don't hide the interface, just clear the search
+  };
+  
+  // Sort archived items
+  const sortArchivedItems = (items, field, direction) => {
+    return [...items].sort((a, b) => {
+      const aValue = a[field];
+      const bValue = b[field];
+      if (direction === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+  };
+{/* Part 4.5 End - Phase 4 Restore Handlers */}
 
 {/* Part 5 Start - Utility Functions */}
   const formatCurrency = (amount) => {
@@ -508,10 +706,310 @@ const ArchivePreview = () => {
                   </button>
                 </div>
               )}
+
+              {/* Phase 4: Restore Search Button */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={toggleRestoreSearch}
+                  disabled={archiveInProgress || restoreInProgress}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center disabled:opacity-50"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  {showRestoreSearch ? 'Hide Archive Table' : 'Show Archive Table'}
+                </button>
+              </div>
             </div>
+
+            {/* Restore Search Interface */}
+            {/* Restore Search Interface with Table View */}
+            {showRestoreSearch && (
+              <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <h3 className="text-lg font-semibold text-purple-800 mb-3 flex items-center">
+                  <RotateCcw className="h-5 w-5 mr-2" />
+                  Archived Items - Search & Restore
+                </h3>
+                
+                <div className="flex items-center space-x-2 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Search by Item ID, IMEI, or Model..."
+                    value={restoreSearchTerm}
+                    onChange={(e) => setRestoreSearchTerm(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearchArchives()}
+                    className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:border-purple-600"
+                    disabled={restoreInProgress}
+                  />
+                  <button
+                    onClick={handleSearchArchives}
+                    disabled={restoreInProgress}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {restoreInProgress ? 'Loading...' : 'Search'}
+                  </button>
+                  {restoreSearchTerm && (
+                    <button
+                      onClick={clearRestoreSearch}
+                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                    >
+                      Clear Search
+                    </button>
+                  )}
+                  <button
+                    onClick={loadAllArchivedItems}
+                    disabled={restoreInProgress}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2 inline" />
+                    Refresh All
+                  </button>
+                </div>
+                
+                {/* Archive Items Table */}
+                {restoreInProgress && !restoreSearchResults ? (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    <p className="mt-2 text-gray-600">Loading archived items...</p>
+                  </div>
+                ) : restoreSearchResults ? (
+                  <div className="overflow-x-auto">
+                    {restoreSearchResults.totalItems === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        {restoreSearchTerm 
+                          ? `No archived items found matching "${restoreSearchTerm}"`
+                          : 'No items in archives yet'}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mb-2 text-sm text-purple-700">
+                          Found {restoreSearchResults.totalItems} archived item(s) in {restoreSearchResults.results.length} batch(es)
+                          {restoreSearchTerm && ` matching "${restoreSearchTerm}"`}
+                        </div>
+                        
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-purple-100">
+                              <th 
+                                className="border px-3 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-purple-200"
+                                onClick={() => {
+                                  const newDirection = archiveSortField === 'id' && archiveSortDirection === 'asc' ? 'desc' : 'asc';
+                                  setArchiveSortField('id');
+                                  setArchiveSortDirection(newDirection);
+                                }}
+                              >
+                                <div className="flex items-center">
+                                  ID
+                                  {archiveSortField === 'id' && (
+                                    <span className="ml-1">{archiveSortDirection === 'asc' ? '↑' : '↓'}</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="border px-3 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-purple-200"
+                                onClick={() => {
+                                  const newDirection = archiveSortField === 'model' && archiveSortDirection === 'asc' ? 'desc' : 'asc';
+                                  setArchiveSortField('model');
+                                  setArchiveSortDirection(newDirection);
+                                }}
+                              >
+                                <div className="flex items-center">
+                                  Model
+                                  {archiveSortField === 'model' && (
+                                    <span className="ml-1">{archiveSortDirection === 'asc' ? '↑' : '↓'}</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="border px-3 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-purple-200"
+                                onClick={() => {
+                                  const newDirection = archiveSortField === 'status' && archiveSortDirection === 'asc' ? 'desc' : 'asc';
+                                  setArchiveSortField('status');
+                                  setArchiveSortDirection(newDirection);
+                                }}
+                              >
+                                <div className="flex items-center">
+                                  Status
+                                  {archiveSortField === 'status' && (
+                                    <span className="ml-1">{archiveSortDirection === 'asc' ? '↑' : '↓'}</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="border px-3 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-purple-200"
+                                onClick={() => {
+                                  const newDirection = archiveSortField === 'imei1' && archiveSortDirection === 'asc' ? 'desc' : 'asc';
+                                  setArchiveSortField('imei1');
+                                  setArchiveSortDirection(newDirection);
+                                }}
+                              >
+                                <div className="flex items-center">
+                                  IMEI
+                                  {archiveSortField === 'imei1' && (
+                                    <span className="ml-1">{archiveSortDirection === 'asc' ? '↑' : '↓'}</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="border px-3 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-purple-200"
+                                onClick={() => {
+                                  const newDirection = archiveSortField === 'lastUpdated' && archiveSortDirection === 'asc' ? 'desc' : 'asc';
+                                  setArchiveSortField('lastUpdated');
+                                  setArchiveSortDirection(newDirection);
+                                }}
+                              >
+                                <div className="flex items-center">
+                                  Archived Date
+                                  {archiveSortField === 'lastUpdated' && (
+                                    <span className="ml-1">{archiveSortDirection === 'asc' ? '↑' : '↓'}</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="border px-3 py-3 text-right text-sm font-semibold cursor-pointer hover:bg-purple-200"
+                                onClick={() => {
+                                  const newDirection = archiveSortField === 'retailPrice' && archiveSortDirection === 'asc' ? 'desc' : 'asc';
+                                  setArchiveSortField('retailPrice');
+                                  setArchiveSortDirection(newDirection);
+                                }}
+                              >
+                                <div className="flex items-center justify-end">
+                                  Price
+                                  {archiveSortField === 'retailPrice' && (
+                                    <span className="ml-1">{archiveSortDirection === 'asc' ? '↑' : '↓'}</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th className="border px-3 py-3 text-left text-sm font-semibold">
+                                Batch ID
+                              </th>
+                              <th className="border px-3 py-3 text-center text-sm font-semibold">
+                                Action
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              // Flatten all items from all batches for table display
+                              const allItems = [];
+                              restoreSearchResults.results.forEach((batch) => {
+                                batch.items.forEach((item) => {
+                                  allItems.push({ ...item, batchId: batch.batchId });
+                                });
+                              });
+                              
+                              // Sort the flattened items
+                              const sortedItems = sortArchivedItems(allItems, archiveSortField, archiveSortDirection);
+                              
+                              return sortedItems.map((item, index) => (
+                                <tr 
+                                  key={`${item.batchId}-${item.id}`}
+                                  className={index % 2 === 0 ? 'bg-white' : 'bg-purple-50'}
+                                >
+                                  <td className="border px-3 py-2 text-sm">{item.id}</td>
+                                  <td className="border px-3 py-2 text-sm">
+                                    {item.manufacturer} {item.model}
+                                  </td>
+                                  <td className="border px-3 py-2 text-sm">
+                                    <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                                      {item.status}
+                                    </span>
+                                  </td>
+                                  <td className="border px-3 py-2 text-sm">{item.imei1 || 'N/A'}</td>
+                                  <td className="border px-3 py-2 text-sm">{formatDate(item.lastUpdated)}</td>
+                                  <td className="border px-3 py-2 text-sm text-right">{formatCurrency(item.retailPrice)}</td>                                  
+                                  <td className="border px-3 py-2 text-sm text-gray-600">
+                                    {item.batchId.substring(0, 20)}...
+                                  </td>
+                                  <td className="border px-3 py-2 text-center">
+                                    <button
+                                      onClick={() => handleRestoreItem(item, item.batchId)}
+                                      disabled={restoreInProgress}
+                                      className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50"
+                                    >
+                                      Restore
+                                    </button>
+                                  </td>
+                                </tr>
+                              ));
+                            })()}
+                          </tbody>
+                        </table>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Restore Confirmation Dialog */}
+            {showRestoreConfirm && itemToRestore && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <RotateCcw className={`h-5 w-5 mr-2 ${testMode ? 'text-green-600' : 'text-red-600'}`} />
+                    Confirm Restore Operation ({testMode ? 'TEST MODE' : '⚠️ LIVE MODE'})
+                  </h3>
+                  
+                  {/* Mode Indicator */}
+                  <div className={`mb-4 p-3 rounded-lg ${
+                    testMode 
+                      ? 'bg-green-50 border border-green-200' 
+                      : 'bg-red-50 border border-red-200'
+                  }`}>
+                    <p className={`font-bold ${testMode ? 'text-green-800' : 'text-red-800'}`}>
+                      {testMode ? '✅ TEST MODE - Safe to proceed' : '⚠️ LIVE MODE - This will affect PRODUCTION data!'}
+                    </p>
+                    <p className={`text-sm mt-1 ${testMode ? 'text-green-700' : 'text-red-700'}`}>
+                      Restoring to: <code className="font-mono bg-white px-1 rounded">
+                        {testMode ? 'inventory_test' : 'inventory (LIVE)'}
+                      </code>
+                      <br/>
+                      Removing from: <code className="font-mono bg-white px-1 rounded">
+                        {testMode ? 'inventory_archives_test' : 'inventory_archives (LIVE)'}
+                      </code>
+                    </p>
+                  </div>
+                  
+                  <div className="bg-gray-50 p-3 rounded mb-4">
+                    <p className="font-medium text-sm mb-1">Item to Restore:</p>
+                    <p className="text-sm text-gray-700">
+                      {itemToRestore.item.manufacturer} {itemToRestore.item.model}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      ID: {itemToRestore.item.id}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      IMEI: {itemToRestore.item.imei1 || 'N/A'}
+                    </p>
+                  </div>
+                  
+                  <p className="text-sm text-gray-700 mb-4">
+                    This will restore the item back to active inventory and remove it from the archive.
+                  </p>
+                  
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={cancelRestore}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmRestore}
+                      className={`px-4 py-2 text-white rounded-lg ${
+                        testMode 
+                          ? 'bg-green-600 hover:bg-green-700' 
+                          : 'bg-red-600 hover:bg-red-700 animate-pulse'
+                      }`}
+                    >
+                      {testMode ? 'Yes, Restore (TEST)' : '⚠️ Yes, Restore (LIVE!)'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
-          {/* Confirmation Dialog - WITH FULL MODE INDICATORS */}
+          {/* Archive Confirmation Dialog - WITH FULL MODE INDICATORS AND ALL ORIGINAL CONTENT */}
           {showConfirmDialog && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 max-w-md mx-4">
@@ -540,6 +1038,7 @@ const ArchivePreview = () => {
                   </p>
                 </div>
                 
+                {/* THIS IS THE SECTION THAT WAS MISSING - NOW RESTORED */}
                 <div className="mb-4 space-y-2">
                   <p className="text-gray-700">
                     You are about to archive <strong>{selectedItems.length} items</strong>.
@@ -565,6 +1064,10 @@ const ArchivePreview = () => {
                     </div>
                   )}
                 </div>
+                
+                <p className="text-sm text-gray-700 mb-4">
+                  This action will permanently move these items from inventory to the archive collection.
+                </p>
                 
                 <div className="flex justify-end space-x-3">
                   <button
