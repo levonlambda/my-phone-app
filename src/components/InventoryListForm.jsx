@@ -15,7 +15,7 @@ const InventoryListForm = () => {
   
   // TEST MODE STATE - NEW
   const [testMode, setTestMode] = useState(false);
-  const [includeArchives, setIncludeArchives] = useState(true); // Include archives by default when in test mode
+  const [includeArchives, setIncludeArchives] = useState(true); // MODIFIED: Now defaults to true for all modes
   const [archiveStats, setArchiveStats] = useState(null); // Store archive statistics
   
   // State for inventory data
@@ -463,11 +463,14 @@ const InventoryListForm = () => {
 {/* Part 4 Start - Data Fetching Functions */}
   // Fetch archived items from test collection - NEW
   const fetchArchivedItems = useCallback(async () => {
-    if (!testMode || !includeArchives) return [];
+    // MODIFIED: Now checks for either testMode OR regular mode with includeArchives
+    if (!includeArchives) return [];
     
     try {
-      console.log('📦 Fetching archived items from inventory_archives_test...');
-      const archivesRef = collection(db, 'inventory_archives_test');
+      // MODIFIED: Use appropriate collection based on mode
+      const archiveCollection = testMode ? 'inventory_archives_test' : 'inventory_archives';
+      console.log(`📦 Fetching archived items from ${archiveCollection}...`);
+      const archivesRef = collection(db, archiveCollection);
       const snapshot = await getDocs(archivesRef);
       
       const archivedItems = [];
@@ -566,9 +569,9 @@ const InventoryListForm = () => {
       
       console.log(`✅ Fetched ${items.length} items from ${collectionName}`);
       
-      // Fetch archived items if in test mode and archives are included
+      // MODIFIED: Fetch archived items in both test mode AND production mode
       let archivedItems = [];
-      if (testMode && includeArchives) {
+      if (includeArchives) {
         archivedItems = await fetchArchivedItems();
       }
       
@@ -587,9 +590,9 @@ const InventoryListForm = () => {
       setInitialLoad(false);
       setLoading(false);
       
-      // Log summary for test mode
-      if (testMode) {
-        console.log('📊 Test Mode Summary:');
+      // MODIFIED: Log summary for both test mode and production mode with archives
+      if (includeArchives) {
+        console.log(`📊 ${testMode ? 'Test Mode' : 'Production Mode'} Summary:`);
         console.log(`   Active items: ${items.length}`);
         console.log(`   Archived items: ${archivedItems.length}`);
         console.log(`   Total items: ${allFetchedItems.length}`);
@@ -599,7 +602,7 @@ const InventoryListForm = () => {
       setError(`Error fetching inventory: ${error.message}`);
       setLoading(false);
     }
-  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters, testMode, fetchArchivedItems]);
+  }, [sortField, sortDirection, filters.manufacturer, filters.model, loadFilterOptions, applyFilters, testMode, fetchArchivedItems, includeArchives]);
 {/* Part 4 End - Data Fetching Functions */}
 
 {/* Part 5 Start - Event Handlers */}
@@ -1019,24 +1022,32 @@ const InventoryListForm = () => {
             )}
           </div>
           <div className="flex gap-2">
-            {/* TEST MODE TOGGLE - NEW */}
-            {isAdmin && (
-              <button
-                onClick={() => {
-                  setTestMode(!testMode);
-                  setIncludeArchives(true); // Reset to include archives when toggling
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
-                  testMode 
-                    ? 'bg-orange-500 text-white hover:bg-orange-600' 
-                    : 'bg-white/20 text-white hover:bg-white/30'
-                }`}
-                title={testMode ? 'Switch to Production Mode' : 'Switch to Test Mode'}
-              >
-                <FlaskConical className="h-5 w-5" />
-                <span>{testMode ? 'TEST MODE' : 'Test Mode'}</span>
-              </button>
-            )}
+            {/* TEST MODE TOGGLE - HIDDEN BUT PRESERVED 
+                Preserved code for test mode button - currently hidden from UI
+                To re-enable: change showTestModeButton from false to true below */}
+            {(() => {
+              const showTestModeButton = false; // Change to true to re-enable test mode button
+              if (showTestModeButton && isAdmin) {
+                return (
+                  <button
+                    onClick={() => {
+                      setTestMode(!testMode);
+                      setIncludeArchives(true); // Reset to include archives when toggling
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
+                      testMode 
+                        ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                        : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
+                    title={testMode ? 'Switch to Production Mode' : 'Switch to Test Mode'}
+                  >
+                    <FlaskConical className="h-5 w-5" />
+                    <span>{testMode ? 'TEST MODE' : 'Test Mode'}</span>
+                  </button>
+                );
+              }
+              return null;
+            })()}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1 ${showFilters ? 
@@ -1075,7 +1086,8 @@ const InventoryListForm = () => {
         </CardHeader>
 
         <CardContent className="p-4">
-          {/* Test Mode Info Banner - NEW */}
+          {/* Test Mode Info Banner - MODIFIED: Now also shows for production mode with archives */}
+          {/* Hidden when test mode is false, but preserved for future use */}
           {testMode && (
             <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4 mb-4">
               <div className="flex items-start gap-3">
@@ -1104,6 +1116,26 @@ const InventoryListForm = () => {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Production Mode Archive Info - NEW: Shows archive stats in production mode */}
+          {!testMode && includeArchives && archiveStats && archiveStats.totalItems > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-blue-800">
+                  📦 Including {archiveStats.totalItems} archived items from {archiveStats.batchCount} batch(es)
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer ml-auto">
+                  <input
+                    type="checkbox"
+                    checked={includeArchives}
+                    onChange={(e) => setIncludeArchives(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-blue-800">Include archived items</span>
+                </label>
               </div>
             </div>
           )}
@@ -1154,7 +1186,7 @@ const InventoryListForm = () => {
                         {inventoryItems.length.toLocaleString()}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {testMode && archiveStats && includeArchives ? (
+                        {(testMode || !testMode) && archiveStats && includeArchives ? (
                           <span>{inventoryItems.filter(i => !i.isArchived).length} active, {inventoryItems.filter(i => i.isArchived).length} archived</span>
                         ) : (
                           <span>{inventoryItems.length === 1 ? 'item' : 'items'}</span>
@@ -1282,7 +1314,7 @@ const InventoryListForm = () => {
             <div className="text-center py-4">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto text-[rgb(52,69,157)]" />
               <p className="text-gray-600 mt-2">
-                Loading inventory items{testMode ? ' from test collections' : ''}...
+                Loading inventory items{testMode ? ' from test collections' : includeArchives ? ' including archives' : ''}...
               </p>
             </div>
           )}
