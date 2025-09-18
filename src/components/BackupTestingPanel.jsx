@@ -22,6 +22,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 const BackupTestingPanel = () => {
+  // VISIBILITY CONTROL - Set to true to show Test Environment tab
+  const showTestEnvironment = false; // ONLY CHANGE: Added this flag to hide Test Environment
+  
   // State management
   const [activeTab, setActiveTab] = useState('backup');
   const [loading, setLoading] = useState(false);
@@ -237,14 +240,9 @@ const BackupTestingPanel = () => {
         
         {/* Header */}
         <CardHeader className="bg-[rgb(52,69,157)] py-3">
-          <CardTitle className="text-2xl text-white flex items-center justify-between">
-            <div className="flex items-center">
-              <Shield className="h-6 w-6 mr-2" />
-              Backup & Testing Panel
-            </div>
-            <span className="text-sm font-normal bg-orange-500 text-white px-3 py-1 rounded">
-              PHASE 2 - TESTING
-            </span>
+          <CardTitle className="text-2xl text-white flex items-center">
+            <Shield className="h-6 w-6 mr-2" />
+            Backup & Testing Panel
           </CardTitle>
         </CardHeader>
 
@@ -290,16 +288,18 @@ const BackupTestingPanel = () => {
             >
               Backup Operations
             </button>
-            <button
-              onClick={() => setActiveTab('testing')}
-              className={`pb-2 px-4 text-sm font-semibold transition-colors ${
-                activeTab === 'testing'
-                  ? 'text-[rgb(52,69,157)] border-b-2 border-[rgb(52,69,157)]'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Test Environment
-            </button>
+            {showTestEnvironment && ( // ONLY CHANGE: Wrapped in conditional
+              <button
+                onClick={() => setActiveTab('testing')}
+                className={`pb-2 px-4 text-sm font-semibold transition-colors ${
+                  activeTab === 'testing'
+                    ? 'text-[rgb(52,69,157)] border-b-2 border-[rgb(52,69,157)]'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Test Environment
+              </button>
+            )}
           </div>
 
           {/* Tab Content */}
@@ -522,8 +522,8 @@ const BackupTestingPanel = () => {
               </div>
             )}
 
-            {/* Testing Tab */}
-            {activeTab === 'testing' && (
+            {/* Testing Tab - ALL CODE PRESERVED, just hidden when showTestEnvironment is false */}
+            {activeTab === 'testing' && showTestEnvironment && ( // ONLY CHANGE: Added showTestEnvironment condition
               <div className="space-y-6">
                 
                 {/* Test Environment Instructions */}

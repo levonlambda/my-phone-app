@@ -13,13 +13,16 @@ import {
   CheckCircle,
   Clock,
   DollarSign,
-  RotateCcw  // Added for restore functionality
+  RotateCcw  // ADDED: Missing import for restore icon
 } from 'lucide-react';
 import archiveService from '../services/archiveService';
 {/* Part 1 End - Imports and Dependencies */}
 
 {/* Part 2 Start - Component Definition and State */}
 const ArchivePreview = () => {
+  // VISIBILITY CONTROL - Set to true to show toggle
+  const showModeToggle = false; // ADDED: Flag to hide toggle button
+  
   // Main data states
   const [loading, setLoading] = useState(true);
   const [eligibleItems, setEligibleItems] = useState([]);
@@ -44,8 +47,8 @@ const ArchivePreview = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Test mode state
-  const [testMode, setTestMode] = useState(true);
-  
+  const [testMode, setTestMode] = useState(false); // CHANGED: From true to false for LIVE MODE
+
   // Phase 4: Restore operation states
   const [showRestoreSearch, setShowRestoreSearch] = useState(false);
   const [restoreSearchTerm, setRestoreSearchTerm] = useState('');
@@ -53,7 +56,7 @@ const ArchivePreview = () => {
   const [restoreInProgress, setRestoreInProgress] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [itemToRestore, setItemToRestore] = useState(null);
-  
+
   // Phase 4: Archive table sorting states
   const [archiveSortField, setArchiveSortField] = useState('id');
   const [archiveSortDirection, setArchiveSortDirection] = useState('asc');
@@ -63,12 +66,10 @@ const ArchivePreview = () => {
   // Load eligible items on component mount
   useEffect(() => {
     console.log('ArchivePreview component mounted');
-    // CRITICAL: Set initial test mode for safety
-    archiveService.setTestMode(true);
+    // Set initial mode to LIVE MODE
+    archiveService.setTestMode(false); // CHANGED: From true to false for LIVE MODE
     loadEligibleItems();
   }, []);
-
-  // Rest of your existing Part 3 code remains the same...
 
   // Filter items based on search
   useEffect(() => {
@@ -212,7 +213,7 @@ const ArchivePreview = () => {
         await loadEligibleItems();
         
         // Show success message WITH MODE
-        alert(`Success! Archived ${result.details.itemsArchived} items in ${result.details.batchesCreated} batch(es) to ${testMode ? 'TEST' : 'LIVE'} collection.`);
+        alert(`Success! Archived ${result.details.itemsArchived} items in ${result.details.batchesCreated} batch(es) to ${testMode ? 'TEST' : 'LIVE'} archive!`);
       } else if (result.cancelled) {
         console.log('Archive cancelled by user');
       } else {
@@ -222,7 +223,7 @@ const ArchivePreview = () => {
     } catch (error) {
       console.error('Archive operation failed:', error);
       setError(`Archive failed: ${error.message}`);
-      alert(`Error: ${error.message}`);
+      alert(`Archive failed: ${error.message}`);
     } finally {
       setArchiveInProgress(false);
     }
@@ -500,33 +501,35 @@ const ArchivePreview = () => {
               <Archive className="h-6 w-6 mr-2" />
               Archive Preview System
             </div>
-            <div className="flex items-center gap-3">
-              {/* Test Mode Toggle Button */}
-              <button
-                onClick={() => {
-                  const newTestMode = !testMode;
-                  setTestMode(newTestMode);
-                  archiveService.setTestMode(newTestMode);
-                  loadEligibleItems(); // Reload data with new mode
-                }}
-                className={`px-4 py-1 rounded-lg text-sm font-bold transition-all ${
+            {showModeToggle && ( // ONLY CHANGE: Wrapped in conditional
+              <div className="flex items-center gap-3">
+                {/* Test Mode Toggle Button */}
+                <button
+                  onClick={() => {
+                    const newTestMode = !testMode;
+                    setTestMode(newTestMode);
+                    archiveService.setTestMode(newTestMode);
+                    loadEligibleItems(); // Reload data with new mode
+                  }}
+                  className={`px-4 py-1 rounded-lg text-sm font-bold transition-all ${
+                    testMode 
+                      ? 'bg-green-500 hover:bg-green-600 text-white' 
+                      : 'bg-orange-500 hover:bg-orange-600 text-white'
+                  }`}
+                >
+                  {testMode ? '🧪 TEST MODE' : '🔴 LIVE MODE'}
+                </button>
+                
+                {/* Status Badge */}
+                <span className={`text-sm font-normal px-3 py-1 rounded ${
                   testMode 
-                    ? 'bg-green-500 hover:bg-green-600 text-white' 
-                    : 'bg-orange-500 hover:bg-orange-600 text-white'
-                }`}
-              >
-                {testMode ? '🧪 TEST MODE' : '🔴 LIVE MODE'}
-              </button>
-              
-              {/* Status Badge */}
-              <span className={`text-sm font-normal px-3 py-1 rounded ${
-                testMode 
-                  ? 'bg-green-500/30 text-white border border-green-400' 
-                  : 'bg-red-500/30 text-white border border-red-400'
-              }`}>
-                {testMode ? 'Using: inventory_test' : 'Using: inventory (LIVE)'}
-              </span>
-            </div>
+                    ? 'bg-green-500/30 text-white border border-green-400' 
+                    : 'bg-red-500/30 text-white border border-red-400'
+                }`}>
+                  {testMode ? 'Using: inventory_test' : 'Using: inventory (LIVE)'}
+                </span>
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
 {/* Part 7.1 End - Card Header */}
@@ -674,18 +677,18 @@ const ArchivePreview = () => {
                     Preview ({selectedItems.length})
                   </button>
                   
-                  {/* Archive Button - WITH FULL SAFETY INDICATORS */}
+                  {/* Archive Button - CHANGED TO GREEN WITHOUT BLINKING */}
                   <button
                     onClick={handleArchiveSelected}
                     disabled={archiveInProgress}
                     className={`px-6 py-2 text-white rounded-lg flex items-center disabled:opacity-50 ${
                       testMode 
                         ? 'bg-green-600 hover:bg-green-700' 
-                        : 'bg-red-600 hover:bg-red-700 animate-pulse'
+                        : 'bg-green-600 hover:bg-green-700'  // CHANGED: Now green for both modes, removed animate-pulse
                     }`}
                     title={testMode 
                       ? 'Archive to TEST collection (inventory_archives_test)' 
-                      : '⚠️ Archive to LIVE collection (inventory_archives)'
+                      : 'Archive to LIVE collection (inventory_archives)'  // CHANGED: Removed ⚠️
                     }
                   >
                     {archiveInProgress ? (
@@ -699,7 +702,7 @@ const ArchivePreview = () => {
                         {testMode ? (
                           <>Archive Selected (TEST) ({selectedItems.length})</>
                         ) : (
-                          <>⚠️ Archive Selected (LIVE!) ({selectedItems.length})</>
+                          <>Archive Selected (LIVE) ({selectedItems.length})</>  // CHANGED: Removed ⚠️ and !
                         )}
                       </>
                     )}
