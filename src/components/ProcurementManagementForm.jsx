@@ -371,7 +371,7 @@ const ProcurementManagementForm = () => {
                   : `${filteredProcurements.length} entries`}
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
@@ -417,8 +417,8 @@ const ProcurementManagementForm = () => {
               <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 font-medium">Payment Status</p>
-                    <p className="text-xs text-gray-500">Paid vs Outstanding amounts</p>
+                    <p className="text-sm text-gray-600 font-medium">Paid Procurements</p>
+                    <p className="text-xs text-gray-500">Completed payment amount</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-purple-600">
@@ -430,7 +430,7 @@ const ProcurementManagementForm = () => {
                           return total;
                         }, 0);
                         return paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                      })()} paid
+                      })()}
                     </p>
                     <p className="text-xs text-gray-500">
                       {(() => {
@@ -439,7 +439,39 @@ const ProcurementManagementForm = () => {
                         ).length;
                         const totalCount = filteredProcurements.length;
                         const percentage = totalCount > 0 ? (paidCount / totalCount * 100) : 0;
-                        return `${percentage.toFixed(1)}% completed`;
+                        return `${paidCount} of ${totalCount} (${percentage.toFixed(1)}%)`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4 border border-orange-100 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Unpaid Procurements</p>
+                    <p className="text-xs text-gray-500">Outstanding payment amount</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-orange-600">
+                      ₱{(() => {
+                        const unpaidAmount = filteredProcurements.reduce((total, procurement) => {
+                          if (procurement.isPaid !== true && procurement.paymentStatus !== 'paid') {
+                            return total + (procurement.grandTotal || 0);
+                          }
+                          return total;
+                        }, 0);
+                        return unpaidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {(() => {
+                        const unpaidCount = filteredProcurements.filter(p => 
+                          p.isPaid !== true && p.paymentStatus !== 'paid'
+                        ).length;
+                        const totalCount = filteredProcurements.length;
+                        const percentage = totalCount > 0 ? (unpaidCount / totalCount * 100) : 0;
+                        return `${unpaidCount} of ${totalCount} (${percentage.toFixed(1)}%)`;
                       })()}
                     </p>
                   </div>

@@ -14,10 +14,15 @@ import {
 import supplierService from '../services/supplierService';
 // Import global state for editing functionality
 import { useGlobalState } from '../context/GlobalStateContext';
+// Import usePhoneCache hook to update price configurations
+import { usePhoneCache } from './phone-selection/hooks/usePhoneCache';
 
 const PhoneProcurementForm = () => {
   // ====== GLOBAL STATE FOR EDITING ======
   const { procurementToEdit, clearProcurementToEdit, isViewingProcurement, procurementMode } = useGlobalState(); // ADDED: procurementMode
+  
+  // ====== PRICE CACHE HOOK ======
+  const { updatePriceConfiguration } = usePhoneCache();
   
   // ====== EDITING STATE ======
   const [isEditing, setIsEditing] = useState(false);
@@ -860,6 +865,38 @@ const PhoneProcurementForm = () => {
         if (result.success) {
           console.log("Procurement updated successfully:", result);
           
+          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS
+          for (const item of procurementItems) {
+            try {
+              // Update base price (without color)
+              await updatePriceConfiguration(
+                item.manufacturer,
+                item.model,
+                item.ram,
+                item.storage,
+                item.dealersPrice,
+                item.retailPrice
+              );
+              
+              // Update color-specific price
+              if (item.color) {
+                await updatePriceConfiguration(
+                  item.manufacturer,
+                  item.model,
+                  item.ram,
+                  item.storage,
+                  item.dealersPrice,
+                  item.retailPrice,
+                  item.color
+                );
+              }
+              
+              console.log(`Updated price configuration for ${item.manufacturer} ${item.model} ${item.ram}GB ${item.storage}GB ${item.color}`);
+            } catch (error) {
+              console.error(`Error updating price configuration for item:`, item, error);
+            }
+          }
+          
           // Clear editing state
           clearProcurementToEdit();
           
@@ -900,6 +937,38 @@ const PhoneProcurementForm = () => {
         
         if (result.success) {
           console.log("Procurement created successfully:", result);
+          
+          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS
+          for (const item of procurementItems) {
+            try {
+              // Update base price (without color)
+              await updatePriceConfiguration(
+                item.manufacturer,
+                item.model,
+                item.ram,
+                item.storage,
+                item.dealersPrice,
+                item.retailPrice
+              );
+              
+              // Update color-specific price
+              if (item.color) {
+                await updatePriceConfiguration(
+                  item.manufacturer,
+                  item.model,
+                  item.ram,
+                  item.storage,
+                  item.dealersPrice,
+                  item.retailPrice,
+                  item.color
+                );
+              }
+              
+              console.log(`Updated price configuration for ${item.manufacturer} ${item.model} ${item.ram}GB ${item.storage}GB ${item.color}`);
+            } catch (error) {
+              console.error(`Error updating price configuration for item:`, item, error);
+            }
+          }
           
           // Success message
           alert(`Procurement record saved successfully!\n\nProcurement ID: ${result.procurementId}\nReference: ${result.reference}\nSupplier: ${selectedSupplierData?.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatPrice(grandTotal.toString())}`);
