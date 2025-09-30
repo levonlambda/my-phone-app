@@ -116,6 +116,7 @@ export const AuthProvider = ({ children }) => {
       { key: 'form', label: 'Add Device Model', requiredRole: 'user' }, // Changed from 'admin' to 'user'
       { key: 'phonelist', label: 'Device Models', requiredRole: 'admin' },
       { key: 'prices', label: 'Price Management', requiredRole: 'admin' },
+      { key: 'price-repair', label: 'Price Config Repair', requiredRole: 'admin' },
       { key: 'archive-preview', label: 'Archive Preview', requiredRole: 'admin' },
       { key: 'backup-testing', label: 'Backup & Testing', requiredRole: 'admin' }
     ];

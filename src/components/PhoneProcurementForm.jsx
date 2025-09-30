@@ -865,17 +865,25 @@ const PhoneProcurementForm = () => {
         if (result.success) {
           console.log("Procurement updated successfully:", result);
           
-          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS
+          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS - FIXED
           for (const item of procurementItems) {
             try {
+              // Parse prices to remove commas and ensure numeric values
+              const dealersPriceNumeric = typeof item.dealersPrice === 'string' 
+                ? item.dealersPrice.replace(/,/g, '') 
+                : item.dealersPrice.toString();
+              const retailPriceNumeric = typeof item.retailPrice === 'string' 
+                ? item.retailPrice.replace(/,/g, '') 
+                : item.retailPrice.toString();
+              
               // Update base price (without color)
               await updatePriceConfiguration(
                 item.manufacturer,
                 item.model,
                 item.ram,
                 item.storage,
-                item.dealersPrice,
-                item.retailPrice
+                dealersPriceNumeric,  // Pass numeric value without commas
+                retailPriceNumeric    // Pass numeric value without commas
               );
               
               // Update color-specific price
@@ -885,8 +893,8 @@ const PhoneProcurementForm = () => {
                   item.model,
                   item.ram,
                   item.storage,
-                  item.dealersPrice,
-                  item.retailPrice,
+                  dealersPriceNumeric,  // Pass numeric value without commas
+                  retailPriceNumeric,   // Pass numeric value without commas
                   item.color
                 );
               }
@@ -938,17 +946,25 @@ const PhoneProcurementForm = () => {
         if (result.success) {
           console.log("Procurement created successfully:", result);
           
-          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS
+          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS - FIXED
           for (const item of procurementItems) {
             try {
+              // Parse prices to remove commas and ensure numeric values
+              const dealersPriceNumeric = typeof item.dealersPrice === 'string' 
+                ? item.dealersPrice.replace(/,/g, '') 
+                : item.dealersPrice.toString();
+              const retailPriceNumeric = typeof item.retailPrice === 'string' 
+                ? item.retailPrice.replace(/,/g, '') 
+                : item.retailPrice.toString();
+              
               // Update base price (without color)
               await updatePriceConfiguration(
                 item.manufacturer,
                 item.model,
                 item.ram,
                 item.storage,
-                item.dealersPrice,
-                item.retailPrice
+                dealersPriceNumeric,  // Pass numeric value without commas
+                retailPriceNumeric    // Pass numeric value without commas
               );
               
               // Update color-specific price
@@ -958,8 +974,8 @@ const PhoneProcurementForm = () => {
                   item.model,
                   item.ram,
                   item.storage,
-                  item.dealersPrice,
-                  item.retailPrice,
+                  dealersPriceNumeric,  // Pass numeric value without commas
+                  retailPriceNumeric,   // Pass numeric value without commas
                   item.color
                 );
               }

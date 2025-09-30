@@ -1,5 +1,6 @@
 // src/App.jsx
 import { useEffect } from 'react';
+import PriceConfigurationRepair from './components/PriceConfigurationRepair';
 import PhoneSpecForm from './components/PhoneSpecForm';
 import PhoneSelectionForm from './components/phone-selection/PhoneSelectionForm';
 import InventoryListForm from './components/InventoryListForm';
@@ -76,6 +77,7 @@ function App() {
     'form': 'user',
     'phonelist': 'user',
     'prices': 'admin',
+    'price-repair': 'admin', 
     'archive-preview': 'admin',
     'backup-testing': 'admin'  
   };
@@ -169,6 +171,7 @@ function App() {
             {activeComponent === 'inventory' && <InventoryListForm />}
             {activeComponent === 'phonelist' && <PhoneListForm />}
             {activeComponent === 'prices' && <PriceManagementForm />}
+            {activeComponent === 'price-repair' && <PriceConfigurationRepair />}
             {activeComponent === 'archive-preview' && <ArchivePreview />}
             {activeComponent === 'backup-testing' && <BackupTestingPanel />} 
           </>

@@ -355,11 +355,12 @@ const PriceManagementForm = () => {
         const batch = writeBatch(db);
         
         // Update ALL inventory items regardless of color
+        // FIXED: Only update prices, NOT the lastUpdated date
         inventorySnap.docs.forEach(docRef => {
           batch.update(docRef.ref, {
             dealersPrice: dealersPrice,
-            retailPrice: retailPrice,
-            lastUpdated: getCurrentDate()
+            retailPrice: retailPrice
+            // REMOVED: lastUpdated: getCurrentDate() - Don't change inventory dates
           });
         });
         
@@ -462,11 +463,12 @@ const PriceManagementForm = () => {
       if (!inventorySnap.empty) {
         const batch = writeBatch(db);
         
+        // FIXED: Only update prices, NOT the lastUpdated date
         inventorySnap.docs.forEach(docRef => {
           batch.update(docRef.ref, {
             dealersPrice: dealersPrice,
-            retailPrice: retailPrice,
-            lastUpdated: getCurrentDate()
+            retailPrice: retailPrice
+            // REMOVED: lastUpdated: getCurrentDate() - Don't change inventory dates
           });
         });
         
