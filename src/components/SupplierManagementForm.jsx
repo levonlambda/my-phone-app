@@ -156,7 +156,7 @@ const SupplierManagementForm = () => {
     } finally {
       setLoading(false);
     }
-  };
+  };  
 {/* Part 2 End - Real Data Fetching Functions */}
 
 {/* Part 3 Start - Real Backend Form Handlers */}
@@ -170,10 +170,22 @@ const SupplierManagementForm = () => {
     }, 5000);
   };
 
-  // Helper function to format numbers with commas
+ // Helper function to format numbers with commas
   const formatNumberWithCommas = (value) => {
     if (!value && value !== 0) return '';
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    
+    // Convert to number and round to 2 decimal places to avoid floating point issues
+    const numValue = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(numValue)) return '';
+    
+    // Round to 2 decimal places
+    const roundedValue = Math.round(numValue * 100) / 100;
+    
+    // Format with commas
+    return roundedValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   // Supplier form handlers - UPDATED to use real backend
@@ -748,6 +760,7 @@ const SupplierManagementForm = () => {
                       Recalculate
                     </button>
                   )}
+                  
                 </div>
               </div>
 
