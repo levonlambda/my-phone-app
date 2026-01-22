@@ -10,8 +10,7 @@ const InventoryFilters = ({
   filters, 
   pendingFilters, 
   filterOptions, 
-  handleFilterChange,
-  allItems
+  handleFilterChange  
 }) => {
 {/* Part 2 End - Component Definition */}
 
@@ -163,136 +162,48 @@ const InventoryFilters = ({
 
 {/* Part 5 Start - Effect Hooks */}
   // Update models when manufacturer changes
+  // FIX: Always load models from database to prevent showing incomplete list after search
   useEffect(() => {
     if (filters.manufacturer) {
-      if (allItems && allItems.length > 0) {
-        // If allItems is populated, filter models from it
-        const modelsForManufacturer = [...new Set(
-          allItems
-            .filter(item => item.manufacturer === filters.manufacturer)
-            .map(item => item.model)
-        )].sort();
-        
-        // Only update if we found models
-        if (modelsForManufacturer.length > 0) {
-          setFilteredModels(modelsForManufacturer);
-        } else {
-          // If no models found in allItems, load from database
-          loadModelsForManufacturer(filters.manufacturer);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadModelsForManufacturer(filters.manufacturer);
-      }
+      // Always load models from database to ensure we get the complete list
+      // This prevents the bug where allItems is filtered by the search results
+      loadModelsForManufacturer(filters.manufacturer);
     } else {
-      // If no manufacturer is selected, show all models
+      // If no manufacturer is selected, show all models from filterOptions
       setFilteredModels(filterOptions.models);
     }
-  }, [filters.manufacturer, allItems, filterOptions.models]);
+  }, [filters.manufacturer, filterOptions.models]);
 
   // Update RAM options when manufacturer and model change
+  // FIX: Always load from database to prevent incomplete lists after search
   useEffect(() => {
     if (filters.manufacturer && filters.model) {
-      if (allItems && allItems.length > 0) {
-        // If allItems is populated, filter RAM options from it
-        const ramsForModel = [...new Set(
-          allItems
-            .filter(item => 
-              item.manufacturer === filters.manufacturer && 
-              item.model === filters.model
-            )
-            .map(item => item.ram)
-        )].sort();
-        
-        // Only update if we found RAM options
-        if (ramsForModel.length > 0) {
-          setFilteredRams(ramsForModel);
-        } else {
-          // If no RAM options found in allItems, load from database
-          loadRamOptions(filters.manufacturer, filters.model);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadRamOptions(filters.manufacturer, filters.model);
-      }
+      // Always load RAM options from database
+      loadRamOptions(filters.manufacturer, filters.model);
     } else {
       // If no manufacturer or model is selected, show all RAM options
       setFilteredRams(filterOptions.rams);
     }
-  }, [filters.manufacturer, filters.model, allItems, filterOptions.rams]);
+  }, [filters.manufacturer, filters.model, filterOptions.rams]);
 
   // Update Storage options when manufacturer, model, and RAM change
+  // FIX: Always load from database to prevent incomplete lists after search
   useEffect(() => {
     if (filters.manufacturer && filters.model) {
-      if (allItems && allItems.length > 0) {
-        // Filter items by current selections
-        let filteredItems = allItems.filter(item => 
-          item.manufacturer === filters.manufacturer && 
-          item.model === filters.model
-        );
-        
-        // If RAM is selected, filter by that too
-        if (filters.ram) {
-          filteredItems = filteredItems.filter(item => item.ram === filters.ram);
-        }
-        
-        // Extract unique storage options
-        const storagesForSelection = [...new Set(
-          filteredItems.map(item => item.storage)
-        )].sort();
-        
-        // Only update if we found storage options
-        if (storagesForSelection.length > 0) {
-          setFilteredStorages(storagesForSelection);
-        } else {
-          // If no storage options found in allItems, load from database
-          loadStorageOptions(filters.manufacturer, filters.model, filters.ram);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadStorageOptions(filters.manufacturer, filters.model, filters.ram);
-      }
+      // Always load storage options from database
+      loadStorageOptions(filters.manufacturer, filters.model, filters.ram);
     } else {
       // If no manufacturer or model is selected, show all storage options
       setFilteredStorages(filterOptions.storages);
     }
-  }, [filters.manufacturer, filters.model, filters.ram, allItems, filterOptions.storages]);
+  }, [filters.manufacturer, filters.model, filters.ram, filterOptions.storages]);
 
   // Update Color options when manufacturer, model, RAM, and storage change
+  // FIX: Always load from database to prevent incomplete lists after search
   useEffect(() => {
     if (filters.manufacturer && filters.model) {
-      if (allItems && allItems.length > 0) {
-        // Filter items by current selections
-        let filteredItems = allItems.filter(item => 
-          item.manufacturer === filters.manufacturer && 
-          item.model === filters.model
-        );
-        
-        // Apply additional filters if selected
-        if (filters.ram) {
-          filteredItems = filteredItems.filter(item => item.ram === filters.ram);
-        }
-        
-        if (filters.storage) {
-          filteredItems = filteredItems.filter(item => item.storage === filters.storage);
-        }
-        
-        // Extract unique color options
-        const colorsForSelection = [...new Set(
-          filteredItems.map(item => item.color)
-        )].sort();
-        
-        // Only update if we found color options
-        if (colorsForSelection.length > 0) {
-          setFilteredColors(colorsForSelection);
-        } else {
-          // If no color options found in allItems, load from database
-          loadColorOptions(filters.manufacturer, filters.model, filters.ram, filters.storage);
-        }
-      } else {
-        // If allItems is not available, load from database
-        loadColorOptions(filters.manufacturer, filters.model, filters.ram, filters.storage);
-      }
+      // Always load color options from database
+      loadColorOptions(filters.manufacturer, filters.model, filters.ram, filters.storage);
     } else {
       // If no manufacturer or model is selected, show all color options
       setFilteredColors(filterOptions.colors);
@@ -302,7 +213,6 @@ const InventoryFilters = ({
     filters.model, 
     filters.ram, 
     filters.storage, 
-    allItems, 
     filterOptions.colors
   ]);
 {/* Part 5 End - Effect Hooks */}
@@ -653,8 +563,7 @@ InventoryFilters.propTypes = {
   filters: PropTypes.object.isRequired,
   pendingFilters: PropTypes.object.isRequired,
   filterOptions: PropTypes.object.isRequired,
-  handleFilterChange: PropTypes.func.isRequired,
-  allItems: PropTypes.array.isRequired
+  handleFilterChange: PropTypes.func.isRequired  
 };
 {/* Part 7 End - PropTypes Validation */}
 
