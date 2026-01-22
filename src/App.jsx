@@ -11,6 +11,7 @@ import PhoneProcurementForm from './components/PhoneProcurementForm';
 import SupplierManagementForm from './components/SupplierManagementForm';
 import ProcurementManagementForm from './components/ProcurementManagementForm';
 import StockReceivingForm from './components/StockReceivingForm';
+import PhoneImageManagementForm from './components/PhoneImageManagementForm';
 import Login from './components/Login';
 import { useGlobalState } from './context/GlobalStateContext';
 import { useAuth } from './context/AuthContext';
@@ -79,7 +80,8 @@ function App() {
     'prices': 'admin',
     'price-repair': 'admin', 
     'archive-preview': 'admin',
-    'backup-testing': 'admin'  
+    'backup-testing': 'admin',
+    'image-management': 'user'
   };
 
   // Check if user has permission for current component
@@ -173,7 +175,8 @@ function App() {
             {activeComponent === 'prices' && <PriceManagementForm />}
             {activeComponent === 'price-repair' && <PriceConfigurationRepair />}
             {activeComponent === 'archive-preview' && <ArchivePreview />}
-            {activeComponent === 'backup-testing' && <BackupTestingPanel />} 
+            {activeComponent === 'backup-testing' && <BackupTestingPanel />}
+            {activeComponent === 'image-management' && <PhoneImageManagementForm />}
           </>
         )}
       </div>

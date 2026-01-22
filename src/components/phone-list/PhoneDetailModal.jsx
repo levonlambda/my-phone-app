@@ -57,6 +57,10 @@ const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
             </div>
             <div className="ml-7">
               <SpecRow label="Type" value={phone.display || '-'} />
+              {/* NEW: Display Size - Below Type */}
+              <SpecRow label="Size" value={phone.displaySize || '-'} />
+              {/* NEW: Edge Display - Below Size */}
+              <SpecRow label="Edge" value={phone.edgeDisplay ? (phone.edgeDisplay.charAt(0).toUpperCase() + phone.edgeDisplay.slice(1)) : 'Flat'} />
               <SpecRow label="Resolution" value={phone.resolution || '-'} />
               {phone.resolution_extra && (
                 <SpecRow label="Refresh Rate" value={`${phone.resolution_extra} Hz`} />
@@ -121,6 +125,8 @@ const PhoneDetailModal = ({ isOpen, phone, onClose }) => {
             <div className="ml-7">
               <SpecRow label="Released" value={phone.released || '-'} />
               <SpecRow label="Weight" value={phone.weight ? `${phone.weight}g` : '-'} />
+              {/* NEW: Network - Below Weight */}
+              <SpecRow label="Network" value={phone.network || '4G'} />
               
               {/* Colors Section */}
               <div className="flex py-0.5">

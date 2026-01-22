@@ -160,8 +160,11 @@ const PhoneSpecForm = () => {
     manufacturer: "",
     model: "",
     released: "",
-    weight: "",    
+    weight: "",
+    network: "4G",           // NEW: Network field with default "4G"
     display: "",
+    displaySize: "",         // NEW: Display Size field
+    edgeDisplay: "flat",     // NEW: Edge Display field with default "flat"
     resolution: "",
     resolution_extra: "",
     resolution_extra2: "", 
@@ -217,7 +220,12 @@ const PhoneSpecForm = () => {
         excludeFromSummary: phoneToEdit.excludeFromSummary || false,
         
         // NEW: Handle device type field (default to "phone" if not present for backward compatibility)
-        deviceType: phoneToEdit.deviceType || 'phone'
+        deviceType: phoneToEdit.deviceType || 'phone',
+        
+        // NEW: Handle new fields with backward compatibility (default values for existing entries)
+        network: phoneToEdit.network || '4G',
+        displaySize: phoneToEdit.displaySize || '',
+        edgeDisplay: phoneToEdit.edgeDisplay || 'flat'
       };
       
       setFormData(formattedData);
@@ -259,6 +267,7 @@ const PhoneSpecForm = () => {
       'frontCamera',
       'storage',
       'storage_extra', // RAM
+      'displaySize',   // NEW: Display Size is freeform (e.g., "6.8 inches")
     ];
   
     // List of fields that should be uppercase
@@ -341,7 +350,12 @@ const PhoneSpecForm = () => {
         excludeFromSummary: formData.excludeFromSummary,
         
         // NEW: Include device type (will be "phone" by default for backward compatibility)
-        deviceType: formData.deviceType
+        deviceType: formData.deviceType,
+        
+        // NEW: Include new fields
+        network: formData.network || '4G',
+        displaySize: formData.displaySize || '',
+        edgeDisplay: formData.edgeDisplay || 'flat'
       };
   
       if (isEditing && editId) {
@@ -360,8 +374,11 @@ const PhoneSpecForm = () => {
         manufacturer: "",
         model: "",
         released: "",
-        weight: "",   
+        weight: "",
+        network: "4G",           // NEW: Reset to default
         display: "",
+        displaySize: "",         // NEW: Reset to empty
+        edgeDisplay: "flat",     // NEW: Reset to default
         resolution: "",
         resolution_extra: "",
         resolution_extra2: "", 
@@ -404,8 +421,11 @@ const PhoneSpecForm = () => {
       manufacturer: "",
       model: "",
       released: "",
-      weight: "",   
+      weight: "",
+      network: "4G",           // NEW: Reset to default
       display: "",
+      displaySize: "",         // NEW: Reset to empty
+      edgeDisplay: "flat",     // NEW: Reset to default
       resolution: "",
       resolution_extra: "",
       resolution_extra2: "", 
@@ -473,7 +493,20 @@ const PhoneSpecForm = () => {
                 <InputField label="Manufacturer" name="manufacturer" value={formData.manufacturer} onChange={handleInputChange} />
                 <InputField label="Model" name="model" value={formData.model} onChange={handleInputChange} />
                 <InputField label="Release Date" name="released" value={formData.released} onChange={handleInputChange} />
-                <InputField label="Weigh (grams)" name="weight" value={formData.weight} onChange={handleInputChange} />                
+                <InputField label="Weigh (grams)" name="weight" value={formData.weight} onChange={handleInputChange} />
+                {/* NEW: Network Field - Below Weight */}
+                <div className="flex items-center py-0.5">
+                  <p className="text-[rgb(52,69,157)] w-40 text-base">Network:</p>
+                  <select
+                    name="network"
+                    value={formData.network}
+                    onChange={handleInputChange}
+                    className="text-base flex-1 border rounded px-2 py-1"
+                  >
+                    <option value="4G">4G</option>
+                    <option value="5G">5G</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -495,6 +528,21 @@ const PhoneSpecForm = () => {
                   onChange={handleInputChange} 
                 />
                 <InputField label="Type" name="display" value={formData.display} onChange={handleInputChange} />
+                {/* NEW: Display Size Field - Below Type */}
+                <InputField label="Display Size" name="displaySize" value={formData.displaySize} onChange={handleInputChange} />
+                {/* NEW: Edge Display Dropdown - Below Display Size */}
+                <div className="flex items-center py-0.5">
+                  <p className="text-[rgb(52,69,157)] w-40 text-base">Edge Display:</p>
+                  <select
+                    name="edgeDisplay"
+                    value={formData.edgeDisplay}
+                    onChange={handleInputChange}
+                    className="text-base flex-1 border rounded px-2 py-1"
+                  >
+                    <option value="flat">Flat</option>
+                    <option value="curved">Curved</option>
+                  </select>
+                </div>
                 <InputField label="Protection" name="protection" value={formData.protection} onChange={handleInputChange} />
               </div>
             </div>

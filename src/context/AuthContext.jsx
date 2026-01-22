@@ -113,9 +113,10 @@ export const AuthProvider = ({ children }) => {
       { key: 'procurementmgmt', label: 'Procurement Management', requiredRole: 'admin' },
       { key: 'stockreceiving', label: 'Stock Receiving', requiredRole: 'admin' },
       { key: 'suppliers', label: 'Supplier Management', requiredRole: 'admin' },
-      { key: 'form', label: 'Add Device Model', requiredRole: 'user' }, // Changed from 'admin' to 'user'
+      { key: 'form', label: 'Add Device Model', requiredRole: 'user' },
       { key: 'phonelist', label: 'Device Models', requiredRole: 'admin' },
       { key: 'prices', label: 'Price Management', requiredRole: 'admin' },
+      { key: 'image-management', label: 'Image Management', requiredRole: 'user' },
       { key: 'price-repair', label: 'Price Config Repair', requiredRole: 'admin' },
       { key: 'archive-preview', label: 'Archive Preview', requiredRole: 'admin' },
       { key: 'backup-testing', label: 'Backup & Testing', requiredRole: 'admin' }
