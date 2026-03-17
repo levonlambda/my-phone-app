@@ -4,14 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs, doc, setDoc, writeBatch, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { 
-  Smartphone, 
-  RefreshCw, 
-  Filter, 
+  Smartphone,
+  RefreshCw,
+  Filter,
   X,
   Edit,
   Save,
   XCircle,
-  CircleAlert  // NEW: Added for exclusion info display
+  CircleAlert,
+  FileText
 } from 'lucide-react';
 import { getCurrentDate } from './phone-selection/utils/phoneUtils';
 
@@ -33,7 +34,8 @@ const PriceManagementForm = () => {
     retailPrice: ''
   });
   const [savingPriceId, setSavingPriceId] = useState(null);
-  
+  const [isExporting, setIsExporting] = useState(false);
+
   // NEW: Add state for excluded models info
   const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
   
@@ -449,6 +451,212 @@ const PriceManagementForm = () => {
   };
 {/* Part 4 End - Save Price Functions */}
 
+  // Handle Word export of price configurations
+  const handleWordExport = () => {
+    if (filteredData.length === 0) {
+      alert('No price configurations to export');
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      // Build filter summary
+      const filterSummary = [];
+      filterSummary.push(`Manufacturer: ${filters.manufacturer || 'All'}`);
+      filterSummary.push(`Model: ${filters.model || 'All'}`);
+      filterSummary.push(`RAM: ${filters.ram || 'All'}`);
+      filterSummary.push(`Storage: ${filters.storage || 'All'}`);
+
+      let htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office"
+              xmlns:w="urn:schemas-microsoft-com:office:word"
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>Price Configuration Report</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+              <w:DoNotOptimizeForBrowser/>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            @page {
+              size: 8.5in 11in;
+              margin: 0.5in 0.5in 0.5in 0.5in;
+              mso-header-margin: 0;
+              mso-footer-margin: 0;
+              mso-paper-source: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+              font-size: 10pt;
+              color: #000;
+            }
+            div.Section1 {
+              page: Section1;
+              margin: 0;
+              padding: 0;
+            }
+            h1 {
+              text-align: center;
+              color: #34459d;
+              font-size: 21pt;
+              margin: 0 0 10pt 0;
+              padding: 0;
+              font-weight: bold;
+            }
+            .header-info {
+              margin: 0 0 3pt 0;
+              font-size: 11pt;
+              padding: 0;
+            }
+            .header-info p {
+              margin: 0 0 3pt 0;
+              padding: 0;
+            }
+            .filter-info {
+              margin: 10pt 0 20pt 0;
+              font-size: 11pt;
+              padding: 0;
+            }
+            .filter-info p {
+              margin: 0;
+              padding: 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              border-spacing: 0;
+              margin: 0;
+              padding: 0;
+              table-layout: fixed;
+            }
+            th {
+              background-color: #34459d;
+              color: white;
+              padding: 6pt 8pt;
+              text-align: center;
+              font-size: 10pt;
+              font-weight: bold;
+              border: 1pt solid #34459d;
+              vertical-align: middle;
+            }
+            td {
+              padding: 5pt 8pt;
+              border: 1pt solid #ddd;
+              font-size: 9pt;
+              font-family: Arial, sans-serif;
+              vertical-align: middle;
+              mso-line-height-rule: exactly;
+              line-height: 14pt;
+            }
+            th.right, td.right {
+              text-align: right;
+            }
+            .gray-row {
+              background-color: #f0f0f0;
+            }
+            .white-row {
+              background-color: white;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="Section1">
+            <h1>Price Configuration Report</h1>
+            <div class="header-info">
+              <p><b>Generated Date:</b> ${new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}</p>
+              <p><b>Total Configurations:</b> ${filteredData.length}</p>
+            </div>
+            <div class="filter-info">
+              <p><b>Applied Filters:</b></p>
+              <p>${filterSummary.join(' | ')}</p>
+            </div>
+            <table>
+              <colgroup>
+                <col style="width: 12%;">
+                <col style="width: 16%;">
+                <col style="width: 8%;">
+                <col style="width: 8%;">
+                <col style="width: 20%;">
+                <col style="width: 12%;">
+                <col style="width: 12%;">
+                <col style="width: 12%;">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Brand</th>
+                  <th>Model</th>
+                  <th>RAM</th>
+                  <th>Storage</th>
+                  <th>Colors</th>
+                  <th>DP</th>
+                  <th>SRP</th>
+                  <th>Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      filteredData.forEach((item, index) => {
+        const rowClass = index % 2 === 0 ? 'white-row' : 'gray-row';
+        const colorsText = item.colors && item.colors.length > 0
+          ? item.colors.map(c => c.color).join(', ')
+          : 'N/A';
+
+        htmlContent += `
+                <tr class="${rowClass}">
+                  <td>${item.manufacturer}</td>
+                  <td>${item.model}</td>
+                  <td>${formatWithGB(item.ram)}</td>
+                  <td>${formatWithGB(item.storage)}</td>
+                  <td>${colorsText}</td>
+                  <td class="right">${formatPrice(item.baseDealersPrice)}</td>
+                  <td class="right">${formatPrice(item.baseRetailPrice)}</td>
+                  <td class="right">${calculateMargin(item.baseDealersPrice, item.baseRetailPrice)}</td>
+                </tr>
+        `;
+      });
+
+      htmlContent += `
+              </tbody>
+            </table>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([htmlContent], {
+        type: 'application/vnd.ms-word;charset=utf-8'
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Price_Configuration_${new Date().toISOString().split('T')[0]}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsExporting(false);
+    } catch (error) {
+      console.error('Error exporting to Word:', error);
+      alert('Failed to export to Word. Please try again.');
+      setIsExporting(false);
+    }
+  };
+
 {/* Part 5 Start - Data Fetching Function with Exclusion Logic */}
   // UPDATED: Fetch and process phone data with exclusion logic
   const fetchPhoneData = useCallback(async (skipLoading = false) => {
@@ -701,6 +909,18 @@ const PriceManagementForm = () => {
             >
               <RefreshCw className="h-5 w-5 mr-1" />
               <span>Refresh</span>
+            </button>
+            <button
+              onClick={handleWordExport}
+              disabled={isExporting || filteredData.length === 0}
+              className={`flex items-center gap-1 ${
+                isExporting || filteredData.length === 0
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-white text-[rgb(52,69,157)]'
+              } px-4 py-2 rounded text-base font-medium`}
+            >
+              <FileText className="h-5 w-5 mr-1" />
+              <span>{isExporting ? 'Exporting...' : 'Export'}</span>
             </button>
           </div>
         </CardHeader>
