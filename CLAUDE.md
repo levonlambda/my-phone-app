@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL: Live Database
+
+The Firebase database is **live production data**. NEVER add, edit, or delete any data in Firestore, Authentication, or Cloud Storage — not via code changes, scripts, Firebase console commands, or any other means. This applies to all collections and documents without exception.
+
 ## Build & Development Commands
 
 - **Dev server:** `npm run dev` (Vite with `--host` for network access)

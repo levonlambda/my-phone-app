@@ -34,9 +34,6 @@ const PriceManagementForm = () => {
   });
   const [savingPriceId, setSavingPriceId] = useState(null);
   
-  // Force re-render state
-  const [forceUpdate, setForceUpdate] = useState(0);
-  
   // NEW: Add state for excluded models info
   const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
   
@@ -368,52 +365,9 @@ const PriceManagementForm = () => {
         console.log(`Updated ${inventorySnap.docs.length} inventory items with new base pricing (ALL colors)`);
       }
       
-      // FORCE STATE UPDATE - Create completely new arrays with updated data
-      const newPhoneData = [...phoneData];
-      newPhoneData[index] = {
-        ...newPhoneData[index],
-        baseDealersPrice: dealersPrice,
-        baseRetailPrice: retailPrice,
-        colors: newPhoneData[index].colors.map(color => ({
-          ...color,
-          dealersPrice: dealersPrice,
-          retailPrice: retailPrice,
-          configId: color.configId || 'updated'
-        }))
-      };
-      
-      // Update phoneData with completely new array
-      setPhoneData(newPhoneData);
-      
-      // Find and update the same item in filteredData
-      const newFilteredData = [...filteredData];
-      const filteredIndex = newFilteredData.findIndex(phone => 
-        phone.manufacturer === item.manufacturer &&
-        phone.model === item.model &&
-        phone.ram === item.ram &&
-        phone.storage === item.storage
-      );
-      
-      if (filteredIndex !== -1) {
-        newFilteredData[filteredIndex] = {
-          ...newFilteredData[filteredIndex],
-          baseDealersPrice: dealersPrice,
-          baseRetailPrice: retailPrice,
-          colors: newFilteredData[filteredIndex].colors.map(color => ({
-            ...color,
-            dealersPrice: dealersPrice,
-            retailPrice: retailPrice,
-            configId: color.configId || 'updated'
-          }))
-        };
-      }
-      
-      // Update filteredData with completely new array
-      setFilteredData(newFilteredData);
-      
-      // Force component re-render
-      setForceUpdate(prev => prev + 1);
-      
+      // Re-fetch data from Firestore to reflect updated prices
+      await fetchPhoneData(true);
+
       // Clear editing state
       handleCancelEdit();
       setSavingPriceId(null);
@@ -476,58 +430,9 @@ const PriceManagementForm = () => {
         console.log(`Updated ${inventorySnap.docs.length} inventory items for color ${colorData.color}`);
       }
       
-      // FORCE STATE UPDATE - Create completely new arrays with updated data
-      const newPhoneData = [...phoneData];
-      newPhoneData[rowIndex] = {
-        ...newPhoneData[rowIndex],
-        colors: newPhoneData[rowIndex].colors.map((color, ci) => {
-          if (ci === colorIndex) {
-            return {
-              ...color,
-              dealersPrice: dealersPrice,
-              retailPrice: retailPrice,
-              configId: color.configId || 'updated'
-            };
-          }
-          return { ...color };
-        })
-      };
-      
-      // Update phoneData with completely new array
-      setPhoneData(newPhoneData);
-      
-      // Find and update the same item in filteredData
-      const newFilteredData = [...filteredData];
-      const filteredIndex = newFilteredData.findIndex(phone => 
-        phone.manufacturer === item.manufacturer &&
-        phone.model === item.model &&
-        phone.ram === item.ram &&
-        phone.storage === item.storage
-      );
-      
-      if (filteredIndex !== -1) {
-        newFilteredData[filteredIndex] = {
-          ...newFilteredData[filteredIndex],
-          colors: newFilteredData[filteredIndex].colors.map((color, ci) => {
-            if (ci === colorIndex) {
-              return {
-                ...color,
-                dealersPrice: dealersPrice,
-                retailPrice: retailPrice,
-                configId: color.configId || 'updated'
-              };
-            }
-            return { ...color };
-          })
-        };
-      }
-      
-      // Update filteredData with completely new array
-      setFilteredData(newFilteredData);
-      
-      // Force component re-render
-      setForceUpdate(prev => prev + 1);
-      
+      // Re-fetch data from Firestore to reflect updated prices
+      await fetchPhoneData(true);
+
       // Clear editing state
       handleCancelEdit();
       setSavingPriceId(null);
@@ -546,8 +451,8 @@ const PriceManagementForm = () => {
 
 {/* Part 5 Start - Data Fetching Function with Exclusion Logic */}
   // UPDATED: Fetch and process phone data with exclusion logic
-  const fetchPhoneData = useCallback(async () => {
-    setLoading(true);
+  const fetchPhoneData = useCallback(async (skipLoading = false) => {
+    if (!skipLoading) setLoading(true);
     setError(null);
     
     try {
@@ -941,7 +846,7 @@ const PriceManagementForm = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredData.map((item, index) => (
-                      <React.Fragment key={`${item.manufacturer}_${item.model}_${item.ram}_${item.storage}_${forceUpdate}_${index}`}>
+                      <React.Fragment key={`${item.manufacturer}_${item.model}_${item.ram}_${item.storage}_${index}`}>
                         {/* Main row - show actual colors instead of "Multiple Colors" */}
                         <tr 
                           className={`hover:bg-gray-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
