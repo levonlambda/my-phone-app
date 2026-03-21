@@ -4,14 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext'; // NEW: Added useAuth import
-import { 
-  Smartphone, 
-  RefreshCw, 
-  ChevronDown, 
-  ChevronRight, 
-  Filter, 
+import {
+  Smartphone,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  Filter,
   X,
-  CircleAlert  // NEW: Added for exclusion info display
+  CircleAlert,  // NEW: Added for exclusion info display
+  FileText
 } from 'lucide-react';
 
 const InventorySummaryForm = () => {
@@ -30,6 +31,9 @@ const InventorySummaryForm = () => {
   
   // NEW: Add state for excluded models info
   const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
+
+  // State for Word export
+  const [isExporting, setIsExporting] = useState(false);
   
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
@@ -85,6 +89,286 @@ const InventorySummaryForm = () => {
       console.error("Error fetching excluded models info:", error);
     }
   }, []);
+
+  // Handle Word export
+  const handleWordExport = async () => {
+    if (filteredData.length === 0) {
+      alert('No inventory data to export');
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      // Build filter summary
+      const filterSummary = [];
+      filterSummary.push(`Brand: ${filters.manufacturer || 'All'}`);
+      filterSummary.push(`Model: ${filters.model || 'All'}`);
+      filterSummary.push(`RAM: ${filters.ram || 'All'}`);
+      filterSummary.push(`Storage: ${filters.storage || 'All'}`);
+      filterSummary.push(`Color: ${filters.color || 'All'}`);
+
+      // Build column headers and colgroup based on admin status
+      const colGroupHtml = isAdmin
+        ? `<colgroup>
+            <col style="width: 12%;">
+            <col style="width: 18%;">
+            <col style="width: 13%;">
+            <col style="width: 9%;">
+            <col style="width: 9%;">
+            <col style="width: 7%;">
+            <col style="width: 6%;">
+            <col style="width: 6%;">
+            <col style="width: 6%;">
+            <col style="width: 7%;">
+            <col style="width: 7%;">
+          </colgroup>`
+        : `<colgroup>
+            <col style="width: 15%;">
+            <col style="width: 22%;">
+            <col style="width: 17%;">
+            <col style="width: 12%;">
+            <col style="width: 7%;">
+            <col style="width: 7%;">
+            <col style="width: 7%;">
+            <col style="width: 7%;">
+            <col style="width: 6%;">
+          </colgroup>`;
+
+      const headerRowHtml = isAdmin
+        ? `<tr>
+            <th>Manufacturer</th>
+            <th>Model</th>
+            <th>Colors</th>
+            <th class="center">DP</th>
+            <th class="center">SRP</th>
+            <th class="center">Margin</th>
+            <th class="center">Sold</th>
+            <th class="center">Display</th>
+            <th class="center">Stock</th>
+            <th class="center">Available</th>
+            <th class="center">Pending</th>
+          </tr>`
+        : `<tr>
+            <th>Manufacturer</th>
+            <th>Model</th>
+            <th>Colors</th>
+            <th class="center">SRP</th>
+            <th class="center">Sold</th>
+            <th class="center">Display</th>
+            <th class="center">Stock</th>
+            <th class="center">Available</th>
+            <th class="center">Pending</th>
+          </tr>`;
+
+      // Build table rows
+      let tableRowsHtml = '';
+      filteredData.forEach((item, index) => {
+        const rowClass = index % 2 === 0 ? 'white-row' : 'gray-row';
+        const ramDisplay = item.ram ? formatWithGB(item.ram) : 'N/A';
+        const storageDisplay = item.storage ? formatWithGB(item.storage) : 'N/A';
+        const modelDisplay = `${item.model} (${ramDisplay}+${storageDisplay})`;
+        const colorsDisplay = item.colors.map(c => c.color).join(', ') || 'N/A';
+
+        tableRowsHtml += `<tr class="${rowClass}">
+          <td>${item.manufacturer}</td>
+          <td>${modelDisplay}</td>
+          <td>${colorsDisplay}</td>
+          ${isAdmin ? `<td class="center">${formatPrice(item.dealersPrice)}</td>` : ''}
+          <td class="center">${formatPrice(item.retailPrice)}</td>
+          ${isAdmin ? `<td class="center">${calculateMargin(item.dealersPrice, item.retailPrice)}</td>` : ''}
+          <td class="center">${item.totalSold}</td>
+          <td class="center">${item.totalOnDisplay}</td>
+          <td class="center">${item.totalOnHand}</td>
+          <td class="center">${item.totalAvailable}</td>
+          <td class="center">${item.totalPending}</td>
+        </tr>`;
+      });
+
+      // Build admin-only summary section
+      let summaryHtml = '';
+      if (isAdmin) {
+        const totalDealerValue = filteredData.reduce((t, i) => t + (i.totalAvailable * i.dealersPrice), 0);
+        const totalRetailValue = filteredData.reduce((t, i) => t + (i.totalAvailable * i.retailPrice), 0);
+        const potentialProfit = totalRetailValue - totalDealerValue;
+        const marginPercentage = totalDealerValue > 0
+          ? ((potentialProfit / totalDealerValue) * 100).toFixed(3)
+          : '0.000';
+        const totalAvailableUnits = filteredData.reduce((t, i) => t + i.totalAvailable, 0);
+
+        summaryHtml = `
+          <div style="margin-top: 20pt;">
+            <h2 style="color: #34459d; font-size: 14pt; margin-bottom: 10pt;">Inventory Value Summary</h2>
+            <table style="width: 60%; border-collapse: collapse; margin: 0;">
+              <tr>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 10pt; font-weight: bold;">Total Dealer's Value</td>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 10pt; text-align: right;">₱${totalDealerValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 9pt; color: #666;">${totalAvailableUnits} available units</td>
+              </tr>
+              <tr style="background-color: #f0f0f0;">
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 10pt; font-weight: bold;">Total Retail Value</td>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 10pt; text-align: right;">₱${totalRetailValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 9pt; color: #666;">${totalAvailableUnits} available units</td>
+              </tr>
+              <tr>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 10pt; font-weight: bold;">Potential Profit</td>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 10pt; text-align: right;">₱${potentialProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="padding: 6pt 8pt; border: 1pt solid #ddd; font-size: 9pt; color: #666;">${marginPercentage}% margin</td>
+              </tr>
+            </table>
+          </div>`;
+      }
+
+      // Construct the full HTML document
+      const htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office"
+              xmlns:w="urn:schemas-microsoft-com:office:word"
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>Inventory Summary Report</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+              <w:DoNotOptimizeForBrowser/>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            @page {
+              size: 11in 8.5in;
+              margin: 0.5in 0.5in 0.5in 0.5in;
+              mso-header-margin: 0;
+              mso-footer-margin: 0;
+              mso-paper-source: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+              font-size: 10pt;
+              color: #000;
+            }
+            div.Section1 {
+              page: Section1;
+              margin: 0;
+              padding: 0;
+            }
+            h1 {
+              text-align: center;
+              color: #34459d;
+              font-size: 21pt;
+              margin: 0 0 10pt 0;
+              padding: 0;
+              font-weight: bold;
+            }
+            .header-info {
+              margin: 0 0 3pt 0;
+              font-size: 11pt;
+              padding: 0;
+            }
+            .header-info p {
+              margin: 0 0 3pt 0;
+              padding: 0;
+            }
+            .filter-info {
+              margin: 10pt 0 20pt 0;
+              font-size: 11pt;
+              padding: 0;
+            }
+            .filter-info p {
+              margin: 0;
+              padding: 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              border-spacing: 0;
+              margin: 0;
+              padding: 0;
+              table-layout: fixed;
+            }
+            th {
+              background-color: #34459d;
+              color: white;
+              padding: 6pt 8pt;
+              text-align: left;
+              font-size: 10pt;
+              font-weight: bold;
+              border: 1pt solid #34459d;
+              vertical-align: middle;
+            }
+            td {
+              padding: 5pt 8pt;
+              border: 1pt solid #ddd;
+              font-size: 9pt;
+              font-family: Arial, sans-serif;
+              vertical-align: middle;
+              mso-line-height-rule: exactly;
+              line-height: 14pt;
+            }
+            th.center, td.center {
+              text-align: center;
+            }
+            .gray-row {
+              background-color: #f0f0f0;
+            }
+            .white-row {
+              background-color: white;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="Section1">
+            <h1>Inventory Summary Report</h1>
+            <div class="header-info">
+              <p><b>Generated Date:</b> ${new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}</p>
+              <p><b>Total Configurations:</b> ${filteredData.length}</p>
+            </div>
+            <div class="filter-info">
+              <p><b>Applied Filters:</b></p>
+              <p>${filterSummary.join(' | ')}</p>
+            </div>
+            <table>
+              ${colGroupHtml}
+              <thead>
+                ${headerRowHtml}
+              </thead>
+              <tbody>
+                ${tableRowsHtml}
+              </tbody>
+            </table>
+            ${summaryHtml}
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Create blob and download
+      const blob = new Blob([htmlContent], {
+        type: 'application/vnd.ms-word;charset=utf-8'
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Inventory_Summary_${new Date().toISOString().split('T')[0]}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting to Word:', error);
+      alert('Failed to export to Word. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Toggle row expansion (for base configurations)
   const toggleRowExpansion = (index) => {
@@ -689,6 +973,20 @@ const InventorySummaryForm = () => {
               <RefreshCw className="h-5 w-5 mr-1" />
               <span>Refresh</span>
             </button>
+            {isAdmin && (
+              <button
+                onClick={handleWordExport}
+                disabled={isExporting || filteredData.length === 0}
+                className={`flex items-center gap-1 ${
+                  isExporting || filteredData.length === 0
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-white text-[rgb(52,69,157)]'
+                } px-4 py-2 rounded text-base font-medium`}
+              >
+                <FileText className="h-5 w-5 mr-1" />
+                <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+              </button>
+            )}
           </div>
         </CardHeader>
 
@@ -835,7 +1133,9 @@ const InventorySummaryForm = () => {
                       <th className="px-3 py-3 text-left">RAM</th>
                       <th className="px-3 py-3 text-left">Storage</th>
                       <th className="px-3 py-3 text-left">Colors</th>
-                      <th className="pl-0 pr-1 py-3 text-center">DP</th>
+                      {isAdmin && (
+                        <th className="pl-0 pr-1 py-3 text-center">DP</th>
+                      )}
                       <th className="px-1 py-3 text-center">SRP</th>
                       {isAdmin && (
                         <th className="px-1 py-3 text-right">Margin</th>
@@ -876,7 +1176,9 @@ const InventorySummaryForm = () => {
                               )}
                             </div>
                           </td>
-                          <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
+                          {isAdmin && (
+                            <td className="pl-0 pr-1 py-3 text-sm text-right">{formatPrice(item.dealersPrice)}</td>
+                          )}
                           <td className="px-1 py-3 text-sm text-right">{formatPrice(item.retailPrice)}</td>
                           {isAdmin && (
                             <td className="px-1 py-3 text-sm text-right font-medium">
