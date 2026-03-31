@@ -219,6 +219,18 @@ const InventorySummaryForm = () => {
           </div>`;
       }
 
+      // Build excluded models section
+      let excludedHtml = '';
+      if (excludedModelsInfo.length > 0) {
+        const excludedList = excludedModelsInfo
+          .map(m => `${m.manufacturer} ${m.model}`)
+          .join(', ');
+        excludedHtml = `
+          <div style="margin-top: 20pt;">
+            <p style="font-size: 10pt; color: #666;"><b>Excluded Models (${excludedModelsInfo.length}):</b> ${excludedList}</p>
+          </div>`;
+      }
+
       // Construct the full HTML document
       const htmlContent = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -345,6 +357,7 @@ const InventorySummaryForm = () => {
               </tbody>
             </table>
             ${summaryHtml}
+            ${excludedHtml}
           </div>
         </body>
         </html>
