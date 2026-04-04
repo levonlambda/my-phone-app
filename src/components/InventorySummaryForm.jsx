@@ -652,11 +652,7 @@ const InventorySummaryForm = () => {
       });
       
       console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
-      
-      // Now fetch inventory data
-      const inventoryRef = collection(db, 'inventory');
-      const snapshot = await getDocs(inventoryRef);
-      
+
       // Group inventory by manufacturer, model, ram, storage (excluding color)
       const groupedData = {};
       const manufacturers = new Set();
@@ -664,6 +660,47 @@ const InventorySummaryForm = () => {
       const rams = new Set();
       const storages = new Set();
       const colors = new Set();
+
+      // Pre-seed from price_configurations so models with configured prices
+      // appear even if they have no current inventory
+      const priceConfigsRef = collection(db, 'price_configurations');
+      const priceConfigsSnapshot = await getDocs(priceConfigsRef);
+      priceConfigsSnapshot.forEach(doc => {
+        const config = doc.data();
+        // Only use base pricing (no color-specific entries)
+        if (!config.manufacturer || !config.model || !config.ram || !config.storage || config.color) return;
+
+        const modelKey = `${config.manufacturer}_${config.model}`;
+        if (excludedModels.has(modelKey)) return;
+
+        const baseKey = `${config.manufacturer}_${config.model}_${config.ram}_${config.storage}`;
+        if (!groupedData[baseKey]) {
+          manufacturers.add(config.manufacturer);
+          models.add(config.model);
+          rams.add(config.ram);
+          storages.add(config.storage);
+
+          groupedData[baseKey] = {
+            manufacturer: config.manufacturer,
+            model: config.model,
+            ram: config.ram,
+            storage: config.storage,
+            totalSold: 0,
+            totalOnDisplay: 0,
+            totalOnHand: 0,
+            totalAvailable: 0,
+            totalPending: 0,
+            dealersPrice: config.dealersPrice || 0,
+            retailPrice: config.retailPrice || 0,
+            colors: {}
+          };
+        }
+      });
+
+      // Now fetch inventory data
+      const inventoryRef = collection(db, 'inventory');
+      const snapshot = await getDocs(inventoryRef);
+
 {/* Part 3 End - Filter Options Update and Date Helper */}
 
 {/* Part 4 Start - Inventory Data Processing */}
@@ -702,7 +739,7 @@ const InventorySummaryForm = () => {
             colors: {}
           };
         }
-        
+
         // Group by color for color breakdown
         if (!groupedData[baseKey].colors[item.color]) {
           groupedData[baseKey].colors[item.color] = {
