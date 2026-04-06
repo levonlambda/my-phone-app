@@ -31,6 +31,7 @@ const InventorySummaryForm = () => {
   
   // NEW: Add state for excluded models info
   const [excludedModelsInfo, setExcludedModelsInfo] = useState([]);
+  const [excludedModelsCollapsed, setExcludedModelsCollapsed] = useState(true);
 
   // State for Word export
   const [isExporting, setIsExporting] = useState(false);
@@ -1134,25 +1135,37 @@ const InventorySummaryForm = () => {
         <CardContent className="p-4">
           {excludedModelsInfo.length > 0 && (
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
+              <div
+                className="flex items-center gap-2 cursor-pointer select-none"
+                onClick={() => setExcludedModelsCollapsed(!excludedModelsCollapsed)}
+              >
                 <CircleAlert className="h-5 w-5 text-yellow-600" />
                 <h4 className="font-medium text-yellow-800">
                   Excluded Models ({excludedModelsInfo.length})
                 </h4>
+                {excludedModelsCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-yellow-600" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-yellow-600" />
+                )}
               </div>
-              <div className="text-sm text-yellow-700">
-                The following models are excluded from this summary:
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {excludedModelsInfo.map((model, index) => (
-                  <span 
-                    key={index}
-                    className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
-                  >
-                    {model.manufacturer} {model.model}
-                  </span>
-                ))}
-              </div>
+              {!excludedModelsCollapsed && (
+                <>
+                  <div className="text-sm text-yellow-700 mt-2">
+                    The following models are excluded from this summary:
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {excludedModelsInfo.map((model, index) => (
+                      <span
+                        key={index}
+                        className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
+                      >
+                        {model.manufacturer} {model.model}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
