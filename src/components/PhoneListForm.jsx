@@ -431,10 +431,11 @@ const PhoneListForm = () => {
                         </th>
                         <th className="border px-4 py-2 text-left w-[10%]">Display</th>
                         <th className="border px-4 py-2 text-left w-[10%]">RAM</th>
-                        <th className="border px-4 py-2 text-left w-[12%]">Storage</th>
-                        <th className="border px-4 py-2 text-left w-[15%]">CPU/Chipset</th>
+                        <th className="border px-4 py-2 text-left w-[11%]">Storage</th>
+                        <th className="border px-4 py-2 text-left w-[14%]">CPU/Chipset</th>
                         <th className="border px-4 py-2 text-left w-[10%]">Battery</th>
                         <th className="border px-4 py-2 text-left w-[13%]">Colors</th>
+                        <th className="border px-4 py-2 text-center w-[7%]">Excluded</th>
                         <th className="border px-4 py-2 text-center w-[8%]">Actions</th>
                       </tr>
                     </thead>
@@ -469,6 +470,7 @@ const PhoneListForm = () => {
                               )}
                             </div>
                           </td>
+                          <td className="border px-4 py-2 text-center">{phone.excludeFromSummary ? 'True' : 'False'}</td>
                           <td className="border px-4 py-2 text-center">
                             <div className="flex justify-center space-x-3">
                               <button
