@@ -642,16 +642,20 @@ const InventorySummaryForm = () => {
       const phonesSnapshot = await getDocs(phonesRef);
       
       const excludedModels = new Set();
+      const validModels = new Set();
       phonesSnapshot.forEach(doc => {
         const phoneData = doc.data();
-        // If excludeFromSummary is true, add the manufacturer_model combination to excluded set
-        if (phoneData.excludeFromSummary === true && phoneData.manufacturer && phoneData.model) {
+        if (phoneData.manufacturer && phoneData.model) {
           const modelKey = `${phoneData.manufacturer}_${phoneData.model}`;
-          excludedModels.add(modelKey);
-          console.log(`Excluding model from summary: ${phoneData.manufacturer} ${phoneData.model}`);
+          validModels.add(modelKey);
+          // If excludeFromSummary is true, add to excluded set
+          if (phoneData.excludeFromSummary === true) {
+            excludedModels.add(modelKey);
+            console.log(`Excluding model from summary: ${phoneData.manufacturer} ${phoneData.model}`);
+          }
         }
       });
-      
+
       console.log(`Found ${excludedModels.size} excluded models:`, Array.from(excludedModels));
 
       // Group inventory by manufacturer, model, ram, storage (excluding color)
@@ -673,6 +677,10 @@ const InventorySummaryForm = () => {
 
         const modelKey = `${config.manufacturer}_${config.model}`;
         if (excludedModels.has(modelKey)) return;
+        if (!validModels.has(modelKey)) {
+          console.log(`Skipping phantom model from price config: ${config.manufacturer} ${config.model}`);
+          return;
+        }
 
         const baseKey = `${config.manufacturer}_${config.model}_${config.ram}_${config.storage}`;
         if (!groupedData[baseKey]) {
@@ -708,11 +716,15 @@ const InventorySummaryForm = () => {
       snapshot.forEach(doc => {
         const item = { id: doc.id, ...doc.data() };
         
-        // NEW: Check if this model should be excluded from summary
+        // Check if this model should be excluded from summary
         const modelKey = `${item.manufacturer}_${item.model}`;
         if (excludedModels.has(modelKey)) {
           console.log(`Skipping excluded model: ${item.manufacturer} ${item.model}`);
-          return; // Skip this item
+          return;
+        }
+        if (!validModels.has(modelKey)) {
+          console.log(`Skipping phantom model from inventory: ${item.manufacturer} ${item.model}`);
+          return;
         }
         
         const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
@@ -794,7 +806,11 @@ const InventorySummaryForm = () => {
             // Check if this model should be excluded from summary
             const modelKey = `${item.manufacturer}_${item.model}`;
             if (excludedModels.has(modelKey)) {
-              return; // Skip this item
+              return;
+            }
+            if (!validModels.has(modelKey)) {
+              console.log(`Skipping phantom model from procurement: ${item.manufacturer} ${item.model}`);
+              return;
             }
             
             const baseKey = `${item.manufacturer}_${item.model}_${item.ram}_${item.storage}`;
