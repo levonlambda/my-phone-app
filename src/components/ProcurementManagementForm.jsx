@@ -35,6 +35,17 @@ const ProcurementManagementForm = () => {
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+
+  // Year options: 2025 (first program year) through the current year, newest first
+  const yearOptions = (() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let y = currentYear; y >= 2025; y--) {
+      years.push(String(y));
+    }
+    return years;
+  })();
 
   // ====== HELPER FUNCTIONS ======
   // Format price with commas and two decimal places
@@ -161,9 +172,16 @@ const ProcurementManagementForm = () => {
         }
       });
     }
-    
+
+    // Apply year filter
+    if (yearFilter !== 'all') {
+      filtered = filtered.filter(procurement =>
+        procurement.purchaseDate?.slice(0, 4) === yearFilter
+      );
+    }
+
     setFilteredProcurements(filtered);
-  }, [procurements, searchTerm, statusFilter]);
+  }, [procurements, searchTerm, statusFilter, yearFilter]);
 {/* Part 2 End - Data Fetching Functions */}
 
 {/* Part 3 Start - Form Action Handlers with Payment Update */}
@@ -333,6 +351,20 @@ const ProcurementManagementForm = () => {
                 </div>
               </div>
 
+              {/* Year Filter */}
+              <div className="w-full md:w-40">
+                <select
+                  value={yearFilter}
+                  onChange={(e) => setYearFilter(e.target.value)}
+                  className="w-full p-2 border rounded-lg text-sm"
+                >
+                  <option value="all">All Years</option>
+                  {yearOptions.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+
               {/* Status Filter */}
               <div className="w-full md:w-48">
                 <select
@@ -366,7 +398,7 @@ const ProcurementManagementForm = () => {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-800">Procurement Summary</h3>
               <div className="text-sm text-gray-600">
-                {searchTerm || statusFilter !== 'all' 
+                {searchTerm || statusFilter !== 'all' || yearFilter !== 'all'
                   ? `${filteredProcurements.length} of ${procurements.length} entries (filtered)`
                   : `${filteredProcurements.length} entries`}
               </div>
