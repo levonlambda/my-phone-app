@@ -370,6 +370,7 @@ const PhoneProcurementForm = () => {
         
         querySnapshot.forEach((doc) => {
           const data = doc.data();
+          if (data.excludeFromSummary === true) return;
           if (data.model) {
             modelSet.add(data.model);
           }
@@ -1499,14 +1500,15 @@ const PhoneProcurementForm = () => {
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border px-3 py-3 text-left font-semibold">Manufacturer</th>
-                        <th className="border px-3 py-3 text-left font-semibold">Model</th>
-                        <th className="border px-3 py-3 text-center font-semibold">RAM</th>
-                        <th className="border px-3 py-3 text-center font-semibold">Storage</th>
-                        <th className="border px-3 py-3 text-center font-semibold">Color</th>
-                        <th className="border px-3 py-3 text-center font-semibold">Qty</th>
-                        <th className="border px-3 py-3 text-right font-semibold">Dealer&apos;s Price</th>
-                        <th className="border px-3 py-3 text-right font-semibold">Total Price</th>
+                        <th className="border px-3 py-3 text-left font-semibold w-[11%]">Manufacturer</th>
+                        <th className="border px-3 py-3 text-left font-semibold w-[17%]">Model</th>
+                        <th className="border px-3 py-3 text-center font-semibold w-[7%]">RAM</th>
+                        <th className="border px-3 py-3 text-center font-semibold w-[8%]">Storage</th>
+                        <th className="border px-3 py-3 text-center font-semibold w-[10%]">Color</th>
+                        <th className="border px-3 py-3 text-center font-semibold w-[10%]">Qty</th>
+                        <th className="border px-3 py-3 text-right font-semibold w-[11%]">Dealer&apos;s Price</th>
+                        <th className="border px-3 py-3 text-right font-semibold w-[12%]">Retail Price</th>
+                        <th className="border px-3 py-3 text-right font-semibold w-[14%]">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1567,6 +1569,9 @@ const PhoneProcurementForm = () => {
                           <td className="border px-3 py-2 text-right font-mono">
                             ₱{formatPrice(item.dealersPrice)}
                           </td>
+                          <td className="border px-3 py-2 text-right font-mono">
+                            ₱{formatPrice(item.retailPrice) || '0.00'}
+                          </td>
                           <td className="border px-3 py-2 text-right font-mono font-medium">
                             ₱{formatPrice(item.totalPrice.toString())}
                           </td>
@@ -1579,7 +1584,7 @@ const PhoneProcurementForm = () => {
                         <td className="border px-3 py-2 text-center font-mono">
                           {procurementItems.reduce((sum, item) => sum + item.quantity, 0)}
                         </td>
-                        <td className="border px-3 py-2 text-right">Grand Total:</td>
+                        <td colSpan="2" className="border px-3 py-2 text-right">Grand Total:</td>
                         <td className="border px-3 py-2 text-right font-mono text-lg">
                           ₱{formatPrice(calculateGrandTotal().toString())}
                         </td>
