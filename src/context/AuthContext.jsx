@@ -119,7 +119,19 @@ export const AuthProvider = ({ children }) => {
       { key: 'image-management', label: 'Image Management', requiredRole: 'user' },
       { key: 'price-repair', label: 'Price Config Repair', requiredRole: 'admin' },
       { key: 'archive-preview', label: 'Archive Preview', requiredRole: 'admin' },
-      { key: 'backup-testing', label: 'Backup & Testing', requiredRole: 'admin' }
+      { key: 'backup-testing', label: 'Backup & Testing', requiredRole: 'admin' },
+
+      // Accessories feature
+      { key: 'acc-products', label: 'Acc. Products', requiredRole: 'user' },
+      { key: 'acc-product-list', label: 'Acc. Product List', requiredRole: 'admin' },
+      { key: 'acc-entry', label: 'Acc. Entry', requiredRole: 'admin' },
+      { key: 'acc-inventory', label: 'Acc. Inventory', requiredRole: 'admin' },
+      { key: 'acc-summary', label: 'Acc. Summary', requiredRole: 'user' },
+      { key: 'acc-prices', label: 'Acc. Prices', requiredRole: 'admin' },
+      { key: 'acc-procurement', label: 'Acc. Procurement', requiredRole: 'admin' },
+      { key: 'acc-procurement-mgmt', label: 'Acc. Proc. Mgmt', requiredRole: 'admin' },
+      { key: 'acc-stock-receiving', label: 'Acc. Receiving', requiredRole: 'admin' },
+      { key: 'acc-ledger', label: 'Acc. Ledger', requiredRole: 'admin' }
     ];
 
     if (userRole === 'admin') {

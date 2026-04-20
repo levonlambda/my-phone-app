@@ -21,6 +21,13 @@ export const GlobalStateProvider = ({ children }) => {
   const [isViewingProcurement, setIsViewingProcurement] = useState(false); // Track view vs edit mode
   const [procurementMode, setProcurementMode] = useState(''); // NEW: Track procurement mode ('view', 'edit', 'payment')
   const [procurementForReceiving, setProcurementForReceiving] = useState(null); // NEW: State for stock receiving
+
+  // ====== ACCESSORIES FEATURE STATE ======
+  const [accessoryProductToEdit, setAccessoryProductToEdit] = useState(null);
+  const [accessoryInventoryItemToEdit, setAccessoryInventoryItemToEdit] = useState(null);
+  const [accessoryProcurementToEdit, setAccessoryProcurementToEdit] = useState(null);
+  const [accessoryProcurementMode, setAccessoryProcurementMode] = useState(''); // 'view' | 'edit' | 'payment'
+  const [accessoryProcurementForReceiving, setAccessoryProcurementForReceiving] = useState(null);
   
   // ====== PHONE EDITING FUNCTIONS ======
   // Function to set a phone for editing and switch to form
@@ -88,7 +95,58 @@ export const GlobalStateProvider = ({ children }) => {
   const clearProcurementForReceiving = () => {
     setProcurementForReceiving(null);
   };
-  
+
+  // ====== ACCESSORIES HELPERS ======
+  const editAccessoryProduct = (product) => {
+    setAccessoryProductToEdit(product);
+    setActiveComponent('acc-products');
+  };
+
+  const clearAccessoryProductToEdit = () => {
+    setAccessoryProductToEdit(null);
+  };
+
+  const editAccessoryInventoryItem = (item) => {
+    setAccessoryInventoryItemToEdit(item);
+    setActiveComponent('acc-entry');
+  };
+
+  const clearAccessoryInventoryItemToEdit = () => {
+    setAccessoryInventoryItemToEdit(null);
+  };
+
+  const editAccessoryProcurement = (procurement) => {
+    setAccessoryProcurementToEdit(procurement);
+    setAccessoryProcurementMode('edit');
+    setActiveComponent('acc-procurement');
+  };
+
+  const viewAccessoryProcurement = (procurement) => {
+    setAccessoryProcurementToEdit(procurement);
+    setAccessoryProcurementMode('view');
+    setActiveComponent('acc-procurement');
+  };
+
+  const paymentAccessoryProcurement = (procurement) => {
+    setAccessoryProcurementToEdit(procurement);
+    setAccessoryProcurementMode('payment');
+    setActiveComponent('acc-procurement');
+  };
+
+  const clearAccessoryProcurementToEdit = () => {
+    setAccessoryProcurementToEdit(null);
+    setAccessoryProcurementMode('');
+  };
+
+  const receiveAccessoryProcurement = (procurement) => {
+    setAccessoryProcurementForReceiving(procurement);
+    setActiveComponent('acc-stock-receiving');
+  };
+
+  const clearAccessoryProcurementForReceiving = () => {
+    setAccessoryProcurementForReceiving(null);
+  };
+
   // ====== CONTEXT VALUE OBJECT ======
   // Create a value object with all the state and functions
   const contextValue = {
@@ -109,7 +167,24 @@ export const GlobalStateProvider = ({ children }) => {
     procurementForReceiving, // NEW: Add procurement for receiving state
     clearProcurementForReceiving, // NEW: Add clear function
     activeComponent,
-    setActiveComponent
+    setActiveComponent,
+
+    // Accessories feature state and helpers
+    accessoryProductToEdit,
+    editAccessoryProduct,
+    clearAccessoryProductToEdit,
+    accessoryInventoryItemToEdit,
+    editAccessoryInventoryItem,
+    clearAccessoryInventoryItemToEdit,
+    accessoryProcurementToEdit,
+    accessoryProcurementMode,
+    editAccessoryProcurement,
+    viewAccessoryProcurement,
+    paymentAccessoryProcurement,
+    clearAccessoryProcurementToEdit,
+    accessoryProcurementForReceiving,
+    receiveAccessoryProcurement,
+    clearAccessoryProcurementForReceiving
   };
   
   return (
