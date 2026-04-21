@@ -16,6 +16,7 @@ import {
   addDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   getDoc,
   getDocs,
   query,
@@ -246,15 +247,22 @@ const DEFAULT_CATEGORIES = [
 ];
 
 /**
- * Fetch all accessory categories, sorted by sortOrder.
+ * Fetch all accessory categories, sorted by sortOrder. Deduplicates by code
+ * in memory so any legacy docs that share a code appear only once.
  */
 export const getAllCategories = async () => {
   try {
     const snapshot = await getDocs(collection(db, 'accessory_categories'));
-    const categories = [];
+    const byCode = new Map();
     snapshot.forEach((d) => {
-      categories.push({ id: d.id, ...d.data() });
+      const data = d.data();
+      const code = (data.code || '').toUpperCase();
+      if (!code) return;
+      if (!byCode.has(code)) {
+        byCode.set(code, { id: d.id, ...data });
+      }
     });
+    const categories = Array.from(byCode.values());
     categories.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
     return { success: true, categories };
   } catch (error) {
@@ -264,7 +272,10 @@ export const getAllCategories = async () => {
 };
 
 /**
- * Create a new accessory category. The code must be unique across active categories.
+ * Create a new accessory category with a Firestore auto-generated doc ID.
+ * The category code must be unique (enforced by a pre-check against the
+ * code field; race-safe in practice because creating categories is a
+ * rare, user-initiated action).
  */
 export const createCategory = async (categoryData) => {
   try {
@@ -273,19 +284,19 @@ export const createCategory = async (categoryData) => {
       throw new Error('Category name and code are required');
     }
 
-    // Check code uniqueness
+    const codeUpper = code.toUpperCase();
     const existingQ = query(
       collection(db, 'accessory_categories'),
-      where('code', '==', code.toUpperCase())
+      where('code', '==', codeUpper)
     );
     const existingSnap = await getDocs(existingQ);
     if (!existingSnap.empty) {
-      return { success: false, error: `Category code "${code}" is already in use` };
+      return { success: false, error: `Category code "${codeUpper}" is already in use` };
     }
 
     const docRef = await addDoc(collection(db, 'accessory_categories'), {
       name,
-      code: code.toUpperCase(),
+      code: codeUpper,
       active: categoryData.active !== undefined ? categoryData.active : true,
       sortOrder: categoryData.sortOrder || 100,
       dateCreated: Timestamp.now(),
@@ -300,18 +311,15 @@ export const createCategory = async (categoryData) => {
 };
 
 /**
- * Update an existing category.
+ * Update an existing category. The code is immutable (it's referenced by
+ * every SKU that uses this category) and is silently stripped from the
+ * payload if present.
  */
 export const updateCategory = async (categoryId, categoryData) => {
   try {
     const categoryRef = doc(db, 'accessory_categories', categoryId);
-    const updatePayload = {
-      ...categoryData,
-      lastUpdated: Timestamp.now()
-    };
-    if (updatePayload.code) {
-      updatePayload.code = updatePayload.code.toUpperCase();
-    }
+    const updatePayload = { ...categoryData, lastUpdated: Timestamp.now() };
+    delete updatePayload.code; // code is immutable — SKUs already reference it
     await updateDoc(categoryRef, updatePayload);
     return { success: true, message: 'Category updated successfully' };
   } catch (error) {
@@ -321,38 +329,94 @@ export const updateCategory = async (categoryId, categoryData) => {
 };
 
 /**
- * Seed the default set of categories if the collection is empty.
- * Safe to call multiple times — it only writes when there are zero categories.
+ * Delete a category. Does NOT cascade-delete products in the category —
+ * callers should warn the user about any products that will be orphaned.
  */
-export const seedDefaultCategoriesIfEmpty = async () => {
+export const deleteCategory = async (categoryId) => {
   try {
-    const snapshot = await getDocs(collection(db, 'accessory_categories'));
-    if (!snapshot.empty) {
-      return { success: true, seeded: false, message: 'Categories already exist' };
-    }
-
-    const batch = writeBatch(db);
-    DEFAULT_CATEGORIES.forEach((cat) => {
-      const ref = doc(collection(db, 'accessory_categories'));
-      batch.set(ref, {
-        ...cat,
-        active: true,
-        dateCreated: Timestamp.now(),
-        lastUpdated: Timestamp.now()
-      });
-    });
-    await batch.commit();
-
-    return {
-      success: true,
-      seeded: true,
-      count: DEFAULT_CATEGORIES.length,
-      message: 'Default categories seeded successfully'
-    };
+    if (!categoryId) throw new Error('Category ID is required');
+    await deleteDoc(doc(db, 'accessory_categories', categoryId));
+    return { success: true, message: 'Category deleted' };
   } catch (error) {
-    console.error('Error seeding default categories:', error);
+    console.error('Error deleting category:', error);
     return { success: false, error: error.message };
   }
+};
+
+/**
+ * Count how many products reference a given category by name. Used by the
+ * category modal's delete flow to warn about orphaning products.
+ */
+export const countProductsInCategory = async (categoryName) => {
+  try {
+    if (!categoryName) return { success: true, count: 0 };
+    const q = query(
+      collection(db, 'accessory_products'),
+      where('category', '==', categoryName)
+    );
+    const snap = await getDocs(q);
+    return { success: true, count: snap.size };
+  } catch (error) {
+    console.error('Error counting products in category:', error);
+    return { success: false, error: error.message, count: 0 };
+  }
+};
+
+// Module-level guard: coalesces concurrent seed calls (e.g. React StrictMode
+// double-invoke of effects) into a single promise so only one seed write runs.
+let _seedPromise = null;
+
+/**
+ * Seed the default set of categories if they don't already exist.
+ * Race-safe: a module-level promise guard coalesces concurrent calls within
+ * a single page load, and the per-code existence check skips any default
+ * that's already present. Categories use Firestore auto-generated doc IDs.
+ */
+export const seedDefaultCategoriesIfEmpty = async () => {
+  if (_seedPromise) return _seedPromise;
+  _seedPromise = (async () => {
+    try {
+      const checks = await Promise.all(
+        DEFAULT_CATEGORIES.map(async (cat) => {
+          const q = query(
+            collection(db, 'accessory_categories'),
+            where('code', '==', cat.code)
+          );
+          const snap = await getDocs(q);
+          return { cat, exists: !snap.empty };
+        })
+      );
+      const missing = checks.filter((c) => !c.exists);
+      if (missing.length === 0) {
+        return { success: true, seeded: false, message: 'Default categories already exist' };
+      }
+
+      const batch = writeBatch(db);
+      missing.forEach(({ cat }) => {
+        const ref = doc(collection(db, 'accessory_categories'));
+        batch.set(ref, {
+          ...cat,
+          active: true,
+          dateCreated: Timestamp.now(),
+          lastUpdated: Timestamp.now()
+        });
+      });
+      await batch.commit();
+
+      return {
+        success: true,
+        seeded: true,
+        count: missing.length,
+        message: 'Default categories seeded successfully'
+      };
+    } catch (error) {
+      // Clear the guard so a future call can retry after a failure
+      _seedPromise = null;
+      console.error('Error seeding default categories:', error);
+      return { success: false, error: error.message };
+    }
+  })();
+  return _seedPromise;
 };
 
 /* ========== PRICING OPERATIONS (accessory_pricing collection) ========== */
@@ -801,6 +865,8 @@ export default {
   getAllCategories,
   createCategory,
   updateCategory,
+  deleteCategory,
+  countProductsInCategory,
   seedDefaultCategoriesIfEmpty,
 
   // Pricing operations
