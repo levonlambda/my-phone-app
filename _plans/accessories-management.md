@@ -29,13 +29,15 @@ The plan below is organized by phase. Each phase section lists files to create/m
 
 ## Architecture Overview (Key Decisions)
 
-- **Document ID = Internal SKU** across `accessory_products`, `accessory_pricing`, `accessory_inventory`. No denormalized SKU field needed in the latter two.
-- **Single image per product**, stored inline as `photoUrl` on the product document (unlike phones, which use a separate `phone_images` collection with per-color entries). Storage path: `accessory_images/{internalSku}/{fileName}`.
+- **Document ID = Internal SKU** for `accessory_products` and `accessory_pricing`.
+- **`accessory_inventory` uses composite doc IDs** — `${sku}__${locationId}`. Each document represents one product at one store; every store has its own onHand/onDisplay/reserved/defective/sold counters. `sku`, `locationId`, and `locationName` are denormalized on the doc for querying and display.
+- **`accessory_locations` is a separate collection** with Firestore auto-generated doc IDs. Seeded with a default "Main Branch" (primary) on first access via a module-level promise guard.
+- **Single image per product**, stored inline as `photoUrl` on the product document (unlike phones, which use a separate `phone_images` collection with per-color entries). Storage path: `accessory_images/{internalSku}/primary.png` (fixed filename — replace-on-upload overwrites automatically).
 - **Suppliers are read-only**: accessory procurement fetches from existing `suppliers` collection but never writes. Accessory financial state lives entirely in `accessory_ledger` — no updates to `suppliers.totalOutstanding`.
-- **`sold` counter** uses `FieldValue.increment()`; the POS/sales flow (built separately) will call into `accessoryInventoryService` to decrement `onHand` and increment `sold`.
+- **`sold` counter** uses `FieldValue.increment()`; the POS/sales flow (built separately) will call into `accessoryInventoryService.recordAccessorySale(sku, quantity, locationId)` to decrement `onHand` and increment `sold` at the selling store.
 - **Retail price visible to all users; dealer price admin-only**, enforced via Firestore security rules and component-level guards.
-- **Image upload on new-product form: defer until first save** (recommended path — storage requires the SKU as canonical ID). Form UI clearly shows "Save product first, then upload image".
-- **Fixed image filename** (`primary.{ext}`) for accessory images — simpler than tracking old paths for delete-on-replace.
+- **Image upload on new-product form**: the user may pick a file before save; it's previewed locally via a blob URL and uploaded to Storage after the product save returns with a canonical SKU.
+- **Available for sale formula**: `(onHand + onDisplay) − (reserved + defective)` — reflects that `onHand` and `onDisplay` are disjoint buckets (items are either in back-storage or on the shelf, not both).
 
 ---
 
@@ -270,7 +272,7 @@ Add blocks for the six new collections, roughly mirroring the spec:
 
 Phase 1:
 - `src/services/accessoryService.js`
-- `src/services/accessoryInventoryService.js`
+- `src/services/accessoryInventoryService.js` (note: Phase 4 rewrote this for per-location inventory with composite doc IDs)
 - `src/services/accessoryImageService.js`
 - `src/components/accessories/utils/accessoryUtils.js`
 
@@ -288,6 +290,8 @@ Phase 4:
 - `src/components/accessories/AccessoryInventoryEntryForm.jsx`
 - `src/components/accessories/AccessoryInventoryListForm.jsx`
 - `src/components/accessories/AccessoryInventorySummaryForm.jsx`
+- `src/components/accessories/AccessoryLocationModal.jsx` (Manage Stores)
+- `src/services/accessoryLocationService.js` (location CRUD + default seed)
 
 Phase 5:
 - `src/components/accessories/AccessoryProcurementForm.jsx`

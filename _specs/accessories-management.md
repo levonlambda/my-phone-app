@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add a complete accessories management system to the app — parallel to, but fully independent from, the existing phone management system. Accessories differ from phones in that they lack unique per-unit identifiers (IMEI, serial number) and are tracked by **quantity per product** rather than individual item records. The feature introduces new Firestore collections (`accessory_products`, `accessory_pricing`, `accessory_inventory`, `accessory_categories`, `accessory_procurements`, `accessory_ledger`), a new Firebase Storage path (`accessory_images/`), new service modules, new context state, and a full set of UI components that mirror the phone management workflow: product catalog, inventory tracking, pricing, procurement, stock receiving, and supplier ledger.
+Add a complete accessories management system to the app — parallel to, but fully independent from, the existing phone management system. Accessories differ from phones in that they lack unique per-unit identifiers (IMEI, serial number) and are tracked by **quantity per product per store** rather than individual item records. The feature introduces new Firestore collections (`accessory_products`, `accessory_pricing`, `accessory_inventory`, `accessory_categories`, `accessory_locations`, `accessory_procurements`, `accessory_ledger`), a new Firebase Storage path (`accessory_images/`), new service modules, new context state, and a full set of UI components that mirror the phone management workflow: product catalog, per-store inventory tracking, pricing, procurement, stock receiving, and supplier ledger.
 
 No existing Firestore collections, components, or forms are modified. The feature is built from the ground up using the same architectural patterns (context-based navigation, service layer with `{success, data/error}` returns, Firestore transactions for atomic operations, role-based tab visibility).
 
@@ -76,40 +76,81 @@ No existing Firestore collections, components, or forms are modified. The featur
 
 - **Access control:** Only users with admin role can see the pricing view and dealer prices. Regular users should never see dealer pricing data. Retail price may be shown in inventory views (fetched on demand for authorized users, or denormalized where needed).
 
-### FR-4: Accessory Inventory Management (`accessory_inventory` collection)
+### FR-4: Accessory Inventory Management (`accessory_inventory` + `accessory_locations` collections)
 
-**Purpose:** Track current stock quantities for each accessory product.
+**Purpose:** Track stock quantities for each accessory product **at each store (location)**. Each physical store has its own onHand / onDisplay / reserved / defective / sold counters for every product it stocks.
 
-- **Inventory document per product:** One document per SKU (document ID = Internal SKU). Fields:
-  - `onHand` (number) — total units physically in store (not including reserved or defective).
-  - `onDisplay` (number) — units on display shelf (subset tracker, not subtracted from onHand).
-  - `reserved` (number) — units set aside for customers.
-  - `defective` (number) — units identified as defective.
-  - `sold` (number) — running counter of total units sold (cached counter pattern, incremented atomically).
-  - `location` (string, optional) — physical location in store.
-  - `lastUpdated` (timestamp) — server timestamp on every modification.
+#### Terminology
 
-- **Inventory entry/adjustment form** (mirroring `PhoneSelectionForm`):
-  - **Product lookup:** Select a product by typing/searching its Internal SKU, scanning its barcode, or selecting from a dropdown. Barcode scan queries `accessory_products` where `barcode == scannedValue` to resolve the SKU.
-  - **Current stock display:** Once a product is selected, show current inventory counts (onHand, onDisplay, reserved, defective, sold) read from the `accessory_inventory` document.
-  - **Adjustment mode:** User enters adjustment quantities (positive to add, negative to subtract) for onHand, onDisplay, reserved, defective. The form validates that resulting values don't go negative.
-  - **Location update:** Optionally update the location field.
-  - **Save:** Uses `FieldValue.increment()` for atomic updates to quantity fields. Always updates `lastUpdated` with server timestamp.
-  - The `sold` field is NOT directly adjustable from this form — it is only incremented through the sale recording flow (or stock receiving).
+- **Location** (a.k.a. "store", "branch") — a physical retail location. Represented as documents in `accessory_locations` (auto-generated doc IDs).
+- **On Hand** — items physically in the store but NOT on display (e.g., in back storage).
+- **On Display** — items currently on the display shelf / showroom.
+- **Reserved** — items claimed by a customer but not yet picked up.
+- **Defective** — items identified as non-sellable.
+- **Sold** — running lifetime-sold counter, incremented by the POS / sales flow.
+- `On Hand`, `On Display`, `Reserved`, `Defective` are **disjoint buckets** — each unit sits in exactly one at any moment.
+- **Available for sale** = `(onHand + onDisplay) − (reserved + defective)`.
 
-- **Inventory list view** (mirroring `InventoryListForm`):
-  - Table of all accessory products that have inventory documents.
-  - Columns: SKU, manufacturer, model, category, onHand, onDisplay, reserved, defective, sold, available (calculated: onHand - reserved - defective), location.
-  - Product info (manufacturer, model, category) is joined from `accessory_products` by matching document IDs.
-  - Filters: category, manufacturer, stock status (in-stock / out-of-stock / low-stock threshold), text search.
-  - Sorting: clickable column headers (mirroring `InventoryTable` sorting).
-  - Inline editing for quantity fields and location (mirroring `InventoryEditForm`).
+#### `accessory_locations` collection
 
-- **Inventory summary view** (mirroring `InventorySummaryForm`):
-  - Dashboard grouped by category, then by manufacturer.
-  - Each group shows aggregate counts: total onHand, onDisplay, reserved, defective, sold across all products in that group.
-  - Expandable: click a group to see individual products with their counts.
-  - Excludes inactive products by default (toggleable).
+Each document (auto-generated ID) represents a store/branch:
+- `name` (string, required, unique) — e.g., "Main Branch", "Tech Hub".
+- `address` (string, optional) — human-readable address.
+- `active` (boolean) — controls visibility in dropdowns.
+- `isPrimary` (boolean) — at most one location should be primary; UI uses it as the default.
+- `sortOrder` (number) — display ordering.
+- `dateCreated`, `lastUpdated` (timestamps).
+
+On first access the app seeds a single default location named **"Main Branch"** (marked primary) if the collection is empty. Seeding is race-safe via a module-level promise guard.
+
+#### `accessory_inventory` collection — composite doc IDs
+
+One document per **(sku, locationId)** pair. The document ID is the deterministic composite string `${sku}__${locationId}` so direct reads/writes don't require an extra query.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| *(document ID)* | string | — | `${sku}__${locationId}`. |
+| `sku` | string | Yes | Denormalized for `where sku == X` queries. |
+| `locationId` | string | Yes | Denormalized for `where locationId == X` queries. |
+| `locationName` | string | Yes | Denormalized for display. Refreshed on every write. |
+| `onHand`, `onDisplay`, `reserved`, `defective`, `sold` | number | Yes | Per-location counts, default 0. |
+| `lastUpdated` | timestamp | Yes | Server timestamp on every modification. |
+
+#### Inventory entry / adjustment form
+
+- **Store picker** (always visible) — dropdown of active locations, defaulting to the primary store. User can switch between stores to adjust each one independently.
+- **Product lookup** — SKU dropdown or barcode lookup, same as before.
+- **Current stock card** — reflects the selected (product, store) pair. Shows the five counts plus a live Available calculation `(onHand + onDisplay) − (reserved + defective)` with before/after projections as the user types adjustments.
+- **Adjustments** — four signed-number deltas (`onHand`, `onDisplay`, `reserved`, `defective`). Save uses `FieldValue.increment()` inside a Firestore transaction on the composite doc ID. Rejects if any field would go negative. `sold` is NOT adjustable here.
+- **Manage Stores button** — opens the `AccessoryLocationModal` (add / edit / delete stores).
+
+#### Inventory list view
+
+- One row per **(sku, location)** pair.
+- Default scope: show every product at the primary store (including zero-stock rows) so admins can easily spot gaps. Switching the Store filter to "All Stores" collapses to showing only actual inventory rows.
+- Columns: SKU, manufacturer, model, category, **store**, onHand, onDisplay, reserved, defective, sold, Available, retail price (all roles), dealer price (admin only), actions.
+- Filters: store, category, manufacturer, stock status (in-stock / low-stock / out-of-stock), active/inactive, text search (SKU / model / store name).
+- Sortable columns including the store column.
+- Inline edit per row: quantity fields edited as absolute targets; the UI computes the delta and calls `adjustAccessoryInventory(sku, locationId, delta)`.
+
+#### Inventory summary view
+
+- Hierarchical grouping: **Store → Category → Manufacturer → Product**.
+- Each level has aggregate counts.
+- Grand totals card across all stores.
+- "Include inactive products" toggle.
+- Expand-All / Collapse-All controls.
+
+#### Service API (inventory)
+
+- `composeInventoryId(sku, locationId)` — returns the composite doc ID.
+- `getAccessoryInventory(sku, locationId)` — single doc read.
+- `getAllAccessoryInventory()` — every doc across all SKUs and locations.
+- `getInventoryForSku(sku)` — all locations for one SKU.
+- `getInventoryForLocation(locationId)` — all SKUs at one location.
+- `adjustAccessoryInventory(sku, locationId, adjustments)` — atomic; creates the doc if missing.
+- `receiveAccessoryStock(procurementId, receivedItems, dateDelivered, deliveryReference, locationId)` — one procurement is received INTO a single destination location.
+- `recordAccessorySale(sku, quantity, locationId)` — for POS integration; decrements `onHand` and increments `sold` at the selling location.
 
 ### FR-5: Accessory Procurement (`accessory_procurements` collection)
 
@@ -350,7 +391,7 @@ No existing Firestore collections, components, or forms are modified. The featur
 - [ ] No existing phone management tabs, forms, or views are modified.
 
 ### Data Isolation
-- [ ] All accessory data lives in new Firestore collections: `accessory_products`, `accessory_pricing`, `accessory_inventory`, `accessory_categories`, `accessory_procurements`, `accessory_ledger`.
+- [ ] All accessory data lives in new Firestore collections: `accessory_products`, `accessory_pricing`, `accessory_inventory`, `accessory_categories`, `accessory_locations`, `accessory_procurements`, `accessory_ledger`.
 - [ ] All accessory images are stored in a new Firebase Storage path: `accessory_images/{internalSku}/`.
 - [ ] No writes to any existing Firestore collection (`phones`, `inventory`, `inventory_counts`, `price_configurations`, `procurements`, `ledger`, `suppliers`, `users`, `phone_images`).
 - [ ] No writes to the existing `phone_images/` Firebase Storage path.

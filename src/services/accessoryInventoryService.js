@@ -1,14 +1,22 @@
 /* ========== ACCESSORY INVENTORY SERVICE ========== */
-/* Handles quantity-based inventory operations for accessories. */
-/* Mirrors the structure of src/components/phone-selection/services/InventoryService.js */
-/* but uses a simpler single-document-per-product model (no per-unit tracking). */
-/* IMPORTANT: Only writes to accessory_inventory and accessory_procurements. */
+/* Handles quantity-based inventory operations for accessories, scoped per */
+/* (sku, locationId) pair. Each store has its own onHand/onDisplay/reserved/ */
+/* defective/sold counters for each product. */
+/*
+ * Document ID format: `{sku}__{locationId}` (composite). The sku and
+ * locationId are ALSO stored as fields for where-clause queries.
+ * locationName is denormalized for display — refreshed on every write.
+ *
+ * IMPORTANT: Only writes to accessory_inventory and accessory_procurements.
+ */
 
 import {
   collection,
   doc,
   getDoc,
   getDocs,
+  query,
+  where,
   Timestamp,
   runTransaction,
   increment
@@ -17,24 +25,25 @@ import { db } from '../firebase/config';
 
 const QUANTITY_FIELDS = ['onHand', 'onDisplay', 'reserved', 'defective'];
 
+/**
+ * Deterministic composite inventory document ID.
+ */
+export const composeInventoryId = (sku, locationId) => `${sku}__${locationId}`;
+
 /* ========== READ OPERATIONS ========== */
 
 /**
- * Fetch the inventory document for a single SKU.
- * Returns { success, inventory } where inventory is null if no doc exists.
+ * Fetch the inventory document for a single (sku, locationId) pair.
+ * Returns { success, inventory } where inventory is null if no doc exists yet.
  */
-export const getAccessoryInventory = async (sku) => {
+export const getAccessoryInventory = async (sku, locationId) => {
   try {
     if (!sku) throw new Error('SKU is required');
-    const ref = doc(db, 'accessory_inventory', sku);
+    if (!locationId) throw new Error('Location ID is required');
+    const ref = doc(db, 'accessory_inventory', composeInventoryId(sku, locationId));
     const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      return { success: true, inventory: null };
-    }
-    return {
-      success: true,
-      inventory: { id: snap.id, ...snap.data() }
-    };
+    if (!snap.exists()) return { success: true, inventory: null };
+    return { success: true, inventory: { id: snap.id, ...snap.data() } };
   } catch (error) {
     console.error('Error fetching accessory inventory:', error);
     return { success: false, error: error.message };
@@ -42,15 +51,13 @@ export const getAccessoryInventory = async (sku) => {
 };
 
 /**
- * Fetch every inventory document.
+ * Fetch every inventory document (all SKUs, all locations).
  */
 export const getAllAccessoryInventory = async () => {
   try {
     const snapshot = await getDocs(collection(db, 'accessory_inventory'));
     const inventory = [];
-    snapshot.forEach((d) => {
-      inventory.push({ id: d.id, ...d.data() });
-    });
+    snapshot.forEach((d) => inventory.push({ id: d.id, ...d.data() }));
     return { success: true, inventory };
   } catch (error) {
     console.error('Error fetching all accessory inventory:', error);
@@ -58,59 +65,106 @@ export const getAllAccessoryInventory = async () => {
   }
 };
 
+/**
+ * Fetch every inventory doc for a specific SKU (all locations).
+ */
+export const getInventoryForSku = async (sku) => {
+  try {
+    if (!sku) throw new Error('SKU is required');
+    const q = query(collection(db, 'accessory_inventory'), where('sku', '==', sku));
+    const snap = await getDocs(q);
+    const inventory = [];
+    snap.forEach((d) => inventory.push({ id: d.id, ...d.data() }));
+    return { success: true, inventory };
+  } catch (error) {
+    console.error('Error fetching inventory for SKU:', error);
+    return { success: false, error: error.message, inventory: [] };
+  }
+};
+
+/**
+ * Fetch every inventory doc at a specific location (all SKUs).
+ */
+export const getInventoryForLocation = async (locationId) => {
+  try {
+    if (!locationId) throw new Error('Location ID is required');
+    const q = query(
+      collection(db, 'accessory_inventory'),
+      where('locationId', '==', locationId)
+    );
+    const snap = await getDocs(q);
+    const inventory = [];
+    snap.forEach((d) => inventory.push({ id: d.id, ...d.data() }));
+    return { success: true, inventory };
+  } catch (error) {
+    console.error('Error fetching inventory for location:', error);
+    return { success: false, error: error.message, inventory: [] };
+  }
+};
+
 /* ========== ADJUSTMENT OPERATIONS ========== */
 
 /**
- * Atomically adjust inventory counts for a SKU. Creates the inventory
- * document if it doesn't exist yet.
+ * Atomically adjust inventory counts for a (sku, locationId) pair. Creates
+ * the inventory document if it doesn't exist yet (denormalizing locationName
+ * from the location doc).
  *
  * adjustments shape:
- *   { onHand?: number, onDisplay?: number, reserved?: number, defective?: number,
- *     location?: string }
+ *   { onHand?: number, onDisplay?: number, reserved?: number, defective?: number }
  *
  * Positive numbers add; negative numbers subtract. The transaction reads the
  * current document first so it can reject the change if any field would go
  * negative. `sold` is intentionally NOT adjustable here — use recordAccessorySale.
  */
-export const adjustAccessoryInventory = async (sku, adjustments = {}) => {
+export const adjustAccessoryInventory = async (sku, locationId, adjustments = {}) => {
   try {
     if (!sku) throw new Error('SKU is required');
+    if (!locationId) throw new Error('Location ID is required');
 
     const quantityDeltas = {};
     QUANTITY_FIELDS.forEach((field) => {
-      if (adjustments[field] !== undefined && adjustments[field] !== null && adjustments[field] !== '') {
+      if (
+        adjustments[field] !== undefined &&
+        adjustments[field] !== null &&
+        adjustments[field] !== ''
+      ) {
         const delta = Number(adjustments[field]);
         if (!Number.isFinite(delta)) {
           throw new Error(`Adjustment for ${field} must be a number`);
         }
-        if (delta !== 0) {
-          quantityDeltas[field] = delta;
-        }
+        if (delta !== 0) quantityDeltas[field] = delta;
       }
     });
 
-    const nextLocation = adjustments.location;
-    const hasLocationUpdate = nextLocation !== undefined && nextLocation !== null;
-    const hasQuantityChange = Object.keys(quantityDeltas).length > 0;
-
-    if (!hasQuantityChange && !hasLocationUpdate) {
+    if (Object.keys(quantityDeltas).length === 0) {
       return { success: true, message: 'No changes to apply' };
     }
 
     await runTransaction(db, async (transaction) => {
-      const invRef = doc(db, 'accessory_inventory', sku);
-      const snap = await transaction.get(invRef);
+      const invRef = doc(db, 'accessory_inventory', composeInventoryId(sku, locationId));
+      const locRef = doc(db, 'accessory_locations', locationId);
 
-      if (!snap.exists()) {
-        // Creating a new inventory doc — all starting values are 0, deltas must
-        // therefore be non-negative.
+      const [invSnap, locSnap] = await Promise.all([
+        transaction.get(invRef),
+        transaction.get(locRef)
+      ]);
+
+      if (!locSnap.exists()) {
+        throw new Error('Location not found — it may have been deleted');
+      }
+      const locationName = locSnap.data().name || '(Unknown)';
+
+      if (!invSnap.exists()) {
+        // First-time stock at this location for this SKU
         const newDoc = {
+          sku,
+          locationId,
+          locationName,
           onHand: 0,
           onDisplay: 0,
           reserved: 0,
           defective: 0,
           sold: 0,
-          location: nextLocation || '',
           lastUpdated: Timestamp.now()
         };
         for (const [field, delta] of Object.entries(quantityDeltas)) {
@@ -122,22 +176,21 @@ export const adjustAccessoryInventory = async (sku, adjustments = {}) => {
         }
         transaction.set(invRef, newDoc);
       } else {
-        const current = snap.data();
-
-        // Validate no field would go negative
+        const current = invSnap.data();
         for (const [field, delta] of Object.entries(quantityDeltas)) {
           const nextValue = (current[field] || 0) + delta;
           if (nextValue < 0) {
-            throw new Error(`Cannot reduce ${field} below zero (current ${current[field] || 0}, delta ${delta})`);
+            throw new Error(
+              `Cannot reduce ${field} below zero (current ${current[field] || 0}, delta ${delta})`
+            );
           }
         }
-
-        const updatePayload = { lastUpdated: Timestamp.now() };
+        const updatePayload = {
+          locationName, // refresh denormalized name in case location was renamed
+          lastUpdated: Timestamp.now()
+        };
         for (const [field, delta] of Object.entries(quantityDeltas)) {
           updatePayload[field] = increment(delta);
-        }
-        if (hasLocationUpdate) {
-          updatePayload.location = nextLocation;
         }
         transaction.update(invRef, updatePayload);
       }
@@ -151,21 +204,27 @@ export const adjustAccessoryInventory = async (sku, adjustments = {}) => {
 };
 
 /**
- * Receive stock from a procurement. Atomically:
- *   - increments onHand for each received SKU (creating the inventory doc if missing)
- *   - optionally sets location (bulk value, applied when provided)
+ * Receive stock from a procurement INTO a specific location. Atomically:
+ *   - increments onHand for each received SKU at the given location
+ *     (creating the inventory doc if missing)
  *   - marks the procurement isReceived and stores delivery metadata
  *
- * receivedItems shape: [{ internalSku, quantity, location? }, ...]
+ * receivedItems shape: [{ internalSku, quantity }, ...]
  */
-export const receiveAccessoryStock = async (procurementId, receivedItems, dateDelivered, deliveryReference = '') => {
+export const receiveAccessoryStock = async (
+  procurementId,
+  receivedItems,
+  dateDelivered,
+  deliveryReference = '',
+  locationId
+) => {
   try {
     if (!procurementId) throw new Error('Procurement ID is required');
+    if (!locationId) throw new Error('Destination location ID is required');
     if (!Array.isArray(receivedItems) || receivedItems.length === 0) {
       throw new Error('receivedItems must be a non-empty array');
     }
 
-    // Validate quantities up front
     receivedItems.forEach((item) => {
       if (!item.internalSku) throw new Error('Each received item must have an internalSku');
       const qty = Number(item.quantity);
@@ -176,16 +235,22 @@ export const receiveAccessoryStock = async (procurementId, receivedItems, dateDe
 
     await runTransaction(db, async (transaction) => {
       const procurementRef = doc(db, 'accessory_procurements', procurementId);
-      const procurementSnap = await transaction.get(procurementRef);
-      if (!procurementSnap.exists()) {
-        throw new Error('Accessory procurement not found');
-      }
+      const locRef = doc(db, 'accessory_locations', locationId);
 
-      // Read all inventory docs first (Firestore transactions: reads before writes)
-      const invRefs = receivedItems.map((item) => doc(db, 'accessory_inventory', item.internalSku));
-      const invSnaps = await Promise.all(invRefs.map((r) => transaction.get(r)));
+      // All reads must come before any writes in a transaction
+      const invRefs = receivedItems.map((item) =>
+        doc(db, 'accessory_inventory', composeInventoryId(item.internalSku, locationId))
+      );
+      const [procurementSnap, locSnap, ...invSnaps] = await Promise.all([
+        transaction.get(procurementRef),
+        transaction.get(locRef),
+        ...invRefs.map((r) => transaction.get(r))
+      ]);
 
-      // Apply writes
+      if (!procurementSnap.exists()) throw new Error('Accessory procurement not found');
+      if (!locSnap.exists()) throw new Error('Destination location not found');
+      const locationName = locSnap.data().name || '(Unknown)';
+
       receivedItems.forEach((item, idx) => {
         const qty = Number(item.quantity);
         if (qty === 0) return;
@@ -194,23 +259,22 @@ export const receiveAccessoryStock = async (procurementId, receivedItems, dateDe
 
         if (!invSnap.exists()) {
           transaction.set(invRef, {
+            sku: item.internalSku,
+            locationId,
+            locationName,
             onHand: qty,
             onDisplay: 0,
             reserved: 0,
             defective: 0,
             sold: 0,
-            location: item.location || '',
             lastUpdated: Timestamp.now()
           });
         } else {
-          const updatePayload = {
+          transaction.update(invRef, {
             onHand: increment(qty),
+            locationName,
             lastUpdated: Timestamp.now()
-          };
-          if (item.location !== undefined && item.location !== null && item.location !== '') {
-            updatePayload.location = item.location;
-          }
-          transaction.update(invRef, updatePayload);
+          });
         }
       });
 
@@ -218,6 +282,8 @@ export const receiveAccessoryStock = async (procurementId, receivedItems, dateDe
         isReceived: true,
         dateDelivered: dateDelivered || new Date().toISOString().split('T')[0],
         deliveryReference: deliveryReference || '',
+        deliveryLocationId: locationId,
+        deliveryLocationName: locationName,
         lastUpdated: Timestamp.now()
       });
     });
@@ -230,27 +296,30 @@ export const receiveAccessoryStock = async (procurementId, receivedItems, dateDe
 };
 
 /**
- * Record a sale: decrement onHand, increment sold. Atomic. Intended for the
- * POS / sales feature to call — rejected if onHand would go negative.
+ * Record a sale at a specific location. Atomic: onHand -= qty; sold += qty.
+ * Rejects if onHand at that location would go negative.
  */
-export const recordAccessorySale = async (sku, quantity) => {
+export const recordAccessorySale = async (sku, quantity, locationId) => {
   try {
     if (!sku) throw new Error('SKU is required');
+    if (!locationId) throw new Error('Location ID is required');
     const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty <= 0) {
       throw new Error('Sale quantity must be a positive number');
     }
 
     await runTransaction(db, async (transaction) => {
-      const invRef = doc(db, 'accessory_inventory', sku);
+      const invRef = doc(db, 'accessory_inventory', composeInventoryId(sku, locationId));
       const snap = await transaction.get(invRef);
       if (!snap.exists()) {
-        throw new Error('Inventory record not found for this product');
+        throw new Error('No inventory for this product at the selected location');
       }
       const current = snap.data();
       const currentOnHand = current.onHand || 0;
       if (currentOnHand < qty) {
-        throw new Error(`Insufficient stock: onHand=${currentOnHand}, requested=${qty}`);
+        throw new Error(
+          `Insufficient stock at ${current.locationName || 'this location'}: onHand=${currentOnHand}, requested=${qty}`
+        );
       }
       transaction.update(invRef, {
         onHand: increment(-qty),
@@ -269,8 +338,11 @@ export const recordAccessorySale = async (sku, quantity) => {
 /* ========== EXPORT STATEMENT ========== */
 
 export default {
+  composeInventoryId,
   getAccessoryInventory,
   getAllAccessoryInventory,
+  getInventoryForSku,
+  getInventoryForLocation,
   adjustAccessoryInventory,
   receiveAccessoryStock,
   recordAccessorySale
