@@ -45,7 +45,7 @@ const PILL_BASE =
 const PILL_CLASS = {
   onHand: 'bg-blue-100 text-blue-800',
   onDisplay: 'bg-yellow-100 text-yellow-800',
-  reserved: 'bg-amber-100 text-amber-800',
+  reserved: 'bg-gray-100 text-gray-700',
   defective: 'bg-red-100 text-red-800',
   sold: 'bg-purple-100 text-purple-800',
   pending: 'bg-orange-100 text-orange-800',
@@ -745,6 +745,12 @@ const AccessoryInventoryListForm = () => {
                     </th>
                     <th
                       className="border px-3 py-2 text-center cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('reserved')}
+                    >
+                      Reserved {sortCaret('reserved')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-center cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('available')}
                     >
                       Available {sortCaret('available')}
@@ -817,6 +823,11 @@ const AccessoryInventoryListForm = () => {
                               {row.onHand}
                             </span>
                           )}
+                        </td>
+                        <td className="border px-3 py-2 text-center">
+                          <span className={`${PILL_BASE} ${PILL_CLASS.reserved}`}>
+                            {row.reserved}
+                          </span>
                         </td>
                         <td className="border px-3 py-2 text-center">
                           <span className={`${PILL_BASE} ${PILL_CLASS.available}`}>
