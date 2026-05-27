@@ -15,6 +15,10 @@ import {
 } from 'lucide-react';
 import { useGlobalState } from '../../context/GlobalStateContext';
 import { receiveAccessoryStock } from '../../services/accessoryInventoryService';
+import {
+  getActiveLocations,
+  seedDefaultLocationIfEmpty
+} from '../../services/accessoryLocationService';
 import { formatNumberWithCommas } from '../phone-selection/utils/phoneUtils';
 
 const todayIso = () => new Date().toISOString().split('T')[0];
@@ -31,10 +35,33 @@ const AccessoryStockReceivingForm = () => {
   const [receivedQtys, setReceivedQtys] = useState({}); // { internalSku -> qty }
   const [dateDelivered, setDateDelivered] = useState(todayIso());
   const [deliveryReference, setDeliveryReference] = useState('');
+  const [destinationLocationId, setDestinationLocationId] = useState('');
+
+  const [locations, setLocations] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoadingLocations(true);
+      try {
+        await seedDefaultLocationIfEmpty();
+        const res = await getActiveLocations();
+        if (cancelled) return;
+        if (res.success) setLocations(res.locations || []);
+      } finally {
+        if (!cancelled) setLoadingLocations(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!proc) return;
@@ -47,6 +74,21 @@ const AccessoryStockReceivingForm = () => {
     setDateDelivered(proc.dateDelivered || todayIso());
     setDeliveryReference(proc.deliveryReference || '');
   }, [proc]);
+
+  // Default destination: use proc's saved location if present (e.g., already received),
+  // otherwise fall back to the primary location once locations load.
+  useEffect(() => {
+    if (!proc) return;
+    setDestinationLocationId((prev) => {
+      if (prev) return prev;
+      if (proc.destinationLocationId) return proc.destinationLocationId;
+      if (locations.length > 0) {
+        const primary = locations.find((l) => l.isPrimary) || locations[0];
+        return primary?.id || '';
+      }
+      return '';
+    });
+  }, [proc, locations]);
 
   const handleQtyChange = (sku, rawValue) => {
     const cleaned = rawValue.replace(/[^\d]/g, '');
@@ -92,10 +134,8 @@ const AccessoryStockReceivingForm = () => {
 
     if (!proc) return;
 
-    if (!proc.destinationLocationId) {
-      setSaveError(
-        'This procurement has no destination store set. Edit the procurement and assign one before receiving.'
-      );
+    if (!destinationLocationId) {
+      setSaveError('Select a destination store before receiving.');
       return;
     }
 
@@ -135,12 +175,12 @@ const AccessoryStockReceivingForm = () => {
         receivedItems,
         dateDelivered,
         deliveryReference,
-        proc.destinationLocationId
+        destinationLocationId
       );
       if (res.success) {
-        setSuccessMessage(
-          `Stock received successfully at ${proc.destinationLocationName || 'destination store'}`
-        );
+        const destName =
+          locations.find((l) => l.id === destinationLocationId)?.name || 'destination store';
+        setSuccessMessage(`Stock received successfully at ${destName}`);
         setTimeout(() => {
           clearAccessoryProcurementForReceiving();
           setActiveComponent('acc-procurement-mgmt');
@@ -240,7 +280,7 @@ const AccessoryStockReceivingForm = () => {
             )}
 
             {/* Procurement header (read-only summary) */}
-            <div className="p-4 bg-gray-50 border rounded grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+            <div className="p-4 bg-gray-50 border rounded grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
                   <User className="h-3 w-3" />
@@ -260,17 +300,6 @@ const AccessoryStockReceivingForm = () => {
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                  <Store className="h-3 w-3" />
-                  Destination Store
-                </p>
-                <p className="font-semibold text-gray-800 mt-0.5">
-                  {proc.destinationLocationName || (
-                    <span className="text-red-600 italic text-sm">(not set)</span>
-                  )}
-                </p>
-              </div>
-              <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Grand Total
                 </p>
@@ -278,6 +307,37 @@ const AccessoryStockReceivingForm = () => {
                   ₱{formatNumberWithCommas((proc.grandTotal || 0).toFixed(2))}
                 </p>
               </div>
+            </div>
+
+            {/* Destination store picker — chosen at receive time */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Store className="w-5 h-5 text-[rgb(52,69,157)]" />
+                <h3 className="text-lg font-semibold">Destination Store</h3>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">
+                Choose which store receives this stock. This locks once saved.
+              </p>
+              <select
+                value={destinationLocationId}
+                onChange={(e) => setDestinationLocationId(e.target.value)}
+                disabled={alreadyReceived || loadingLocations}
+                className={`w-full px-3 py-2 border rounded text-sm ${
+                  alreadyReceived || loadingLocations
+                    ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                    : 'bg-white'
+                }`}
+              >
+                <option value="">
+                  {loadingLocations ? 'Loading stores…' : '-- Select a store --'}
+                </option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                    {loc.isPrimary ? ' ★' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Delivery metadata */}

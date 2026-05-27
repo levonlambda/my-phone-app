@@ -2,11 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ShoppingCart,
-  Store,
-  Calendar,
-  User,
-  CreditCard,
-  Package,
   Search,
   Barcode,
   Plus,
@@ -16,8 +11,7 @@ import {
   RefreshCw,
   AlertCircle,
   Check,
-  X,
-  Building2
+  X
 } from 'lucide-react';
 import { useGlobalState } from '../../context/GlobalStateContext';
 import { getAllSuppliers } from '../../services/supplierService';
@@ -30,13 +24,8 @@ import {
   markAccessoryProcurementPaid
 } from '../../services/accessoryService';
 import {
-  getActiveLocations,
-  seedDefaultLocationIfEmpty
-} from '../../services/accessoryLocationService';
-import {
   formatNumberWithCommas,
-  parsePrice,
-  handleKeyDown
+  parsePrice
 } from '../phone-selection/utils/phoneUtils';
 
 const todayIso = () => new Date().toISOString().split('T')[0];
@@ -60,7 +49,6 @@ const AccessoryProcurementForm = () => {
   const [products, setProducts] = useState([]);
   const [pricingMap, setPricingMap] = useState({});
   const [suppliers, setSuppliers] = useState([]);
-  const [locations, setLocations] = useState([]);
   const [loadingRefs, setLoadingRefs] = useState(true);
   const [refsError, setRefsError] = useState(null);
 
@@ -68,7 +56,6 @@ const AccessoryProcurementForm = () => {
 
   const [purchaseDate, setPurchaseDate] = useState(todayIso());
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
-  const [destinationLocationId, setDestinationLocationId] = useState('');
 
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
@@ -79,6 +66,7 @@ const AccessoryProcurementForm = () => {
   const [paymentReference, setPaymentReference] = useState('');
 
   const [isReceived, setIsReceived] = useState(false);
+  const [dateDelivered, setDateDelivered] = useState('');
 
   /* ========== ITEMS ========== */
 
@@ -99,6 +87,7 @@ const AccessoryProcurementForm = () => {
   const [pickerSku, setPickerSku] = useState('');
   const [pickerQuantity, setPickerQuantity] = useState('1');
   const [pickerDealersPrice, setPickerDealersPrice] = useState('');
+  const [pickerRetailPrice, setPickerRetailPrice] = useState('');
   const [pickerBarcode, setPickerBarcode] = useState('');
   const [pickerBarcodeError, setPickerBarcodeError] = useState(null);
   const [pickerBarcodeLookingUp, setPickerBarcodeLookingUp] = useState(false);
@@ -115,12 +104,10 @@ const AccessoryProcurementForm = () => {
     setLoadingRefs(true);
     setRefsError(null);
     try {
-      await seedDefaultLocationIfEmpty();
-      const [productsRes, pricingRes, suppliersRes, locationsRes] = await Promise.all([
+      const [productsRes, pricingRes, suppliersRes] = await Promise.all([
         getAllAccessoryProducts(),
         getAllAccessoryPricing(),
-        getAllSuppliers(),
-        getActiveLocations()
+        getAllSuppliers()
       ]);
       if (productsRes.success) setProducts(productsRes.products || []);
       const pMap = {};
@@ -131,7 +118,6 @@ const AccessoryProcurementForm = () => {
       }
       setPricingMap(pMap);
       if (suppliersRes.success) setSuppliers(suppliersRes.suppliers || []);
-      if (locationsRes.success) setLocations(locationsRes.locations || []);
     } catch (err) {
       setRefsError(err.message);
     } finally {
@@ -150,7 +136,6 @@ const AccessoryProcurementForm = () => {
       const p = accessoryProcurementToEdit;
       setPurchaseDate(p.purchaseDate || todayIso());
       setSelectedSupplierId(p.supplierId || '');
-      setDestinationLocationId(p.destinationLocationId || '');
       setBankName(p.bankName || '');
       setBankAccount(p.bankAccount || '');
       setAccountPayable(p.accountPayable || '');
@@ -158,6 +143,7 @@ const AccessoryProcurementForm = () => {
       setDatePaid(p.datePaid || '');
       setPaymentReference(p.paymentReference || '');
       setIsReceived(Boolean(p.isReceived));
+      setDateDelivered(p.dateDelivered || '');
       setItems(
         (p.items || []).map((item) => ({
           id: nextItemId(),
@@ -167,6 +153,7 @@ const AccessoryProcurementForm = () => {
           category: item.category || '',
           quantity: Number(item.quantity) || 0,
           dealersPrice: Number(item.dealersPrice) || 0,
+          retailPrice: Number(item.retailPrice) || 0,
           totalPrice: (Number(item.quantity) || 0) * (Number(item.dealersPrice) || 0)
         }))
       );
@@ -192,7 +179,6 @@ const AccessoryProcurementForm = () => {
   const resetForm = () => {
     setPurchaseDate(todayIso());
     setSelectedSupplierId('');
-    setDestinationLocationId('');
     setBankName('');
     setBankAccount('');
     setAccountPayable('');
@@ -200,11 +186,13 @@ const AccessoryProcurementForm = () => {
     setDatePaid('');
     setPaymentReference('');
     setIsReceived(false);
+    setDateDelivered('');
     setItems([]);
     setPickerFilters({ category: '', manufacturer: '', model: '' });
     setPickerSku('');
     setPickerQuantity('1');
     setPickerDealersPrice('');
+    setPickerRetailPrice('');
     setPickerBarcode('');
     setPickerBarcodeError(null);
     setSaveError(null);
@@ -215,18 +203,18 @@ const AccessoryProcurementForm = () => {
 
   const activeProducts = useMemo(() => products.filter((p) => p.active !== false), [products]);
 
-  const pickerCategories = useMemo(() => {
-    const set = new Set(activeProducts.map((p) => p.category).filter(Boolean));
+  const pickerManufacturers = useMemo(() => {
+    const set = new Set(activeProducts.map((p) => p.manufacturer).filter(Boolean));
     return Array.from(set).sort();
   }, [activeProducts]);
 
-  const pickerManufacturers = useMemo(() => {
-    const source = pickerFilters.category
-      ? activeProducts.filter((p) => p.category === pickerFilters.category)
+  const pickerCategories = useMemo(() => {
+    const source = pickerFilters.manufacturer
+      ? activeProducts.filter((p) => p.manufacturer === pickerFilters.manufacturer)
       : activeProducts;
-    const set = new Set(source.map((p) => p.manufacturer).filter(Boolean));
+    const set = new Set(source.map((p) => p.category).filter(Boolean));
     return Array.from(set).sort();
-  }, [activeProducts, pickerFilters.category]);
+  }, [activeProducts, pickerFilters.manufacturer]);
 
   const pickerModels = useMemo(() => {
     let source = activeProducts;
@@ -257,10 +245,11 @@ const AccessoryProcurementForm = () => {
     return products.find((p) => (p.internalSku || p.id) === pickerSku) || null;
   }, [pickerSku, products]);
 
-  // When a SKU is selected, default the dealer price from pricingMap
+  // When a SKU is selected, default both prices from pricingMap
   useEffect(() => {
     if (!pickerSku) {
       setPickerDealersPrice('');
+      setPickerRetailPrice('');
       return;
     }
     const pricing = pricingMap[pickerSku];
@@ -269,6 +258,11 @@ const AccessoryProcurementForm = () => {
     } else {
       setPickerDealersPrice('');
     }
+    if (pricing && pricing.retailPrice) {
+      setPickerRetailPrice(formatNumberWithCommas(String(pricing.retailPrice)));
+    } else {
+      setPickerRetailPrice('');
+    }
   }, [pickerSku, pricingMap]);
 
   /* ========== HANDLERS ========== */
@@ -276,10 +270,10 @@ const AccessoryProcurementForm = () => {
   const handlePickerFilterChange = (name, value) => {
     setPickerFilters((prev) => {
       const next = { ...prev, [name]: value };
-      if (name === 'category') {
-        next.manufacturer = '';
+      if (name === 'manufacturer') {
+        next.category = '';
         next.model = '';
-      } else if (name === 'manufacturer') {
+      } else if (name === 'category') {
         next.model = '';
       }
       return next;
@@ -328,8 +322,13 @@ const AccessoryProcurementForm = () => {
       return;
     }
     const price = parseFloat(parsePrice(pickerDealersPrice)) || 0;
-    if (price < 0) {
-      setSaveError('Dealer price cannot be negative');
+    if (price <= 0) {
+      setSaveError('Dealer price must be greater than zero');
+      return;
+    }
+    const retail = parseFloat(parsePrice(pickerRetailPrice)) || 0;
+    if (retail <= 0) {
+      setSaveError('Retail price must be greater than zero');
       return;
     }
 
@@ -359,6 +358,7 @@ const AccessoryProcurementForm = () => {
           category: product.category || '',
           quantity: qty,
           dealersPrice: price,
+          retailPrice: retail,
           totalPrice: qty * price
         }
       ]);
@@ -367,6 +367,7 @@ const AccessoryProcurementForm = () => {
     setPickerSku('');
     setPickerQuantity('1');
     setPickerDealersPrice('');
+    setPickerRetailPrice('');
   };
 
   const handleChangeItemQuantity = (id, delta) => {
@@ -456,19 +457,24 @@ const AccessoryProcurementForm = () => {
       setSaveError('Supplier is required');
       return;
     }
-    if (!destinationLocationId) {
-      setSaveError('Destination store is required');
+
+    const invalidItem = items.find(
+      (it) => !(it.dealersPrice > 0) || !(it.retailPrice > 0)
+    );
+    if (invalidItem) {
+      setSaveError(
+        `Dealer and Retail prices must be greater than zero for "${
+          invalidItem.model || invalidItem.internalSku
+        }". Edit or remove the item before saving.`
+      );
       return;
     }
 
     const supplier = suppliers.find((s) => s.id === selectedSupplierId);
-    const location = locations.find((l) => l.id === destinationLocationId);
 
     const payload = {
       supplierId: selectedSupplierId,
       supplierName: supplier?.supplierName || '',
-      destinationLocationId,
-      destinationLocationName: location?.name || '',
       purchaseDate,
       items: items.map((it) => ({
         internalSku: it.internalSku,
@@ -477,6 +483,7 @@ const AccessoryProcurementForm = () => {
         category: it.category,
         quantity: it.quantity,
         dealersPrice: it.dealersPrice,
+        retailPrice: it.retailPrice || 0,
         totalPrice: it.totalPrice
       })),
       grandTotal: totals.grandTotal,
@@ -518,15 +525,6 @@ const AccessoryProcurementForm = () => {
     }
   };
 
-  /* ========== RENDER HELPERS ========== */
-
-  const disabledBase = 'bg-gray-100 text-gray-600 cursor-not-allowed';
-  const inputStyle = (extraDisabled = false) =>
-    `w-full px-3 py-2 border rounded text-sm ${
-      isReadOnly || extraDisabled ? disabledBase : 'bg-white'
-    }`;
-
-  const destinationLocked = isReceived; // once received, can't change destination
   const coreFieldsDisabled = isReadOnly || isPaymentMode;
 
   const headerTitle = isViewing
@@ -585,38 +583,38 @@ const AccessoryProcurementForm = () => {
               </div>
             )}
 
-            {/* Section: Procurement Details */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-[rgb(52,69,157)]" />
-                <h3 className="text-lg font-semibold">Procurement Details</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Purchase Date *
+            {/* Procurement Details Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">Procurement Details</h3>
+
+              {/* First Row: Purchase Date, Supplier, Bank Name, Bank Account, Account Payable */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Purchase Date:
                   </label>
                   <input
                     type="date"
                     value={purchaseDate}
                     onChange={(e) => setPurchaseDate(e.target.value)}
                     disabled={coreFieldsDisabled}
-                    onKeyDown={handleKeyDown}
-                    className={inputStyle()}
+                    required
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    <User className="h-3.5 w-3.5 inline mr-1" />
-                    Supplier *
+
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Supplier:
                   </label>
                   <select
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
                     disabled={coreFieldsDisabled || loadingRefs}
-                    className={inputStyle()}
+                    required
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
                   >
-                    <option value="">Select a supplier</option>
+                    <option value="">-- Select Supplier --</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.supplierName || s.name || s.id}
@@ -624,78 +622,55 @@ const AccessoryProcurementForm = () => {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    <Store className="h-3.5 w-3.5 inline mr-1" />
-                    Destination Store *
-                  </label>
-                  <select
-                    value={destinationLocationId}
-                    onChange={(e) => setDestinationLocationId(e.target.value)}
-                    disabled={coreFieldsDisabled || destinationLocked || loadingRefs}
-                    title={destinationLocked ? 'Store is locked after stock is received' : ''}
-                    className={inputStyle(destinationLocked)}
-                  >
-                    <option value="">Select a store</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name}
-                        {loc.isPrimary ? ' ★' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            {/* Section: Payment / Bank Info */}
-            <div className="space-y-1 border-t pt-4">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-[rgb(52,69,157)]" />
-                <h3 className="text-lg font-semibold">Payment Information</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    <Building2 className="h-3.5 w-3.5 inline mr-1" />
-                    Bank Name
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Bank Name:
                   </label>
                   <input
                     type="text"
                     value={bankName}
                     onChange={(e) => setBankName(e.target.value)}
-                    disabled={coreFieldsDisabled}
-                    className={inputStyle()}
-                    placeholder="Auto-filled from supplier"
+                    placeholder="Bank name"
+                    disabled
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Bank Account
+
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Bank Account:
                   </label>
                   <input
                     type="text"
                     value={bankAccount}
                     onChange={(e) => setBankAccount(e.target.value)}
-                    disabled={coreFieldsDisabled}
-                    className={inputStyle()}
+                    placeholder="Account number"
+                    disabled
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Account Payable
+
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Account Payable:
                   </label>
                   <input
                     type="text"
                     value={accountPayable}
                     onChange={(e) => setAccountPayable(e.target.value)}
-                    disabled={coreFieldsDisabled}
-                    className={inputStyle()}
+                    placeholder="Payable amount"
+                    disabled
+                    className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Payment Status
+              </div>
+
+              {/* Second Row: Payment Status, Date Paid, Payment Reference, Delivery Status, Date Delivered */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Payment Status:
                   </label>
                   <select
                     value={isPaid ? 'paid' : 'unpaid'}
@@ -709,311 +684,445 @@ const AccessoryProcurementForm = () => {
                         setDatePaid(todayIso());
                       }
                     }}
-                    disabled={isReadOnly}
-                    className={`${inputStyle()} ${
-                      isPaid ? 'bg-green-50 text-green-800' : ''
+                    disabled={!isPaymentMode}
+                    className={`w-full p-2 border rounded text-sm h-10 font-medium ${
+                      isPaymentMode
+                        ? isPaid
+                          ? 'bg-green-100 text-green-800 border-green-300'
+                          : 'bg-red-100 text-red-800 border-red-300'
+                        : 'bg-gray-100 text-gray-400'
                     }`}
                   >
                     <option value="unpaid">Unpaid</option>
                     <option value="paid">Paid</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Date Paid</label>
+
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Date Paid:
+                  </label>
                   <input
                     type="date"
                     value={datePaid}
                     onChange={(e) => setDatePaid(e.target.value)}
-                    disabled={isReadOnly || !isPaid}
-                    className={inputStyle(!isPaid)}
+                    disabled={!isPaymentMode || !isPaid}
+                    className={`w-full p-2 border rounded text-sm h-10 ${
+                      isPaymentMode && isPaid
+                        ? 'bg-white text-black'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Payment Reference
+
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Payment Reference:
                   </label>
                   <input
                     type="text"
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
-                    disabled={isReadOnly || !isPaid}
                     placeholder="Auto-generated if blank"
-                    className={inputStyle(!isPaid)}
+                    disabled={!isPaymentMode || !isPaid}
+                    className={`w-full p-2 border rounded text-sm h-10 ${
+                      isPaymentMode && isPaid
+                        ? 'bg-white text-black'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Delivery Status:
+                  </label>
+                  <input
+                    type="text"
+                    value={isReceived ? 'Delivered' : 'Pending'}
+                    disabled
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                    Date Delivered:
+                  </label>
+                  <input
+                    type="date"
+                    value={dateDelivered}
+                    disabled
+                    className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-400"
                   />
                 </div>
               </div>
-              <div className="flex items-center gap-3 mt-2 text-xs text-gray-600">
-                <span>Delivery:</span>
-                {isReceived ? (
-                  <span className="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
-                    Delivered
-                  </span>
-                ) : (
-                  <span className="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
-                    Pending
-                  </span>
-                )}
-              </div>
             </div>
 
-            {/* Section: Pick a Product */}
+            {/* Section: Add Accessories to Procurement */}
             {!isPaymentMode && !isReadOnly && (
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center gap-2">
-                  <Package className="w-5 h-5 text-[rgb(52,69,157)]" />
-                  <h3 className="text-lg font-semibold">Add Items</h3>
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
+                  Add Accessories to Procurement
+                </h3>
+
+                {/* Row 1: Manufacturer, Category, Model */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      Manufacturer:
+                    </label>
+                    <select
+                      value={pickerFilters.manufacturer}
+                      onChange={(e) => handlePickerFilterChange('manufacturer', e.target.value)}
+                      disabled={pickerManufacturers.length === 0}
+                      className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
+                    >
+                      <option value="">-- All Manufacturers --</option>
+                      {pickerManufacturers.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      Category:
+                    </label>
+                    <select
+                      value={pickerFilters.category}
+                      onChange={(e) => handlePickerFilterChange('category', e.target.value)}
+                      disabled={!pickerFilters.manufacturer || pickerCategories.length === 0}
+                      className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
+                    >
+                      <option value="">-- All Categories --</option>
+                      {pickerCategories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      Model:
+                    </label>
+                    <select
+                      value={pickerFilters.model}
+                      onChange={(e) => handlePickerFilterChange('model', e.target.value)}
+                      disabled={!pickerFilters.category || pickerModels.length === 0}
+                      className="w-full p-2 border rounded text-sm h-10 disabled:bg-gray-100 disabled:text-gray-500"
+                    >
+                      <option value="">-- All Models --</option>
+                      {pickerModels.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="p-3 bg-gray-50 border rounded space-y-4">
-                  {/* Cascading filters */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Category
-                      </label>
-                      <select
-                        value={pickerFilters.category}
-                        onChange={(e) => handlePickerFilterChange('category', e.target.value)}
-                        className="w-full p-2 border rounded text-sm bg-white"
-                      >
-                        <option value="">All Categories</option>
-                        {pickerCategories.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
+                {/* Row 2: Product picker + Barcode lookup */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="md:col-span-8 space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      <Search className="h-3.5 w-3.5 inline mr-1" />
+                      Select Product:
+                    </label>
+                    <select
+                      value={pickerSku}
+                      onChange={(e) => setPickerSku(e.target.value)}
+                      className="w-full p-2 border rounded text-sm h-10"
+                    >
+                      <option value="">
+                        {pickerProductOptions.length === 0
+                          ? '-- No active products --'
+                          : `-- Pick a product (${pickerProductOptions.length} available) --`}
+                      </option>
+                      {pickerProductOptions.map((p) => {
+                        const sku = p.internalSku || p.id;
+                        return (
+                          <option key={sku} value={sku}>
+                            {p.manufacturer} — {p.model} [{sku}]
                           </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Manufacturer
-                      </label>
-                      <select
-                        value={pickerFilters.manufacturer}
-                        onChange={(e) => handlePickerFilterChange('manufacturer', e.target.value)}
-                        disabled={pickerManufacturers.length === 0}
-                        className="w-full p-2 border rounded text-sm bg-white disabled:bg-gray-100"
-                      >
-                        <option value="">All Manufacturers</option>
-                        {pickerManufacturers.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Model</label>
-                      <select
-                        value={pickerFilters.model}
-                        onChange={(e) => handlePickerFilterChange('model', e.target.value)}
-                        disabled={!pickerFilters.manufacturer || pickerModels.length === 0}
-                        className="w-full p-2 border rounded text-sm bg-white disabled:bg-gray-100"
-                      >
-                        <option value="">All Models</option>
-                        {pickerModels.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                        );
+                      })}
+                    </select>
                   </div>
-
-                  {/* SKU / Barcode + qty + price + Add */}
-                  <div className="border-t border-gray-200 pt-4 grid grid-cols-1 md:grid-cols-12 gap-3">
-                    <div className="md:col-span-5">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        <Search className="h-3.5 w-3.5 inline mr-1" />
-                        Select product
-                      </label>
-                      <select
-                        value={pickerSku}
-                        onChange={(e) => setPickerSku(e.target.value)}
-                        className="w-full p-2 border rounded text-sm bg-white"
-                      >
-                        <option value="">
-                          {pickerProductOptions.length === 0
-                            ? 'No active products'
-                            : `Pick (${pickerProductOptions.length} available)`}
-                        </option>
-                        {pickerProductOptions.map((p) => {
-                          const sku = p.internalSku || p.id;
-                          return (
-                            <option key={sku} value={sku}>
-                              {p.manufacturer} — {p.model} [{sku}]
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-                    <div className="md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        <Barcode className="h-3.5 w-3.5 inline mr-1" />
-                        Or barcode
-                      </label>
-                      <div className="flex gap-1">
-                        <input
-                          type="text"
-                          value={pickerBarcode}
-                          onChange={(e) => setPickerBarcode(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handlePickerBarcodeLookup();
-                            }
-                          }}
-                          placeholder="Scan or type"
-                          className="flex-1 px-2 py-2 border rounded text-sm bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={handlePickerBarcodeLookup}
-                          disabled={!pickerBarcode.trim() || pickerBarcodeLookingUp}
-                          className={`px-2 py-2 rounded text-sm ${
-                            !pickerBarcode.trim() || pickerBarcodeLookingUp
-                              ? 'bg-gray-200 text-gray-500'
-                              : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
-                          }`}
-                          title="Find by barcode"
-                        >
-                          {pickerBarcodeLookingUp ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Search className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                      {pickerBarcodeError && (
-                        <p className="text-xs text-red-600 mt-1">{pickerBarcodeError}</p>
-                      )}
-                    </div>
-                    <div className="md:col-span-1">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Qty</label>
+                  <div className="md:col-span-4 space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      <Barcode className="h-3.5 w-3.5 inline mr-1" />
+                      Or Barcode:
+                    </label>
+                    <div className="flex gap-1">
                       <input
                         type="text"
-                        inputMode="numeric"
+                        value={pickerBarcode}
+                        onChange={(e) => setPickerBarcode(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handlePickerBarcodeLookup();
+                          }
+                        }}
+                        placeholder="Scan or type"
+                        className="flex-1 px-2 py-2 border rounded text-sm h-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={handlePickerBarcodeLookup}
+                        disabled={!pickerBarcode.trim() || pickerBarcodeLookingUp}
+                        className={`px-3 rounded text-sm h-10 ${
+                          !pickerBarcode.trim() || pickerBarcodeLookingUp
+                            ? 'bg-gray-200 text-gray-500'
+                            : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
+                        }`}
+                        title="Find by barcode"
+                      >
+                        {pickerBarcodeLookingUp ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Search className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                    {pickerBarcodeError && (
+                      <p className="text-xs text-red-600 mt-1">{pickerBarcodeError}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 3: Quantity, Dealer Price, Retail Price, Total Price, Margin + Action */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  {/* Quantity */}
+                  <div className="space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      Quantity:
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPickerQuantity((q) =>
+                            String(Math.max(1, (parseInt(q, 10) || 1) - 1))
+                          )
+                        }
+                        disabled={(parseInt(pickerQuantity, 10) || 1) <= 1}
+                        className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
                         value={pickerQuantity}
                         onChange={(e) =>
                           setPickerQuantity(e.target.value.replace(/[^\d]/g, ''))
                         }
-                        className="w-full p-2 border rounded text-sm bg-white text-right"
+                        className="w-full p-2 border rounded text-center text-sm h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPickerQuantity((q) =>
+                            String((parseInt(q, 10) || 0) + 1)
+                          )
+                        }
+                        className="w-10 h-10 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Dealer Price
-                      </label>
+                  </div>
+
+                  {/* Dealer Price */}
+                  <div className="space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      Dealer&apos;s Price:
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
                       <input
                         type="text"
                         value={pickerDealersPrice}
                         onChange={(e) =>
                           setPickerDealersPrice(formatNumberWithCommas(e.target.value))
                         }
-                        className="w-full p-2 border rounded text-sm bg-white text-right"
+                        className="w-full p-2 pl-6 border rounded text-sm h-10"
                         placeholder="0.00"
                       />
                     </div>
-                    <div className="md:col-span-1 flex items-end">
+                  </div>
+
+                  {/* Retail Price */}
+                  <div className="space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      Retail Price:
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
+                      <input
+                        type="text"
+                        value={pickerRetailPrice}
+                        onChange={(e) =>
+                          setPickerRetailPrice(formatNumberWithCommas(e.target.value))
+                        }
+                        className="w-full p-2 pl-6 border rounded text-sm h-10"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Total Price (auto) */}
+                  <div className="space-y-2">
+                    <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                      Total Price:
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-2 text-gray-500 text-sm">₱</span>
+                      <input
+                        type="text"
+                        value={formatNumberWithCommas(
+                          (
+                            (parseFloat(parsePrice(pickerDealersPrice)) || 0) *
+                            (parseInt(pickerQuantity, 10) || 0)
+                          ).toFixed(2)
+                        )}
+                        disabled
+                        readOnly
+                        className="w-full p-2 pl-6 border rounded text-sm h-10 bg-gray-100 text-gray-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Margin + Add */}
+                  <div className="flex gap-2">
+                    <div className="flex-1 space-y-2">
+                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                        Margin:
+                      </label>
+                      <input
+                        type="text"
+                        value={(() => {
+                          const d = parseFloat(parsePrice(pickerDealersPrice)) || 0;
+                          const r = parseFloat(parsePrice(pickerRetailPrice)) || 0;
+                          if (!d) return '0.00%';
+                          return `${(((r - d) / d) * 100).toFixed(2)}%`;
+                        })()}
+                        disabled
+                        readOnly
+                        className="w-full p-2 border rounded text-sm h-10 bg-gray-100 text-gray-500 text-center"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
+                        Action:
+                      </label>
                       <button
                         type="button"
                         onClick={handleAddItem}
                         disabled={!pickerSku}
-                        className={`w-full flex items-center justify-center gap-1 py-2 rounded text-sm ${
-                          !pickerSku
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
-                        }`}
+                        className="w-full h-10 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center"
                       >
                         <Plus className="h-4 w-4" />
                         Add
                       </button>
                     </div>
                   </div>
-                  {pickerSelectedProduct && (
-                    <div className="text-xs text-gray-600">
-                      Adding: {pickerSelectedProduct.manufacturer} — {pickerSelectedProduct.model} ·
-                      Category: {pickerSelectedProduct.category || '(none)'}
-                    </div>
-                  )}
                 </div>
               </div>
             )}
 
-            {/* Section: Items Table */}
-            <div className="space-y-2 border-t pt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Package className="w-5 h-5 text-[rgb(52,69,157)]" />
-                  <h3 className="text-lg font-semibold">
-                    Order Items{' '}
-                    <span className="text-sm font-normal text-gray-500">
-                      ({items.length} line{items.length !== 1 ? 's' : ''} · {totals.totalUnits} unit
-                      {totals.totalUnits !== 1 ? 's' : ''})
-                    </span>
-                  </h3>
-                </div>
+            {/* Section: Procurement List */}
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-[rgb(52,69,157)]">
+                  Procurement List ({items.length} item{items.length !== 1 ? 's' : ''})
+                </h3>
+                {items.length > 0 && !isReadOnly && !isPaymentMode && (
+                  <button
+                    type="button"
+                    onClick={() => setItems([])}
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Clear All
+                  </button>
+                )}
               </div>
 
               {items.length === 0 ? (
-                <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 border border-dashed rounded">
-                  No items yet — add products from the section above.
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <p className="text-lg font-medium">No items in procurement list</p>
+                  <p className="text-sm">Add accessories using the form above</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto border rounded">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr className="bg-gray-100 text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                        <th className="px-3 py-2 text-left">SKU</th>
-                        <th className="px-3 py-2 text-left">Manufacturer</th>
-                        <th className="px-3 py-2 text-left">Model</th>
-                        <th className="px-3 py-2 text-left">Category</th>
-                        <th className="px-3 py-2 text-center">Qty</th>
-                        <th className="px-3 py-2 text-right">Dealer Price</th>
-                        <th className="px-3 py-2 text-right">Total</th>
+                      <tr className="bg-gray-100">
+                        <th className="border px-3 py-3 text-left font-semibold w-[14%]">SKU</th>
+                        <th className="border px-3 py-3 text-left font-semibold w-[9%]">Manufacturer</th>
+                        <th className="border px-3 py-3 text-left font-semibold w-[19%]">Model</th>
+                        <th className="border px-3 py-3 text-left font-semibold w-[10%]">Category</th>
+                        <th className="border px-3 py-3 text-center font-semibold w-[10%]">Qty</th>
+                        <th className="border px-3 py-3 text-right font-semibold w-[12%]">Dealer&apos;s Price</th>
+                        <th className="border px-3 py-3 text-right font-semibold w-[12%]">Retail Price</th>
+                        <th className="border px-3 py-3 text-right font-semibold w-[14%]">Total Price</th>
                         {!isReadOnly && !isPaymentMode && (
-                          <th className="px-3 py-2 text-center w-10"></th>
+                          <th className="border px-3 py-3 text-center font-semibold w-10"></th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((it) => (
-                        <tr key={it.id} className="hover:bg-gray-50 border-t">
-                          <td className="px-3 py-2 font-mono text-xs">{it.internalSku}</td>
-                          <td className="px-3 py-2">{it.manufacturer || '-'}</td>
-                          <td className="px-3 py-2 font-medium">{it.model || '-'}</td>
-                          <td className="px-3 py-2">{it.category || '-'}</td>
-                          <td className="px-3 py-2 text-center">
+                        <tr key={it.id} className="hover:bg-gray-50">
+                          <td className="border px-3 py-2 text-left whitespace-nowrap">{it.internalSku}</td>
+                          <td className="border px-3 py-2 text-left">{it.manufacturer || '-'}</td>
+                          <td className="border px-3 py-2 text-left">{it.model || '-'}</td>
+                          <td className="border px-3 py-2 text-left">{it.category || '-'}</td>
+                          <td className="border px-3 py-2 text-center">
                             {isReadOnly || isPaymentMode ? (
-                              <span>{it.quantity}</span>
+                              <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
+                                {it.quantity}
+                              </span>
                             ) : (
-                              <div className="inline-flex items-center gap-1">
+                              <div className="flex items-center justify-center gap-1">
                                 <button
                                   type="button"
                                   onClick={() => handleChangeItemQuantity(it.id, -1)}
-                                  className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
+                                  className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                  title={it.quantity === 1 ? 'Remove item' : 'Decrease quantity'}
                                 >
                                   <Minus className="h-3 w-3" />
                                 </button>
-                                <span className="w-8 text-center font-semibold">{it.quantity}</span>
+                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium min-w-[2rem] text-center">
+                                  {it.quantity}
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => handleChangeItemQuantity(it.id, 1)}
-                                  className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
+                                  className="w-6 h-6 border rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs"
+                                  title="Increase quantity"
                                 >
                                   <Plus className="h-3 w-3" />
                                 </button>
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-right">
+                          <td className="border px-3 py-2 text-right font-mono">
                             ₱{formatNumberWithCommas(it.dealersPrice.toFixed(2))}
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold">
+                          <td className="border px-3 py-2 text-right font-mono">
+                            ₱{formatNumberWithCommas((it.retailPrice || 0).toFixed(2))}
+                          </td>
+                          <td className="border px-3 py-2 text-right font-mono font-medium">
                             ₱{formatNumberWithCommas(it.totalPrice.toFixed(2))}
                           </td>
                           {!isReadOnly && !isPaymentMode && (
-                            <td className="px-3 py-2 text-center">
+                            <td className="border px-3 py-2 text-center">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveItem(it.id)}
@@ -1028,17 +1137,20 @@ const AccessoryProcurementForm = () => {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-gray-50 border-t font-semibold">
-                        <td
-                          colSpan={6}
-                          className="px-3 py-2 text-right text-gray-700"
-                        >
-                          Grand Total
+                      <tr className="bg-blue-50 font-semibold">
+                        <td colSpan="4" className="border px-3 py-2 text-right">
+                          Total Items:
                         </td>
-                        <td className="px-3 py-2 text-right text-[rgb(52,69,157)] text-base">
+                        <td className="border px-3 py-2 text-center font-mono">
+                          {totals.totalUnits}
+                        </td>
+                        <td colSpan="2" className="border px-3 py-2 text-right">
+                          Grand Total:
+                        </td>
+                        <td className="border px-3 py-2 text-right font-mono text-lg">
                           ₱{formatNumberWithCommas(totals.grandTotal.toFixed(2))}
                         </td>
-                        {!isReadOnly && !isPaymentMode && <td></td>}
+                        {!isReadOnly && !isPaymentMode && <td className="border"></td>}
                       </tr>
                     </tfoot>
                   </table>
@@ -1046,22 +1158,51 @@ const AccessoryProcurementForm = () => {
               )}
             </div>
 
-            {/* Summary cards */}
+            {/* Procurement Summary Section */}
             {items.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t pt-4">
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                  <p className="text-xs text-gray-600 font-medium">Line Items</p>
-                  <p className="text-2xl font-bold text-blue-700">{totals.totalItems}</p>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-                  <p className="text-xs text-gray-600 font-medium">Total Units</p>
-                  <p className="text-2xl font-bold text-amber-700">{totals.totalUnits}</p>
-                </div>
-                <div className="bg-green-50 border border-green-100 rounded-lg p-3">
-                  <p className="text-xs text-gray-600 font-medium">Grand Total</p>
-                  <p className="text-2xl font-bold text-green-700">
-                    ₱{formatNumberWithCommas(totals.grandTotal.toFixed(2))}
-                  </p>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Procurement Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Line Items</p>
+                        <p className="text-xs text-gray-500">Different accessories ordered</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-blue-600">{totals.totalItems}</p>
+                        <p className="text-xs text-gray-500">items</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Total Units</p>
+                        <p className="text-xs text-gray-500">Combined quantity ordered</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-green-600">{totals.totalUnits}</p>
+                        <p className="text-xs text-gray-500">units</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">Grand Total</p>
+                        <p className="text-xs text-gray-500">Total procurement cost</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-purple-600">
+                          ₱{formatNumberWithCommas(totals.grandTotal.toFixed(2))}
+                        </p>
+                        <p className="text-xs text-gray-500">total cost</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
