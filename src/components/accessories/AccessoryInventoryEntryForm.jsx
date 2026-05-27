@@ -13,9 +13,13 @@ import {
   ArrowRight,
   Image as ImageIcon,
   Store,
-  Settings
+  Settings,
+  History,
+  Lock,
+  MessageSquare
 } from 'lucide-react';
 import { useGlobalState } from '../../context/GlobalStateContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   getAllAccessoryProducts,
   getProductByBarcode
@@ -28,7 +32,9 @@ import {
   getAccessoryInventory,
   adjustAccessoryInventory
 } from '../../services/accessoryInventoryService';
+import { verifySettingsPassword } from '../../services/appConfigService';
 import AccessoryLocationModal from './AccessoryLocationModal';
+import AccessoryAdjustmentHistoryModal from './AccessoryAdjustmentHistoryModal';
 
 const EMPTY_ADJUSTMENTS = { onHand: '', onDisplay: '', reserved: '', defective: '' };
 const QUANTITY_FIELDS = ['onHand', 'onDisplay', 'reserved', 'defective'];
@@ -38,6 +44,7 @@ const formatFieldLabel = (f) =>
 
 const AccessoryInventoryEntryForm = () => {
   const { accessoryInventoryItemToEdit, clearAccessoryInventoryItemToEdit } = useGlobalState();
+  const { currentUser } = useAuth();
 
   /* ========== REFERENCE DATA ========== */
 
@@ -65,10 +72,16 @@ const AccessoryInventoryEntryForm = () => {
   /* ========== DRAFT ========== */
 
   const [adjustments, setAdjustments] = useState(EMPTY_ADJUSTMENTS);
+  const [reason, setReason] = useState('');
+  const [password, setPassword] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+
+  /* ========== HISTORY MODAL ========== */
+
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   /* ========== BARCODE LOOKUP ========== */
 
@@ -164,6 +177,8 @@ const AccessoryInventoryEntryForm = () => {
   // React to (sku, location) selection changes
   useEffect(() => {
     setAdjustments(EMPTY_ADJUSTMENTS);
+    setReason('');
+    setPassword('');
     setSaveError(null);
     setSuccessMessage('');
     loadInventory(selectedSku, selectedLocationId);
@@ -342,6 +357,14 @@ const AccessoryInventoryEntryForm = () => {
       );
       return;
     }
+    if (!reason.trim()) {
+      setSaveError('Enter a reason for this adjustment');
+      return;
+    }
+    if (!password) {
+      setSaveError('Enter the confirmation password');
+      return;
+    }
 
     const payload = {};
     QUANTITY_FIELDS.forEach((f) => {
@@ -351,12 +374,33 @@ const AccessoryInventoryEntryForm = () => {
 
     setSaving(true);
     try {
-      const res = await adjustAccessoryInventory(selectedSku, selectedLocationId, payload);
+      const verify = await verifySettingsPassword(password);
+      if (!verify.success) {
+        setSaveError(verify.error || 'Could not verify password');
+        return;
+      }
+      if (!verify.ok) {
+        setSaveError('Incorrect confirmation password');
+        return;
+      }
+
+      const res = await adjustAccessoryInventory(
+        selectedSku,
+        selectedLocationId,
+        payload,
+        {
+          reason: reason.trim(),
+          userId: currentUser?.uid || null,
+          userEmail: currentUser?.email || null
+        }
+      );
       if (res.success) {
         setSuccessMessage(
           `Inventory updated for ${selectedSku} at ${selectedLocation?.name || 'selected store'}`
         );
         setAdjustments(EMPTY_ADJUSTMENTS);
+        setReason('');
+        setPassword('');
         await loadInventory(selectedSku, selectedLocationId);
       } else {
         setSaveError(res.error || 'Save failed');
@@ -370,6 +414,8 @@ const AccessoryInventoryEntryForm = () => {
 
   const handleClear = () => {
     setAdjustments(EMPTY_ADJUSTMENTS);
+    setReason('');
+    setPassword('');
     setSaveError(null);
     setSuccessMessage('');
   };
@@ -377,6 +423,8 @@ const AccessoryInventoryEntryForm = () => {
   const handleDeselect = () => {
     setSelectedSku('');
     setAdjustments(EMPTY_ADJUSTMENTS);
+    setReason('');
+    setPassword('');
     setCurrentInventory(null);
     setSaveError(null);
     setSuccessMessage('');
@@ -778,11 +826,21 @@ const AccessoryInventoryEntryForm = () => {
 
               {/* Adjustments */}
               <div className="border rounded p-4 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="font-semibold text-[rgb(52,69,157)]">Adjustments</h3>
-                  <p className="text-xs text-gray-500">
-                    Positive adds stock, negative removes. Leave blank for no change.
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-gray-500">
+                      Positive adds stock, negative removes. Leave blank for no change.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryModalOpen(true)}
+                      className="text-xs flex items-center gap-1 px-2 py-1 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      View History
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {QUANTITY_FIELDS.map((f) => (
@@ -800,6 +858,42 @@ const AccessoryInventoryEntryForm = () => {
                       />
                     </div>
                   ))}
+                </div>
+
+                <div className="pt-3 border-t border-gray-200 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <MessageSquare className="h-4 w-4 inline mr-1 text-[rgb(52,69,157)]" />
+                      Reason <span className="text-red-600">*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Why are you making this adjustment? (e.g. stock-take correction, damage write-off, transferred from supplier overage)"
+                      className="w-full px-3 py-2 border rounded text-sm"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Recorded in the adjustment history alongside who made the change.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Lock className="h-4 w-4 inline mr-1 text-[rgb(52,69,157)]" />
+                      Confirmation Password <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter the settings password"
+                      autoComplete="off"
+                      className="w-full px-3 py-2 border rounded text-sm"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Required for every save. Verified against the settings password in Firestore.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -834,14 +928,18 @@ const AccessoryInventoryEntryForm = () => {
                     saving ||
                     isInactiveProduct ||
                     preview.negative.length > 0 ||
-                    !selectedLocationId
+                    !selectedLocationId ||
+                    !reason.trim() ||
+                    !password
                   }
                   className={`w-2/3 flex items-center justify-center gap-1 py-2 rounded ${
                     !isDirty ||
                     saving ||
                     isInactiveProduct ||
                     preview.negative.length > 0 ||
-                    !selectedLocationId
+                    !selectedLocationId ||
+                    !reason.trim() ||
+                    !password
                       ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                       : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
                   }`}
@@ -863,6 +961,19 @@ const AccessoryInventoryEntryForm = () => {
         isOpen={locationModalOpen}
         onClose={() => setLocationModalOpen(false)}
         onLocationsChanged={loadLocations}
+      />
+
+      <AccessoryAdjustmentHistoryModal
+        isOpen={historyModalOpen}
+        sku={selectedSku}
+        locationId={selectedLocationId}
+        productLabel={
+          selectedProduct
+            ? `${selectedProduct.manufacturer || ''} ${selectedProduct.model || ''}`.trim()
+            : ''
+        }
+        locationName={selectedLocation?.name || ''}
+        onClose={() => setHistoryModalOpen(false)}
       />
     </div>
   );

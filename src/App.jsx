@@ -28,6 +28,7 @@ import AccessoryProcurementForm from './components/accessories/AccessoryProcurem
 import AccessoryProcurementManagementForm from './components/accessories/AccessoryProcurementManagementForm';
 import AccessoryStockReceivingForm from './components/accessories/AccessoryStockReceivingForm';
 import AccessoryLedgerView from './components/accessories/AccessoryLedgerView';
+import AccessoryAdjustmentLogForm from './components/accessories/AccessoryAdjustmentLogForm';
 
 function App() {
   const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
@@ -103,7 +104,8 @@ function App() {
     'acc-procurement': 'admin',
     'acc-procurement-mgmt': 'admin',
     'acc-stock-receiving': 'admin',
-    'acc-ledger': 'admin'
+    'acc-ledger': 'admin',
+    'acc-adjustments': 'admin'
   };
 
   // Check if user has permission for current component
@@ -211,6 +213,7 @@ function App() {
             {activeComponent === 'acc-procurement-mgmt' && <AccessoryProcurementManagementForm />}
             {activeComponent === 'acc-stock-receiving' && <AccessoryStockReceivingForm />}
             {activeComponent === 'acc-ledger' && <AccessoryLedgerView />}
+            {activeComponent === 'acc-adjustments' && <AccessoryAdjustmentLogForm />}
           </>
         )}
       </div>

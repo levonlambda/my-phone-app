@@ -22,7 +22,6 @@ import {
 } from '../../services/accessoryService';
 import {
   getAllAccessoryInventory,
-  adjustAccessoryInventory,
   composeInventoryId
 } from '../../services/accessoryInventoryService';
 import {
@@ -31,6 +30,7 @@ import {
 } from '../../services/accessoryLocationService';
 import { formatNumberWithCommas } from '../phone-selection/utils/phoneUtils';
 import AccessoryLocationModal from './AccessoryLocationModal';
+import AccessoryAdjustmentConfirmModal from './AccessoryAdjustmentConfirmModal';
 
 const LOW_STOCK_THRESHOLD = 5;
 // Columns editable inline in the list. Reserved / Defective are hidden from
@@ -53,7 +53,7 @@ const PILL_CLASS = {
 };
 
 const AccessoryInventoryListForm = () => {
-  const { userRole } = useAuth();
+  const { userRole, currentUser } = useAuth();
   const { editAccessoryInventoryItem } = useGlobalState();
   const isAdmin = userRole === 'admin';
 
@@ -85,6 +85,7 @@ const AccessoryInventoryListForm = () => {
   const [editingRowKey, setEditingRowKey] = useState(null);
   const [editDraft, setEditDraft] = useState({ onHand: '', onDisplay: '' });
   const [savingRowKey, setSavingRowKey] = useState(null);
+  const [confirmContext, setConfirmContext] = useState(null);
 
   /* ========== DATA LOAD ========== */
 
@@ -421,7 +422,7 @@ const AccessoryInventoryListForm = () => {
     setEditDraft((prev) => ({ ...prev, [field]: cleaned }));
   };
 
-  const saveEdit = async (row) => {
+  const saveEdit = (row) => {
     setError(null);
     setSuccessMessage('');
 
@@ -440,21 +441,33 @@ const AccessoryInventoryListForm = () => {
       return;
     }
 
-    setSavingRowKey(row.rowKey);
-    try {
-      const res = await adjustAccessoryInventory(row.sku, row.locationId, payload);
-      if (res.success) {
-        setSuccessMessage(`Inventory updated for ${row.sku} at ${row.locationName}`);
-        setEditingRowKey(null);
-        await loadData();
-      } else {
-        setError(res.error || 'Save failed');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSavingRowKey(null);
+    setConfirmContext({
+      rowKey: row.rowKey,
+      sku: row.sku,
+      locationId: row.locationId,
+      locationName: row.locationName,
+      productLabel: `${row.manufacturer || ''} ${row.model || ''}`.trim() || row.sku,
+      before: {
+        onHand: row.onHand || 0,
+        onDisplay: row.onDisplay || 0,
+        reserved: row.reserved || 0,
+        defective: row.defective || 0
+      },
+      adjustments: payload
+    });
+  };
+
+  const handleConfirmSuccess = async () => {
+    const sku = confirmContext?.sku;
+    const locationName = confirmContext?.locationName;
+    setConfirmContext(null);
+    setEditingRowKey(null);
+    setEditDraft({ onHand: '', onDisplay: '' });
+    setSavingRowKey(null);
+    if (sku) {
+      setSuccessMessage(`Inventory updated for ${sku} at ${locationName || 'selected store'}`);
     }
+    await loadData();
   };
 
   const handleOpenEntry = (row) => {
@@ -918,6 +931,21 @@ const AccessoryInventoryListForm = () => {
         isOpen={locationModalOpen}
         onClose={() => setLocationModalOpen(false)}
         onLocationsChanged={loadData}
+      />
+
+      <AccessoryAdjustmentConfirmModal
+        isOpen={Boolean(confirmContext)}
+        sku={confirmContext?.sku}
+        locationId={confirmContext?.locationId}
+        locationName={confirmContext?.locationName}
+        productLabel={confirmContext?.productLabel}
+        before={confirmContext?.before}
+        adjustments={confirmContext?.adjustments}
+        userId={currentUser?.uid || null}
+        userEmail={currentUser?.email || null}
+        source="inventory-list-edit"
+        onClose={() => setConfirmContext(null)}
+        onSuccess={handleConfirmSuccess}
       />
     </div>
   );

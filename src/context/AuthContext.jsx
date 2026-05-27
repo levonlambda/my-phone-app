@@ -131,7 +131,8 @@ export const AuthProvider = ({ children }) => {
       { key: 'acc-procurement', label: 'Acc. Procurement', requiredRole: 'admin' },
       { key: 'acc-procurement-mgmt', label: 'Acc. Proc. Mgmt', requiredRole: 'admin' },
       { key: 'acc-stock-receiving', label: 'Acc. Receiving', requiredRole: 'admin' },
-      { key: 'acc-ledger', label: 'Acc. Ledger', requiredRole: 'admin' }
+      { key: 'acc-ledger', label: 'Acc. Ledger', requiredRole: 'admin' },
+      { key: 'acc-adjustments', label: 'Acc. Adjustments', requiredRole: 'admin' }
     ];
 
     if (userRole === 'admin') {

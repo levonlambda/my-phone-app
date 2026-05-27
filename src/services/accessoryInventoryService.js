@@ -24,6 +24,14 @@ import {
 import { db } from '../firebase/config';
 
 const QUANTITY_FIELDS = ['onHand', 'onDisplay', 'reserved', 'defective'];
+const ADJUSTMENTS_COLLECTION = 'accessory_inventory_adjustments';
+
+const buildQuantitySnapshot = (data) => ({
+  onHand: data?.onHand || 0,
+  onDisplay: data?.onDisplay || 0,
+  reserved: data?.reserved || 0,
+  defective: data?.defective || 0
+});
 
 /**
  * Deterministic composite inventory document ID.
@@ -107,19 +115,34 @@ export const getInventoryForLocation = async (locationId) => {
 /**
  * Atomically adjust inventory counts for a (sku, locationId) pair. Creates
  * the inventory document if it doesn't exist yet (denormalizing locationName
- * from the location doc).
+ * from the location doc). Writes an audit record to
+ * accessory_inventory_adjustments inside the same transaction so the audit
+ * trail can never drift from the inventory state.
  *
  * adjustments shape:
  *   { onHand?: number, onDisplay?: number, reserved?: number, defective?: number }
+ *
+ * metadata shape (all required):
+ *   { reason: string, userId?: string, userEmail?: string }
  *
  * Positive numbers add; negative numbers subtract. The transaction reads the
  * current document first so it can reject the change if any field would go
  * negative. `sold` is intentionally NOT adjustable here — use recordAccessorySale.
  */
-export const adjustAccessoryInventory = async (sku, locationId, adjustments = {}) => {
+export const adjustAccessoryInventory = async (
+  sku,
+  locationId,
+  adjustments = {},
+  metadata = {}
+) => {
   try {
     if (!sku) throw new Error('SKU is required');
     if (!locationId) throw new Error('Location ID is required');
+
+    const reason = String(metadata.reason || '').trim();
+    if (!reason) {
+      throw new Error('A reason is required for inventory adjustments');
+    }
 
     const quantityDeltas = {};
     QUANTITY_FIELDS.forEach((field) => {
@@ -154,37 +177,31 @@ export const adjustAccessoryInventory = async (sku, locationId, adjustments = {}
       }
       const locationName = locSnap.data().name || '(Unknown)';
 
+      const before = invSnap.exists()
+        ? buildQuantitySnapshot(invSnap.data())
+        : buildQuantitySnapshot(null);
+
+      const after = { ...before };
+      for (const [field, delta] of Object.entries(quantityDeltas)) {
+        const next = before[field] + delta;
+        if (next < 0) {
+          throw new Error(
+            `Cannot reduce ${field} below zero (current ${before[field]}, delta ${delta})`
+          );
+        }
+        after[field] = next;
+      }
+
       if (!invSnap.exists()) {
-        // First-time stock at this location for this SKU
-        const newDoc = {
+        transaction.set(invRef, {
           sku,
           locationId,
           locationName,
-          onHand: 0,
-          onDisplay: 0,
-          reserved: 0,
-          defective: 0,
+          ...after,
           sold: 0,
           lastUpdated: Timestamp.now()
-        };
-        for (const [field, delta] of Object.entries(quantityDeltas)) {
-          const next = newDoc[field] + delta;
-          if (next < 0) {
-            throw new Error(`Cannot set ${field} below zero (attempted ${next})`);
-          }
-          newDoc[field] = next;
-        }
-        transaction.set(invRef, newDoc);
+        });
       } else {
-        const current = invSnap.data();
-        for (const [field, delta] of Object.entries(quantityDeltas)) {
-          const nextValue = (current[field] || 0) + delta;
-          if (nextValue < 0) {
-            throw new Error(
-              `Cannot reduce ${field} below zero (current ${current[field] || 0}, delta ${delta})`
-            );
-          }
-        }
         const updatePayload = {
           locationName, // refresh denormalized name in case location was renamed
           lastUpdated: Timestamp.now()
@@ -194,12 +211,81 @@ export const adjustAccessoryInventory = async (sku, locationId, adjustments = {}
         }
         transaction.update(invRef, updatePayload);
       }
+
+      const auditRef = doc(collection(db, ADJUSTMENTS_COLLECTION));
+      transaction.set(auditRef, {
+        sku,
+        locationId,
+        locationName,
+        userId: metadata.userId || null,
+        userEmail: metadata.userEmail || null,
+        timestamp: Timestamp.now(),
+        before,
+        after,
+        delta: { ...quantityDeltas },
+        reason,
+        source: metadata.source || 'manual-entry'
+      });
     });
 
     return { success: true, message: 'Inventory adjusted successfully' };
   } catch (error) {
     console.error('Error adjusting accessory inventory:', error);
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Fetch every adjustment-history entry across all SKUs and stores, sorted by
+ * timestamp desc. Used by the global audit log view. Caps at limitCount so a
+ * runaway collection doesn't blow up the client; bump it if needed.
+ */
+export const getAllAdjustments = async (limitCount = 500) => {
+  try {
+    const snap = await getDocs(collection(db, ADJUSTMENTS_COLLECTION));
+    const entries = [];
+    snap.forEach((d) => entries.push({ id: d.id, ...d.data() }));
+    entries.sort((a, b) => {
+      const ta = a.timestamp?.seconds || 0;
+      const tb = b.timestamp?.seconds || 0;
+      return tb - ta;
+    });
+    return { success: true, entries: entries.slice(0, Math.max(1, limitCount)) };
+  } catch (error) {
+    console.error('Error fetching all adjustments:', error);
+    return { success: false, error: error.message, entries: [] };
+  }
+};
+
+/**
+ * Fetch the most recent adjustment-history entries for a (sku, locationId)
+ * pair. Filters server-side by sku (single where clause — no composite index
+ * required) and refines by locationId client-side, then sorts by timestamp
+ * desc and slices to limitCount. Fine for the small data volumes expected
+ * at this scale.
+ */
+export const getAdjustmentHistory = async (sku, locationId, limitCount = 50) => {
+  try {
+    if (!sku) throw new Error('SKU is required');
+    if (!locationId) throw new Error('Location ID is required');
+    const q = query(collection(db, ADJUSTMENTS_COLLECTION), where('sku', '==', sku));
+    const snap = await getDocs(q);
+    const entries = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      if (data.locationId === locationId) {
+        entries.push({ id: d.id, ...data });
+      }
+    });
+    entries.sort((a, b) => {
+      const ta = a.timestamp?.seconds || 0;
+      const tb = b.timestamp?.seconds || 0;
+      return tb - ta;
+    });
+    return { success: true, entries: entries.slice(0, Math.max(1, limitCount)) };
+  } catch (error) {
+    console.error('Error fetching adjustment history:', error);
+    return { success: false, error: error.message, entries: [] };
   }
 };
 
@@ -344,6 +430,8 @@ export default {
   getInventoryForSku,
   getInventoryForLocation,
   adjustAccessoryInventory,
+  getAdjustmentHistory,
+  getAllAdjustments,
   receiveAccessoryStock,
   recordAccessorySale
 };
