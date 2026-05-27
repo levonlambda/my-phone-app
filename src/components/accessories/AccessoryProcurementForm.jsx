@@ -21,7 +21,8 @@ import {
   getProductByBarcode,
   createAccessoryProcurement,
   updateAccessoryProcurement,
-  markAccessoryProcurementPaid
+  markAccessoryProcurementPaid,
+  setAccessoryPricing
 } from '../../services/accessoryService';
 import {
   formatNumberWithCommas,
@@ -505,10 +506,27 @@ const AccessoryProcurementForm = () => {
         res = await createAccessoryProcurement(payload);
       }
       if (res.success) {
+        // Push the dealer/retail prices used in this procurement into the
+        // accessory_pricing collection so the catalog stays in sync. Errors
+        // are logged but don't block the success flow — the procurement is
+        // already saved.
+        await Promise.all(
+          items.map(async (it) => {
+            try {
+              await setAccessoryPricing(it.internalSku, {
+                dealersPrice: it.dealersPrice,
+                retailPrice: it.retailPrice || 0
+              });
+            } catch (priceErr) {
+              console.error(`Failed to update pricing for ${it.internalSku}:`, priceErr);
+            }
+          })
+        );
+
         setSuccessMessage(
           isEditing
-            ? 'Procurement updated successfully'
-            : `Procurement created successfully (${res.reference || ''})`
+            ? 'Procurement updated successfully · prices synced to catalog'
+            : `Procurement created successfully (${res.reference || ''}) · prices synced to catalog`
         );
         setTimeout(() => {
           clearAccessoryProcurementToEdit();
