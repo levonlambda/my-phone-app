@@ -13,12 +13,14 @@ import {
   Check,
   Settings,
   Save,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { useGlobalState } from '../../context/GlobalStateContext';
 import {
   createAccessoryProduct,
   updateAccessoryProduct,
+  deleteAccessoryProduct,
   getAllAccessoryProducts,
   getAllCategories
 } from '../../services/accessoryService';
@@ -67,6 +69,7 @@ const AccessoryProductForm = () => {
   const [pendingImagePreview, setPendingImagePreview] = useState(null);
 
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [loadingRefs, setLoadingRefs] = useState(true);
@@ -202,6 +205,46 @@ const AccessoryProductForm = () => {
   const handleCancel = () => {
     clearAccessoryProductToEdit();
     resetForm();
+  };
+
+  const handleDelete = async () => {
+    if (!editSku) return;
+
+    const displayName =
+      `${formData.manufacturer || ''} ${formData.model || ''}`.trim() || editSku;
+    const confirmMsg =
+      `Delete this accessory product?\n\n` +
+      `SKU: ${editSku}\n` +
+      `Product: ${displayName}\n\n` +
+      `Deletion is blocked if Stock, Display, Reserved, or Pending quantities are non-zero at any location. ` +
+      `Defective stock does NOT block deletion.\n\n` +
+      `This will remove the product, its pricing, all per-location inventory rows, and the product image. ` +
+      `Procurement history and adjustment-log entries are preserved.\n\n` +
+      `This action cannot be undone.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setDeleting(true);
+    setError(null);
+    setSuccessMessage('');
+    try {
+      const result = await deleteAccessoryProduct(editSku);
+      if (!result.success) {
+        setError(result.error || 'Failed to delete product');
+        return;
+      }
+      setSuccessMessage(result.message || 'Product deleted successfully');
+      // Brief pause so the user sees confirmation, then close the form
+      setTimeout(() => {
+        clearAccessoryProductToEdit();
+        resetForm();
+      }, 1200);
+    } catch (err) {
+      console.error('Error deleting accessory product:', err);
+      setError(err.message || 'Failed to delete product');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   /* ========== SUBMIT ========== */
@@ -349,7 +392,7 @@ const AccessoryProductForm = () => {
             {error && (
               <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>{error}</span>
+                <span className="whitespace-pre-line">{error}</span>
               </div>
             )}
             {successMessage && (
@@ -528,19 +571,43 @@ const AccessoryProductForm = () => {
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="w-1/3 flex items-center justify-center gap-1 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+                  disabled={submitting || deleting}
+                  className="w-1/4 flex items-center justify-center gap-1 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <X className="h-4 w-4" />
                   Cancel
                 </button>
               )}
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={submitting || deleting}
+                  className={`w-1/4 flex items-center justify-center gap-1 py-2 rounded ${
+                    submitting || deleting
+                      ? 'bg-red-300 text-white cursor-not-allowed'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                >
+                  {deleting ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete
+                </button>
+              )}
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || deleting}
                 className={`${
-                  isEditing || accessoryProductToEdit ? 'w-2/3' : 'w-full'
+                  isEditing
+                    ? 'w-1/2'
+                    : accessoryProductToEdit
+                    ? 'w-3/4'
+                    : 'w-full'
                 } flex items-center justify-center gap-1 py-2 rounded ${
-                  submitting
+                  submitting || deleting
                     ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                     : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
                 }`}

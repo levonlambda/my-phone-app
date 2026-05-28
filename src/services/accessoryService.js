@@ -27,6 +27,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { deleteImageFromStorage } from './accessoryImageService';
 
 /* ========== UTILITY FUNCTIONS ========== */
 
@@ -208,6 +209,132 @@ export const getProductByBarcode = async (barcode) => {
   } catch (error) {
     console.error('Error fetching product by barcode:', error);
     return { success: false, error: error.message, product: null };
+  }
+};
+
+/**
+ * Delete an accessory product, but only when it carries no active inventory
+ * or pending procurements. Specifically, rejects if ANY of the following is
+ * non-zero across ALL locations:
+ *   - onHand (Stock)
+ *   - onDisplay (Display)
+ *   - reserved
+ *   - pending — sum of quantity in unreceived accessory_procurements[].items[]
+ *               for this SKU
+ *
+ * `defective` is intentionally NOT a blocker (per product spec): a SKU sitting
+ * on defective-only remnants is treated as inactive for delete purposes.
+ *
+ * When the check passes, batch-deletes the product doc, every inventory doc
+ * for this SKU (across all locations), and the pricing doc. Then best-effort
+ * removes the primary image from Storage; a Storage failure does NOT roll
+ * back the Firestore deletes (the photoUrl reference is already gone).
+ *
+ * Historical procurement line items and adjustment-log entries are LEFT
+ * UNTOUCHED so the audit trail remains reconstructible.
+ */
+export const deleteAccessoryProduct = async (sku) => {
+  try {
+    if (!sku) throw new Error('SKU is required');
+
+    const productRef = doc(db, 'accessory_products', sku);
+    const productSnap = await getDoc(productRef);
+    if (!productSnap.exists()) {
+      return { success: false, error: 'Product not found' };
+    }
+
+    // Check 1: active inventory across all locations
+    const invQuery = query(
+      collection(db, 'accessory_inventory'),
+      where('sku', '==', sku)
+    );
+    const invSnap = await getDocs(invQuery);
+    const blockingLocations = [];
+    invSnap.forEach((d) => {
+      const data = d.data();
+      const onHand = data.onHand || 0;
+      const onDisplay = data.onDisplay || 0;
+      const reserved = data.reserved || 0;
+      if (onHand > 0 || onDisplay > 0 || reserved > 0) {
+        blockingLocations.push({
+          locationName: data.locationName || data.locationId || '(unknown location)',
+          onHand,
+          onDisplay,
+          reserved
+        });
+      }
+    });
+
+    // Check 2: pending (unreceived) procurements that include this SKU
+    const procSnap = await getDocs(collection(db, 'accessory_procurements'));
+    let pendingTotal = 0;
+    const pendingProcs = [];
+    procSnap.forEach((d) => {
+      const data = d.data();
+      if (data.isReceived) return;
+      const line = (data.items || []).find((it) => it.internalSku === sku);
+      const qty = Number(line?.quantity) || 0;
+      if (qty > 0) {
+        pendingTotal += qty;
+        pendingProcs.push({
+          reference: data.reference || d.id,
+          quantity: qty
+        });
+      }
+    });
+
+    if (blockingLocations.length > 0 || pendingTotal > 0) {
+      const reasons = [];
+      if (blockingLocations.length > 0) {
+        const detail = blockingLocations
+          .map(
+            (b) =>
+              `${b.locationName} (Stock: ${b.onHand}, Display: ${b.onDisplay}, Reserved: ${b.reserved})`
+          )
+          .join('; ');
+        reasons.push(`Active inventory at — ${detail}`);
+      }
+      if (pendingTotal > 0) {
+        const refs = pendingProcs.map((p) => `${p.reference} (${p.quantity})`).join(', ');
+        reasons.push(
+          `Pending procurements totalling ${pendingTotal} unit(s): ${refs}`
+        );
+      }
+      return {
+        success: false,
+        error: `Cannot delete "${sku}". Stock, Display, Reserved, and Pending must all be zero before deletion.\n${reasons.join('\n')}`
+      };
+    }
+
+    // Clear to delete. Batch-delete the product, its pricing doc, and every
+    // inventory doc for this SKU (the blocking counters are zero — only
+    // `defective` may carry a remainder, which is intentionally allowed).
+    const batch = writeBatch(db);
+    batch.delete(productRef);
+    batch.delete(doc(db, 'accessory_pricing', sku));
+    invSnap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+
+    // Best-effort image cleanup; tolerated failure preserves the successful
+    // Firestore deletes above. deleteImageFromStorage treats object-not-found
+    // as success, so a SKU without an image is a non-event.
+    let storageWarning = '';
+    try {
+      const storageResult = await deleteImageFromStorage(sku);
+      if (!storageResult.success) {
+        storageWarning = ` (Storage cleanup warning: ${storageResult.error})`;
+      }
+    } catch (storageErr) {
+      storageWarning = ` (Storage cleanup warning: ${storageErr.message})`;
+    }
+
+    return {
+      success: true,
+      message: `Accessory product "${sku}" deleted successfully${storageWarning}`
+    };
+  } catch (error) {
+    console.error('Error deleting accessory product:', error);
+    return { success: false, error: error.message };
   }
 };
 
@@ -855,6 +982,7 @@ export default {
   // Product operations
   createAccessoryProduct,
   updateAccessoryProduct,
+  deleteAccessoryProduct,
   getAccessoryProductBySku,
   getAllAccessoryProducts,
   getProductByBarcode,
