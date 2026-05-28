@@ -291,12 +291,19 @@ export const getAdjustmentHistory = async (sku, locationId, limitCount = 50) => 
 
 /**
  * Receive stock from a procurement INTO a specific location. Atomically:
- *   - increments onHand for each received SKU at the given location
- *     (creating the inventory doc if missing)
+ *   - increments onHand / onDisplay / defective per SKU as allocated by the
+ *     caller (creating the inventory doc if missing)
  *   - marks the procurement isReceived and stores delivery metadata
+ *   - stores receivedBreakdown on the procurement so view-only mode can
+ *     reproduce the per-bucket split
  *
- * receivedItems shape: [{ internalSku, quantity }, ...]
+ * receivedItems shape:
+ *   [{ internalSku, onHand?: number, onDisplay?: number, defective?: number }, ...]
+ *
+ * Items with all zero buckets are skipped.
  */
+const RECEIVE_BUCKETS = ['onHand', 'onDisplay', 'defective'];
+
 export const receiveAccessoryStock = async (
   procurementId,
   receivedItems,
@@ -311,12 +318,26 @@ export const receiveAccessoryStock = async (
       throw new Error('receivedItems must be a non-empty array');
     }
 
-    receivedItems.forEach((item) => {
+    // Normalize each line into an object with numeric onHand/onDisplay/defective
+    // and a total. Reject negatives and non-finite values up front.
+    const normalized = receivedItems.map((item) => {
       if (!item.internalSku) throw new Error('Each received item must have an internalSku');
-      const qty = Number(item.quantity);
-      if (!Number.isFinite(qty) || qty < 0) {
-        throw new Error(`Invalid received quantity for SKU ${item.internalSku}`);
-      }
+      const buckets = {};
+      let total = 0;
+      RECEIVE_BUCKETS.forEach((b) => {
+        const raw = item[b];
+        if (raw === undefined || raw === null || raw === '') {
+          buckets[b] = 0;
+        } else {
+          const n = Number(raw);
+          if (!Number.isFinite(n) || n < 0) {
+            throw new Error(`Invalid ${b} quantity for SKU ${item.internalSku}`);
+          }
+          buckets[b] = n;
+        }
+        total += buckets[b];
+      });
+      return { internalSku: item.internalSku, ...buckets, total };
     });
 
     await runTransaction(db, async (transaction) => {
@@ -324,7 +345,7 @@ export const receiveAccessoryStock = async (
       const locRef = doc(db, 'accessory_locations', locationId);
 
       // All reads must come before any writes in a transaction
-      const invRefs = receivedItems.map((item) =>
+      const invRefs = normalized.map((item) =>
         doc(db, 'accessory_inventory', composeInventoryId(item.internalSku, locationId))
       );
       const [procurementSnap, locSnap, ...invSnaps] = await Promise.all([
@@ -337,9 +358,8 @@ export const receiveAccessoryStock = async (
       if (!locSnap.exists()) throw new Error('Destination location not found');
       const locationName = locSnap.data().name || '(Unknown)';
 
-      receivedItems.forEach((item, idx) => {
-        const qty = Number(item.quantity);
-        if (qty === 0) return;
+      normalized.forEach((item, idx) => {
+        if (item.total === 0) return;
         const invRef = invRefs[idx];
         const invSnap = invSnaps[idx];
 
@@ -348,19 +368,22 @@ export const receiveAccessoryStock = async (
             sku: item.internalSku,
             locationId,
             locationName,
-            onHand: qty,
-            onDisplay: 0,
+            onHand: item.onHand,
+            onDisplay: item.onDisplay,
             reserved: 0,
-            defective: 0,
+            defective: item.defective,
             sold: 0,
             lastUpdated: Timestamp.now()
           });
         } else {
-          transaction.update(invRef, {
-            onHand: increment(qty),
+          const updatePayload = {
             locationName,
             lastUpdated: Timestamp.now()
+          };
+          RECEIVE_BUCKETS.forEach((b) => {
+            if (item[b] > 0) updatePayload[b] = increment(item[b]);
           });
+          transaction.update(invRef, updatePayload);
         }
       });
 
@@ -370,6 +393,12 @@ export const receiveAccessoryStock = async (
         deliveryReference: deliveryReference || '',
         deliveryLocationId: locationId,
         deliveryLocationName: locationName,
+        receivedBreakdown: normalized.map(({ internalSku, onHand, onDisplay, defective }) => ({
+          internalSku,
+          onHand,
+          onDisplay,
+          defective
+        })),
         lastUpdated: Timestamp.now()
       });
     });
