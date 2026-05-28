@@ -18,6 +18,17 @@ import { useAuth } from './context/AuthContext';
 import { LogOut, User, Shield } from 'lucide-react';
 import ArchivePreview from './components/ArchivePreview';
 import BackupTestingPanel from './components/BackupTestingPanel';
+import AccessoryProductForm from './components/accessories/AccessoryProductForm';
+import AccessoryProductListForm from './components/accessories/AccessoryProductListForm';
+import AccessoryInventoryEntryForm from './components/accessories/AccessoryInventoryEntryForm';
+import AccessoryInventoryListForm from './components/accessories/AccessoryInventoryListForm';
+import AccessoryInventorySummaryForm from './components/accessories/AccessoryInventorySummaryForm';
+import AccessoryPriceManagementForm from './components/accessories/AccessoryPriceManagementForm';
+import AccessoryProcurementForm from './components/accessories/AccessoryProcurementForm';
+import AccessoryProcurementManagementForm from './components/accessories/AccessoryProcurementManagementForm';
+import AccessoryStockReceivingForm from './components/accessories/AccessoryStockReceivingForm';
+import AccessoryLedgerView from './components/accessories/AccessoryLedgerView';
+import AccessoryAdjustmentLogForm from './components/accessories/AccessoryAdjustmentLogForm';
 
 function App() {
   const { activeComponent, setActiveComponent, phoneToEdit } = useGlobalState();
@@ -78,10 +89,23 @@ function App() {
     'form': 'user',
     'phonelist': 'user',
     'prices': 'admin',
-    'price-repair': 'admin', 
+    'price-repair': 'admin',
     'archive-preview': 'admin',
     'backup-testing': 'admin',
-    'image-management': 'user'
+    'image-management': 'user',
+
+    // Accessories feature
+    'acc-products': 'user',
+    'acc-product-list': 'admin',
+    'acc-entry': 'admin',
+    'acc-inventory': 'admin',
+    'acc-summary': 'user',
+    'acc-prices': 'admin',
+    'acc-procurement': 'admin',
+    'acc-procurement-mgmt': 'admin',
+    'acc-stock-receiving': 'admin',
+    'acc-ledger': 'admin',
+    'acc-adjustments': 'admin'
   };
 
   // Check if user has permission for current component
@@ -177,6 +201,19 @@ function App() {
             {activeComponent === 'archive-preview' && <ArchivePreview />}
             {activeComponent === 'backup-testing' && <BackupTestingPanel />}
             {activeComponent === 'image-management' && <PhoneImageManagementForm />}
+
+            {/* Accessories feature (placeholders through Phase 1; real components land in later phases) */}
+            {activeComponent === 'acc-products' && <AccessoryProductForm />}
+            {activeComponent === 'acc-product-list' && <AccessoryProductListForm />}
+            {activeComponent === 'acc-entry' && <AccessoryInventoryEntryForm />}
+            {activeComponent === 'acc-inventory' && <AccessoryInventoryListForm />}
+            {activeComponent === 'acc-summary' && <AccessoryInventorySummaryForm />}
+            {activeComponent === 'acc-prices' && <AccessoryPriceManagementForm />}
+            {activeComponent === 'acc-procurement' && <AccessoryProcurementForm />}
+            {activeComponent === 'acc-procurement-mgmt' && <AccessoryProcurementManagementForm />}
+            {activeComponent === 'acc-stock-receiving' && <AccessoryStockReceivingForm />}
+            {activeComponent === 'acc-ledger' && <AccessoryLedgerView />}
+            {activeComponent === 'acc-adjustments' && <AccessoryAdjustmentLogForm />}
           </>
         )}
       </div>
