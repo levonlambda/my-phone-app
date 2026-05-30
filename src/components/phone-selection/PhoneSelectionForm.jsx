@@ -23,6 +23,7 @@ import {
   addPhoneToInventory 
 } from './services/InventoryService';
 import supplierService from '../../services/supplierService'; // NEW: Import supplier service
+import { getActiveLocations } from '../../services/accessoryLocationService'; // Store locations for Location dropdown
 import { Search, ArrowRight, CircleAlert } from 'lucide-react';
 {/* Part 1 End - Imports and Dependencies */}
 
@@ -79,6 +80,7 @@ const PhoneSelectionForm = () => {
   const [location, setLocation] = useState(''); // NEW: Added location state
   const [supplier, setSupplier] = useState(''); // NEW: Added supplier state
   const [suppliers, setSuppliers] = useState([]); // NEW: Added suppliers array state
+  const [activeLocations, setActiveLocations] = useState([]); // Active store locations for the Location dropdown
   const [dealersPrice, setDealersPrice] = useState('');
   const [retailPrice, setRetailPrice] = useState('');
   const [status, setStatus] = useState('On-Hand');
@@ -519,6 +521,29 @@ const PhoneSelectionForm = () => {
     fetchSuppliers();
   }, []);
 
+  // Fetch active store locations on mount (read-only) to populate the Location dropdown.
+  // Pre-selects the primary store, but never overrides a value already set (e.g. when editing).
+  useEffect(() => {
+    async function fetchLocations() {
+      try {
+        const result = await getActiveLocations();
+        if (result.success) {
+          setActiveLocations(result.locations);
+          const primary = result.locations.find((loc) => loc.isPrimary);
+          if (primary) {
+            setLocation((prev) => (prev ? prev : primary.name));
+          }
+        } else {
+          console.error("Error loading store locations:", result.error);
+        }
+      } catch (error) {
+        console.error("Error fetching store locations:", error);
+      }
+    }
+
+    fetchLocations();
+  }, []);
+
   // Check if selections are complete and fetch prices directly from Firestore
   useEffect(() => {
     const fetchPricesDirectly = async () => {
@@ -840,6 +865,7 @@ const PhoneSelectionForm = () => {
                 barcode={barcode}
                 serialNumber={serialNumber}
                 location={location}
+                activeLocations={activeLocations}
                 supplier={supplier}
                 suppliers={suppliers}
                 status={status}

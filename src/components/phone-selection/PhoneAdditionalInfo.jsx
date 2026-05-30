@@ -9,6 +9,7 @@ const PhoneAdditionalInfo = ({
   barcode,
   serialNumber,
   location,
+  activeLocations = [],
   supplier,
   suppliers,
   status,
@@ -95,14 +96,24 @@ const PhoneAdditionalInfo = ({
       <div className="flex gap-4">
         <div className="flex-1 space-y-2">
           <label className="block text-[rgb(52,69,157)] font-semibold">Location:</label>
-          <input 
-            type="text" 
-            className="w-full p-2 border rounded"
+          <select
+            className="w-full p-2 border rounded bg-white"
             value={location}
             onChange={handleLocationChange}
-            placeholder="Enter location"
             required
-          />
+          >
+            <option value="">Select a location…</option>
+            {activeLocations.map((loc) => (
+              <option key={loc.id} value={loc.name}>
+                {loc.name}
+              </option>
+            ))}
+            {/* Existing phone may reference an inactive/deleted store — keep it visible */}
+            {location &&
+              !activeLocations.some((loc) => loc.name === location) && (
+                <option value={location}>{location}</option>
+              )}
+          </select>
         </div>
         <div className="flex-1 space-y-2">
           <label className="block text-[rgb(52,69,157)] font-semibold">Supplier:</label>
@@ -161,6 +172,7 @@ PhoneAdditionalInfo.propTypes = {
   barcode: PropTypes.string.isRequired,
   serialNumber: PropTypes.string.isRequired,
   location: PropTypes.string.isRequired,
+  activeLocations: PropTypes.array,
   supplier: PropTypes.string.isRequired,
   suppliers: PropTypes.array.isRequired,
   status: PropTypes.string.isRequired,
