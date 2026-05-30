@@ -25,6 +25,7 @@ import {
 import { db } from '../firebase/config';
 import { checkDuplicateImeis } from './phone-selection/services/InventoryService';
 import { createInventoryId, getCurrentDate } from './phone-selection/utils/phoneUtils';
+import { getActiveLocations } from '../services/accessoryLocationService';
 
 const StockReceivingForm = () => {
   // Get procurement data from global state
@@ -36,6 +37,10 @@ const StockReceivingForm = () => {
   const [dateDelivered, setDateDelivered] = useState(new Date().toISOString().split('T')[0]);
   const [bulkLocation, setBulkLocation] = useState('');
   const [deliveryReference, setDeliveryReference] = useState('');
+
+  // State for store locations (sourced from Manage Stores / accessory_locations)
+  const [activeLocations, setActiveLocations] = useState([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
   
   // State for group barcodes
   const [groupBarcodes, setGroupBarcodes] = useState({});
@@ -108,6 +113,36 @@ const StockReceivingForm = () => {
       }
     }
   }, [procurementData]);
+
+  // Load active store locations from Manage Stores (accessory_locations) on mount.
+  // Read-only: used to populate the location dropdowns. Pre-selects the primary store.
+  useEffect(() => {
+    let cancelled = false;
+    const loadLocations = async () => {
+      setLocationsLoading(true);
+      try {
+        const result = await getActiveLocations();
+        if (cancelled) return;
+        if (result.success) {
+          setActiveLocations(result.locations);
+          const primary = result.locations.find(loc => loc.isPrimary);
+          if (primary) {
+            setBulkLocation(prev => (prev ? prev : primary.name));
+          }
+        } else {
+          console.error('Failed to load store locations:', result.error);
+        }
+      } catch (error) {
+        console.error('Error loading store locations:', error);
+      } finally {
+        if (!cancelled) setLocationsLoading(false);
+      }
+    };
+    loadLocations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Initialize receiving items state
   const [receivingItems, setReceivingItems] = useState([]);
@@ -908,14 +943,25 @@ const StockReceivingForm = () => {
                     Set all locations to:
                   </label>
                   <div className="flex gap-2">
-                    <input
-                      type="text"
+                    <select
                       value={bulkLocation}
                       onChange={(e) => setBulkLocation(e.target.value)}
-                      className="flex-1 px-3 py-2 border rounded text-sm"
-                      placeholder="e.g. Stockroom A"
-                      disabled={isViewOnly}
-                    />
+                      className="flex-1 px-3 py-2 border rounded text-sm bg-white"
+                      disabled={isViewOnly || locationsLoading}
+                    >
+                      <option value="">
+                        {locationsLoading
+                          ? 'Loading stores…'
+                          : activeLocations.length === 0
+                            ? 'No stores configured'
+                            : 'Select a store…'}
+                      </option>
+                      {activeLocations.map((loc) => (
+                        <option key={loc.id} value={loc.name}>
+                          {loc.name}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={handleBulkLocationSet}
@@ -1012,9 +1058,19 @@ const StockReceivingForm = () => {
                             type="text"
                             value={groupBarcodes[groupKey] || ''}
                             onChange={(e) => handleGroupBarcodeChange(groupKey, e.target.value)}
+                            onKeyDown={(e) => {
+                              // Barcode scanners emit a trailing Enter. Prevent it from
+                              // submitting the form (which would fire full validation and
+                              // show "required" errors). Instead, treat Enter as "save".
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                toggleBarcodeEditMode(groupKey);
+                              }
+                            }}
                             className={`px-2 py-1 border rounded text-sm w-32 ${fieldErrors[`barcode-group-${groupKey}`] ? 'border-red-500' : ''}`}
                             placeholder="Enter barcode"
                             disabled={isViewOnly}
+                            autoFocus
                           />
                         </>
                       ) : (
@@ -1122,15 +1178,25 @@ const StockReceivingForm = () => {
                             </td>
                             <td className="px-3 py-3">
                               <div>
-                                <input
-                                  type="text"
+                                <select
                                   value={item.location}
                                   onChange={(e) => handleItemChange(item.id, 'location', e.target.value)}
-                                  className={`w-full px-2 py-1.5 border rounded text-sm ${fieldErrors[`location-${item.id}`] ? 'border-red-500' : ''}`}
-                                  placeholder="Required"
+                                  className={`w-full px-2 py-1.5 border rounded text-sm bg-white ${fieldErrors[`location-${item.id}`] ? 'border-red-500' : ''}`}
                                   required
                                   disabled={isViewOnly}
-                                />
+                                >
+                                  <option value="">Required</option>
+                                  {activeLocations.map((loc) => (
+                                    <option key={loc.id} value={loc.name}>
+                                      {loc.name}
+                                    </option>
+                                  ))}
+                                  {/* Saved record may reference an inactive/deleted store — keep it visible */}
+                                  {item.location &&
+                                    !activeLocations.some((loc) => loc.name === item.location) && (
+                                      <option value={item.location}>{item.location}</option>
+                                    )}
+                                </select>
                                 {fieldErrors[`location-${item.id}`] && (
                                   <p className="text-red-500 text-xs mt-1">{fieldErrors[`location-${item.id}`]}</p>
                                 )}
