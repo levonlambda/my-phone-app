@@ -282,17 +282,24 @@ const AccessoryInventoryEntryForm = () => {
         setBarcodeError(res.error || 'Lookup failed');
         return;
       }
-      if (!res.product) {
-        setBarcodeError(`No product found with barcode "${code}"`);
+      let product = res.product;
+      if (!product) {
+        // No barcode match — fall back to matching the code against product SKUs
+        const codeUpper = code.toUpperCase();
+        product =
+          products.find((p) => (p.internalSku || p.id).toUpperCase() === codeUpper) || null;
+      }
+      if (!product) {
+        setBarcodeError(`No product found with barcode or SKU "${code}"`);
         return;
       }
-      if (res.product.active === false) {
+      if (product.active === false) {
         setBarcodeError(
-          `Product "${res.product.model}" is INACTIVE and cannot have inventory adjusted. Reactivate it first.`
+          `Product "${product.model}" is INACTIVE and cannot have inventory adjusted. Reactivate it first.`
         );
         return;
       }
-      const sku = res.product.internalSku || res.product.id;
+      const sku = product.internalSku || product.id;
       setSelectedSku(sku);
       setBarcodeInput('');
     } catch (err) {
@@ -658,14 +665,14 @@ const AccessoryInventoryEntryForm = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         <Barcode className="h-4 w-4 inline mr-1" />
-                        Or enter barcode
+                        Or enter barcode / SKU
                       </label>
                       <form onSubmit={handleBarcodeLookup} className="flex gap-2">
                         <input
                           type="text"
                           value={barcodeInput}
                           onChange={(e) => setBarcodeInput(e.target.value)}
-                          placeholder="Type or paste barcode"
+                          placeholder="Type or paste barcode or SKU"
                           className="flex-1 px-3 py-2 border rounded text-sm bg-white"
                         />
                         <button

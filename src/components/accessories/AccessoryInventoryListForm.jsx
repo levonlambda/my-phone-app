@@ -320,6 +320,7 @@ const AccessoryInventoryListForm = () => {
       result = result.filter(
         (r) =>
           r.sku.toLowerCase().includes(s) ||
+          (r.barcode || '').toLowerCase().includes(s) ||
           r.manufacturer.toLowerCase().includes(s) ||
           r.model.toLowerCase().includes(s) ||
           r.category.toLowerCase().includes(s) ||
@@ -661,7 +662,7 @@ const AccessoryInventoryListForm = () => {
                       name="searchTerm"
                       value={filters.searchTerm}
                       onChange={handleFilterChange}
-                      placeholder="SKU, model, store…"
+                      placeholder="SKU, barcode, model, store…"
                       className="w-full p-2 pl-9 border rounded"
                     />
                     <Search className="h-4 w-4 text-gray-400 absolute left-3 top-3" />
@@ -713,6 +714,12 @@ const AccessoryInventoryListForm = () => {
                       onClick={() => handleSort('sku')}
                     >
                       SKU {sortCaret('sku')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('barcode')}
+                    >
+                      Barcode {sortCaret('barcode')}
                     </th>
                     <th
                       className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
@@ -790,6 +797,7 @@ const AccessoryInventoryListForm = () => {
                         className={isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}
                       >
                         <td className="border px-3 py-2">{row.sku}</td>
+                        <td className="border px-3 py-2">{row.barcode || '-'}</td>
                         <td className="border px-3 py-2">{row.manufacturer || '-'}</td>
                         <td className="border px-3 py-2 font-medium">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -964,6 +972,7 @@ function buildRow(sku, product, locationId, locationName, inv, price, pending = 
   return {
     rowKey: `${sku}__${locationId}`,
     sku,
+    barcode: product.barcode || '',
     locationId,
     locationName: inv.locationName || locationName || '',
     manufacturer: product.manufacturer || '',
