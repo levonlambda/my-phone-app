@@ -6,6 +6,7 @@ import { db } from '../firebase/config';
 import { Smartphone, RefreshCw, Filter, X, Search, FileText, FlaskConical } from 'lucide-react';
 import InventoryTable from './inventory/InventoryTable';
 import InventoryFilters from './inventory/InventoryFilters';
+import { getActiveLocations } from '../services/accessoryLocationService';
 import { useAuth } from '../context/AuthContext'; // Added for admin check
 
 const InventoryListForm = () => {
@@ -41,10 +42,11 @@ const InventoryListForm = () => {
     barcode: '',
     serialNumber: '', // ADD THIS LINE
     supplier: '', // ADD THIS LINE
+    location: '',
     startDate: '',
     endDate: ''
   });
-  
+
   // Separate state for pending filter changes (before debounce) - UPDATED: Added date fields
   const [pendingFilters, setPendingFilters] = useState({
     minPrice: '',
@@ -64,6 +66,7 @@ const InventoryListForm = () => {
     storages: [],
     colors: [],
     suppliers: [],
+    locations: [],
     statuses: ['Stock', 'On-Display', 'Sold', 'Reserved', 'Defective']
   });
   
@@ -150,6 +153,27 @@ const InventoryListForm = () => {
     
     loadSuppliers();
   }, []);
+
+  // Load active store locations from Manage Stores (accessory_locations)
+  useEffect(() => {
+    async function loadLocations() {
+      try {
+        const result = await getActiveLocations();
+        if (result.success) {
+          setFilterOptions(prev => ({
+            ...prev,
+            locations: result.locations
+          }));
+        } else {
+          console.error("Error loading locations:", result.error);
+        }
+      } catch (error) {
+        console.error("Error loading locations:", error);
+      }
+    }
+
+    loadLocations();
+  }, []);
 {/* Part 2 End - Helper Functions and Effects */}
 
 {/* Part 3 Start - Filter Logic and Handlers */}
@@ -213,6 +237,11 @@ const InventoryListForm = () => {
         if (item.supplier !== filters.supplier) {
           return false;
         }
+      }
+
+      // Apply location filter (exact match by store name)
+      if (filters.location && item.location !== filters.location) {
+        return false;
       }
       
       // Apply min price filter (using retail price)
@@ -436,8 +465,9 @@ const InventoryListForm = () => {
       color: '',
       imei1: '',
       barcode: '',
-      serialNumber: '', 
+      serialNumber: '',
       supplier: '',
+      location: '',
       startDate: '',
       endDate: ''
     });
@@ -684,6 +714,12 @@ const InventoryListForm = () => {
         filterSummary.push(`Supplier: ${supplierName}`);
       } else {
         filterSummary.push('Supplier: All');
+      }
+
+      if (filters.location) {
+        filterSummary.push(`Location: ${filters.location}`);
+      } else {
+        filterSummary.push('Location: All');
       }
       
       if (filters.startDate) {

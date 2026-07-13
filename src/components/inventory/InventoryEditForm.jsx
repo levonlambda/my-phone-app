@@ -128,6 +128,11 @@ const InventoryEditForm = ({
         </select>
       </td>
 
+      {/* NEW: Added location column - read-only display (preserved on save) */}
+      <td className="border px-2 py-3 text-sm text-gray-600">
+        {editFormData.location || 'N/A'}
+      </td>
+
       {/* NEW: Added retail price column - read-only display */}
       <td className="border px-2 py-3 whitespace-nowrap text-right">
         <span className="text-gray-600 font-medium">
