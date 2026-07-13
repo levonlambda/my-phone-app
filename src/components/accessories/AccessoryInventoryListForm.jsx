@@ -324,6 +324,7 @@ const AccessoryInventoryListForm = () => {
           r.manufacturer.toLowerCase().includes(s) ||
           r.model.toLowerCase().includes(s) ||
           r.category.toLowerCase().includes(s) ||
+          r.tags.join(' ').toLowerCase().includes(s) ||
           (r.locationName || '').toLowerCase().includes(s)
       );
     }
@@ -662,7 +663,7 @@ const AccessoryInventoryListForm = () => {
                       name="searchTerm"
                       value={filters.searchTerm}
                       onChange={handleFilterChange}
-                      placeholder="SKU, barcode, model, store…"
+                      placeholder="SKU, barcode, model, tags, store…"
                       className="w-full p-2 pl-9 border rounded"
                     />
                     <Search className="h-4 w-4 text-gray-400 absolute left-3 top-3" />
@@ -739,6 +740,7 @@ const AccessoryInventoryListForm = () => {
                     >
                       Category {sortCaret('category')}
                     </th>
+                    <th className="border px-3 py-2 text-left">Tags</th>
                     <th
                       className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('locationName')}
@@ -810,6 +812,9 @@ const AccessoryInventoryListForm = () => {
                           </div>
                         </td>
                         <td className="border px-3 py-2">{row.category || '-'}</td>
+                        <td className="border px-3 py-2 text-gray-600">
+                          {row.tags.length > 0 ? row.tags.join(', ') : '-'}
+                        </td>
                         <td className="border px-3 py-2">{row.locationName || '-'}</td>
 
                         <td className="border px-3 py-2 text-center">
@@ -978,6 +983,7 @@ function buildRow(sku, product, locationId, locationName, inv, price, pending = 
     manufacturer: product.manufacturer || '',
     model: product.model || '',
     category: product.category || '',
+    tags: Array.isArray(product.tags) ? product.tags : [],
     active: product.active !== false,
     onHand,
     onDisplay,
