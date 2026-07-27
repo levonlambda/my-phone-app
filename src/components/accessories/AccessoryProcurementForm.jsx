@@ -18,7 +18,6 @@ import { getAllSuppliers } from '../../services/supplierService';
 import {
   getAllAccessoryProducts,
   getAllAccessoryPricing,
-  getProductByBarcode,
   createAccessoryProcurement,
   updateAccessoryProcurement,
   markAccessoryProcurementPaid,
@@ -90,8 +89,6 @@ const AccessoryProcurementForm = () => {
   const [pickerDealersPrice, setPickerDealersPrice] = useState('');
   const [pickerRetailPrice, setPickerRetailPrice] = useState('');
   const [pickerBarcode, setPickerBarcode] = useState('');
-  const [pickerBarcodeError, setPickerBarcodeError] = useState(null);
-  const [pickerBarcodeLookingUp, setPickerBarcodeLookingUp] = useState(false);
 
   /* ========== UI ========== */
 
@@ -195,7 +192,6 @@ const AccessoryProcurementForm = () => {
     setPickerDealersPrice('');
     setPickerRetailPrice('');
     setPickerBarcode('');
-    setPickerBarcodeError(null);
     setSaveError(null);
     setSuccessMessage('');
   };
@@ -226,12 +222,31 @@ const AccessoryProcurementForm = () => {
     return Array.from(set).sort();
   }, [activeProducts, pickerFilters.category, pickerFilters.manufacturer]);
 
+  const pickerKeyword = pickerBarcode.trim().toLowerCase();
+
   const pickerProductOptions = useMemo(() => {
     let list = activeProducts;
     if (pickerFilters.category) list = list.filter((p) => p.category === pickerFilters.category);
     if (pickerFilters.manufacturer)
       list = list.filter((p) => p.manufacturer === pickerFilters.manufacturer);
     if (pickerFilters.model) list = list.filter((p) => p.model === pickerFilters.model);
+    // The barcode/SKU/keyword input live-filters the dropdown
+    if (pickerKeyword) {
+      list = list.filter((p) => {
+        const sku = (p.internalSku || p.id || '').toLowerCase();
+        const barcode = (p.barcode || '').toLowerCase();
+        const model = (p.model || '').toLowerCase();
+        const shortDesc = (p.shortDescription || '').toLowerCase();
+        const tags = Array.isArray(p.tags) ? p.tags.join(' ').toLowerCase() : '';
+        return (
+          sku.includes(pickerKeyword) ||
+          barcode.includes(pickerKeyword) ||
+          model.includes(pickerKeyword) ||
+          shortDesc.includes(pickerKeyword) ||
+          tags.includes(pickerKeyword)
+        );
+      });
+    }
     return list
       .slice()
       .sort((a, b) => {
@@ -239,7 +254,23 @@ const AccessoryProcurementForm = () => {
         if (m !== 0) return m;
         return (a.model || '').localeCompare(b.model || '');
       });
-  }, [activeProducts, pickerFilters]);
+  }, [activeProducts, pickerFilters, pickerKeyword]);
+
+  // Exact barcode or SKU match auto-selects the product and clears the input
+  // (covers the scanner workflow: scan → selected → ready for the next scan)
+  useEffect(() => {
+    const code = pickerBarcode.trim().toUpperCase();
+    if (!code) return;
+    const exact = activeProducts.filter((p) => {
+      const sku = (p.internalSku || p.id || '').toUpperCase();
+      const barcode = (p.barcode || '').toUpperCase();
+      return sku === code || barcode === code;
+    });
+    if (exact.length === 1) {
+      setPickerSku(exact[0].internalSku || exact[0].id);
+      setPickerBarcode('');
+    }
+  }, [pickerBarcode, activeProducts]);
 
   const pickerSelectedProduct = useMemo(() => {
     if (!pickerSku) return null;
@@ -279,35 +310,6 @@ const AccessoryProcurementForm = () => {
       }
       return next;
     });
-  };
-
-  const handlePickerBarcodeLookup = async (e) => {
-    if (e) e.preventDefault();
-    const code = pickerBarcode.trim();
-    if (!code) return;
-    setPickerBarcodeError(null);
-    setPickerBarcodeLookingUp(true);
-    try {
-      const res = await getProductByBarcode(code);
-      if (!res.success) {
-        setPickerBarcodeError(res.error || 'Lookup failed');
-        return;
-      }
-      if (!res.product) {
-        setPickerBarcodeError(`No product found with barcode "${code}"`);
-        return;
-      }
-      if (res.product.active === false) {
-        setPickerBarcodeError(`Product "${res.product.model}" is inactive`);
-        return;
-      }
-      setPickerSku(res.product.internalSku || res.product.id);
-      setPickerBarcode('');
-    } catch (err) {
-      setPickerBarcodeError(err.message);
-    } finally {
-      setPickerBarcodeLookingUp(false);
-    }
   };
 
   const handleAddItem = () => {
@@ -855,15 +857,24 @@ const AccessoryProcurementForm = () => {
                       className="w-full p-2 border rounded text-sm h-10"
                     >
                       <option value="">
-                        {pickerProductOptions.length === 0
+                        {activeProducts.length === 0
                           ? '-- No active products --'
-                          : `-- Pick a product (${pickerProductOptions.length} available) --`}
+                          : pickerProductOptions.length === 0
+                          ? '-- No products match the current filters --'
+                          : pickerKeyword ||
+                            pickerFilters.category ||
+                            pickerFilters.manufacturer ||
+                            pickerFilters.model
+                          ? `-- Select a product (${pickerProductOptions.length} of ${activeProducts.length} matching) --`
+                          : `-- Select a product (${activeProducts.length} active) --`}
                       </option>
                       {pickerProductOptions.map((p) => {
                         const sku = p.internalSku || p.id;
                         return (
                           <option key={sku} value={sku}>
-                            {p.manufacturer} — {p.model} [{sku}]
+                            {p.manufacturer} —{' '}
+                            {p.shortDescription ? `${p.shortDescription} — ` : ''}
+                            {p.model} [{sku}]
                           </option>
                         );
                       })}
@@ -872,43 +883,30 @@ const AccessoryProcurementForm = () => {
                   <div className="md:col-span-4 space-y-2">
                     <label className="block text-[rgb(52,69,157)] font-semibold text-sm">
                       <Barcode className="h-3.5 w-3.5 inline mr-1" />
-                      Or Barcode:
+                      Or Barcode / SKU / Keyword:
                     </label>
-                    <div className="flex gap-1">
-                      <input
-                        type="text"
-                        value={pickerBarcode}
-                        onChange={(e) => setPickerBarcode(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handlePickerBarcodeLookup();
+                    <input
+                      type="text"
+                      value={pickerBarcode}
+                      onChange={(e) => setPickerBarcode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          // Enter picks the only remaining product, if any
+                          if (pickerProductOptions.length === 1) {
+                            const p = pickerProductOptions[0];
+                            setPickerSku(p.internalSku || p.id);
+                            setPickerBarcode('');
                           }
-                        }}
-                        placeholder="Scan or type"
-                        className="flex-1 px-2 py-2 border rounded text-sm h-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={handlePickerBarcodeLookup}
-                        disabled={!pickerBarcode.trim() || pickerBarcodeLookingUp}
-                        className={`px-3 rounded text-sm h-10 ${
-                          !pickerBarcode.trim() || pickerBarcodeLookingUp
-                            ? 'bg-gray-200 text-gray-500'
-                            : 'bg-[rgb(52,69,157)] text-white hover:bg-[rgb(52,69,157)]/90'
-                        }`}
-                        title="Find by barcode"
-                      >
-                        {pickerBarcodeLookingUp ? (
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Search className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                    {pickerBarcodeError && (
-                      <p className="text-xs text-red-600 mt-1">{pickerBarcodeError}</p>
-                    )}
+                        }
+                      }}
+                      placeholder="Scan or type to filter"
+                      className="w-full px-2 py-2 border rounded text-sm h-10"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Typing filters the product dropdown. An exact barcode or SKU selects it
+                      automatically.
+                    </p>
                   </div>
                 </div>
 

@@ -88,12 +88,14 @@ const AccessoryProductListForm = () => {
         const sku = (p.internalSku || p.id || '').toLowerCase();
         const mfg = (p.manufacturer || '').toLowerCase();
         const model = (p.model || '').toLowerCase();
+        const shortDesc = (p.shortDescription || '').toLowerCase();
         const barcode = (p.barcode || '').toLowerCase();
         const tags = Array.isArray(p.tags) ? p.tags.join(' ').toLowerCase() : '';
         return (
           sku.includes(s) ||
           mfg.includes(s) ||
           model.includes(s) ||
+          shortDesc.includes(s) ||
           barcode.includes(s) ||
           tags.includes(s)
         );
@@ -240,7 +242,7 @@ const AccessoryProductListForm = () => {
                       name="searchTerm"
                       value={filters.searchTerm}
                       onChange={handleFilterChange}
-                      placeholder="SKU, model, barcode, tag…"
+                      placeholder="SKU, model, description, barcode, tag…"
                       className="w-full p-2 pl-9 border rounded"
                     />
                     <Search className="h-4 w-4 text-gray-400 absolute left-3 top-3" />
@@ -291,8 +293,10 @@ const AccessoryProductListForm = () => {
                     <th className="border px-3 py-2 text-center w-20">Image</th>
                     <th className="border px-3 py-2 text-left">SKU</th>
                     <th className="border px-3 py-2 text-left">Manufacturer</th>
+                    <th className="border px-3 py-2 text-left">Short Description</th>
                     <th className="border px-3 py-2 text-left">Model</th>
                     <th className="border px-3 py-2 text-left">Category</th>
+                    <th className="border px-3 py-2 text-left">Tags</th>
                     <th className="border px-3 py-2 text-left">Barcode</th>
                     <th className="border px-3 py-2 text-center">Status</th>
                     <th className="border px-3 py-2 text-center w-24">Actions</th>
@@ -322,8 +326,22 @@ const AccessoryProductListForm = () => {
                         </td>
                         <td className="border px-3 py-2 font-mono text-xs">{sku}</td>
                         <td className="border px-3 py-2">{p.manufacturer || '-'}</td>
+                        <td className="border px-3 py-2 text-gray-600" title={p.shortDescription || ''}>
+                          <div className="max-w-40 truncate">{p.shortDescription || '-'}</div>
+                        </td>
                         <td className="border px-3 py-2 font-medium">{p.model || '-'}</td>
                         <td className="border px-3 py-2">{p.category || '-'}</td>
+                        <td
+                          className="border px-3 py-2 text-gray-600"
+                          title={Array.isArray(p.tags) ? p.tags.join(', ') : ''}
+                        >
+                          <div className="max-w-28 truncate">
+                            {renderTagsCell(
+                              Array.isArray(p.tags) ? p.tags : [],
+                              filters.searchTerm
+                            )}
+                          </div>
+                        </td>
                         <td className="border px-3 py-2 font-mono text-xs">{p.barcode || '-'}</td>
                         <td className="border px-3 py-2 text-center">
                           {p.active === false ? (
@@ -382,5 +400,21 @@ const AccessoryProductListForm = () => {
     </div>
   );
 };
+
+// Single-line tag display: show the tag matching the search term (or the first
+// tag), plus a "+N" count for the rest. Full list lives in the cell's tooltip.
+function renderTagsCell(tags, searchTerm) {
+  if (!tags.length) return '-';
+  const s = (searchTerm || '').trim().toLowerCase();
+  const matched = s ? tags.find((t) => t.toLowerCase().includes(s)) : null;
+  const shown = matched || tags[0];
+  const rest = tags.length - 1;
+  return (
+    <>
+      {shown}
+      {rest > 0 && <span className="ml-1 text-xs text-gray-400">+{rest}</span>}
+    </>
+  );
+}
 
 export default AccessoryProductListForm;

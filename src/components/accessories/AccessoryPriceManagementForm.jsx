@@ -107,6 +107,7 @@ const AccessoryPriceManagementForm = () => {
         sku,
         barcode: p.barcode || '',
         manufacturer: p.manufacturer || '',
+        shortDescription: p.shortDescription || '',
         model: p.model || '',
         category: p.category || '',
         active: p.active !== false,
@@ -127,6 +128,7 @@ const AccessoryPriceManagementForm = () => {
           r.sku.toLowerCase().includes(s) ||
           (r.barcode || '').toLowerCase().includes(s) ||
           r.manufacturer.toLowerCase().includes(s) ||
+          (r.shortDescription || '').toLowerCase().includes(s) ||
           r.model.toLowerCase().includes(s) ||
           r.category.toLowerCase().includes(s)
         );
@@ -259,7 +261,7 @@ const AccessoryPriceManagementForm = () => {
 
   return (
     <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-7xl mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+      <Card className="w-full mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
         <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <DollarSign className="h-6 w-6 text-white" />
@@ -368,7 +370,7 @@ const AccessoryPriceManagementForm = () => {
                       name="searchTerm"
                       value={filters.searchTerm}
                       onChange={handleFilterChange}
-                      placeholder="SKU, barcode, model, category…"
+                      placeholder="SKU, barcode, model, description, category…"
                       className="w-full p-2 pl-9 border rounded"
                     />
                     <Search className="h-4 w-4 text-gray-400 absolute left-3 top-3" />
@@ -413,6 +415,7 @@ const AccessoryPriceManagementForm = () => {
                     <th className="border px-3 py-2 text-left">SKU</th>
                     <th className="border px-3 py-2 text-left">Barcode</th>
                     <th className="border px-3 py-2 text-left">Manufacturer</th>
+                    <th className="border px-3 py-2 text-left">Short Description</th>
                     <th className="border px-3 py-2 text-left">Model</th>
                     <th className="border px-3 py-2 text-left">Category</th>
                     <th className="border px-3 py-2 text-right">Dealer Price</th>
@@ -439,6 +442,12 @@ const AccessoryPriceManagementForm = () => {
                         <td className="border px-3 py-2">{row.sku}</td>
                         <td className="border px-3 py-2">{row.barcode || '-'}</td>
                         <td className="border px-3 py-2">{row.manufacturer || '-'}</td>
+                        <td
+                          className="border px-3 py-2 text-gray-600"
+                          title={row.shortDescription || ''}
+                        >
+                          <div className="max-w-40 truncate">{row.shortDescription || '-'}</div>
+                        </td>
                         <td className="border px-3 py-2 font-medium">{row.model || '-'}</td>
                         <td className="border px-3 py-2">{row.category || '-'}</td>
                         <td className="border px-3 py-2 text-right">
