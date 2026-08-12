@@ -44,6 +44,9 @@ const AccessoryPriceManagementForm = () => {
   });
   const [showFilters, setShowFilters] = useState(true);
 
+  const [sortField, setSortField] = useState('manufacturer');
+  const [sortDirection, setSortDirection] = useState('asc');
+
   // Inline edit state
   const [editingSku, setEditingSku] = useState(null);
   const [editDraft, setEditDraft] = useState({ dealersPrice: '', retailPrice: '' });
@@ -112,7 +115,16 @@ const AccessoryPriceManagementForm = () => {
         category: p.category || '',
         active: p.active !== false,
         dealersPrice: pricing.dealersPrice ?? null,
-        retailPrice: pricing.retailPrice ?? null
+        retailPrice: pricing.retailPrice ?? null,
+        // Derived, for column sorting only — cells still compute these live
+        profit:
+          pricing.dealersPrice != null && pricing.retailPrice != null
+            ? pricing.retailPrice - pricing.dealersPrice
+            : null,
+        markup:
+          pricing.dealersPrice > 0 && pricing.retailPrice != null
+            ? ((pricing.retailPrice - pricing.dealersPrice) / pricing.dealersPrice) * 100
+            : null
       };
     });
 
@@ -135,15 +147,26 @@ const AccessoryPriceManagementForm = () => {
       });
     }
 
-    // Sort: by manufacturer, then model
+    // Sort by the clicked column
     result.sort((a, b) => {
-      const mfg = a.manufacturer.localeCompare(b.manufacturer);
-      if (mfg !== 0) return mfg;
-      return a.model.localeCompare(b.model);
+      let cmp = 0;
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+      if (typeof aVal === 'number' || typeof bVal === 'number') {
+        // Numeric column — rows missing the value (e.g. no pricing set) sort as 0
+        cmp = (Number(aVal) || 0) - (Number(bVal) || 0);
+      } else {
+        cmp = String(aVal || '').localeCompare(String(bVal || ''));
+      }
+      if (cmp === 0) {
+        // Stable tie-break so equal values keep a predictable order
+        cmp = a.manufacturer.localeCompare(b.manufacturer) || a.model.localeCompare(b.model);
+      }
+      return sortDirection === 'asc' ? cmp : -cmp;
     });
 
     return result;
-  }, [products, pricingMap, filters]);
+  }, [products, pricingMap, filters, sortField, sortDirection]);
 
   /* ========== HANDLERS ========== */
 
@@ -154,6 +177,20 @@ const AccessoryPriceManagementForm = () => {
 
   const clearFilters = () => {
     setFilters({ category: '', manufacturer: '', activeStatus: 'active', searchTerm: '' });
+  };
+
+  const handleSort = (field) => {
+    if (field === sortField) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortCaret = (field) => {
+    if (sortField !== field) return null;
+    return <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
   };
 
   const startEdit = (row) => {
@@ -412,17 +449,72 @@ const AccessoryPriceManagementForm = () => {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="border px-3 py-2 text-left">SKU</th>
-                    <th className="border px-3 py-2 text-left">Barcode</th>
-                    <th className="border px-3 py-2 text-left">Manufacturer</th>
-                    <th className="border px-3 py-2 text-left">Short Description</th>
-                    <th className="border px-3 py-2 text-left">Model</th>
-                    <th className="border px-3 py-2 text-left">Category</th>
-                    <th className="border px-3 py-2 text-right">Dealer Price</th>
-                    <th className="border px-3 py-2 text-right">Retail Price</th>
-                    <th className="border px-3 py-2 text-right">Markup %</th>
-                    <th className="border px-3 py-2 text-right">Profit</th>
-                    <th className="border px-3 py-2 text-center">Status</th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('sku')}
+                    >
+                      SKU {sortCaret('sku')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('barcode')}
+                    >
+                      Barcode {sortCaret('barcode')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('manufacturer')}
+                    >
+                      Manufacturer {sortCaret('manufacturer')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('shortDescription')}
+                    >
+                      Short Description {sortCaret('shortDescription')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('model')}
+                    >
+                      Model {sortCaret('model')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('category')}
+                    >
+                      Category {sortCaret('category')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-right cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('dealersPrice')}
+                    >
+                      Dealer Price {sortCaret('dealersPrice')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-right cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('retailPrice')}
+                    >
+                      Retail Price {sortCaret('retailPrice')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-right cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('markup')}
+                    >
+                      Markup % {sortCaret('markup')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-right cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('profit')}
+                    >
+                      Profit {sortCaret('profit')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-center cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('active')}
+                    >
+                      Status {sortCaret('active')}
+                    </th>
                     <th className="border px-3 py-2 text-center w-28">Actions</th>
                   </tr>
                 </thead>
