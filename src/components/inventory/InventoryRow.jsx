@@ -72,18 +72,22 @@ const InventoryRow = ({
           )}
         </div>
       </td>
-      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.model}</td>
+      <td className="border px-2 py-3 text-sm">{item.model}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.ram}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-center">{item.storage}</td>
-      <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.color}</td>
+      <td className="border px-2 py-3 text-sm">{item.color}</td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm">{item.imei1}</td>
       {/* UPDATED: Replaced barcode with serial number */}
       <td className="border px-2 py-3 whitespace-nowrap text-sm uppercase">
         {item.serialNumber || 'N/A'}
       </td>
       {/* NEW: Added supplier column */}
-      <td className="border px-2 py-3 whitespace-nowrap text-sm">
+      <td className="border px-2 py-3 text-sm">
         {supplierName}
+      </td>
+      {/* NEW: Added location column */}
+      <td className="border px-2 py-3 text-sm">
+        {item.location || 'N/A'}
       </td>
       <td className="border px-2 py-3 whitespace-nowrap text-sm text-right">
         <span className="text-gray-600">
@@ -152,6 +156,7 @@ InventoryRow.propTypes = {
     imei1: PropTypes.string.isRequired,
     serialNumber: PropTypes.string, // FIXED: Added serialNumber
     supplier: PropTypes.string, // FIXED: Added supplier
+    location: PropTypes.string, // NEW: Added location
     retailPrice: PropTypes.number, // NEW: Added retailPrice prop
     status: PropTypes.string.isRequired,
     lastUpdated: PropTypes.string

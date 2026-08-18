@@ -10,7 +10,8 @@ import {
   AlertCircle,
   CircleAlert,
   Store,
-  Eye
+  Eye,
+  Search
 } from 'lucide-react';
 import AccessoryProductDetailModal from './AccessoryProductDetailModal';
 import { useAuth } from '../../context/AuthContext';
@@ -44,6 +45,22 @@ const formatPrice = (val) => {
   return `₱${formatNumberWithCommas(String(val))}`;
 };
 
+// Single-line tag display: show the tag matching the search term (or the first
+// tag), plus a "+N" count for the rest. Full list lives in the cell's tooltip.
+const renderTagsCell = (tags, searchTerm) => {
+  if (!tags.length) return '-';
+  const s = (searchTerm || '').trim().toLowerCase();
+  const matched = s ? tags.find((t) => t.toLowerCase().includes(s)) : null;
+  const shown = matched || tags[0];
+  const rest = tags.length - 1;
+  return (
+    <>
+      {shown}
+      {rest > 0 && <span className="ml-1 text-xs text-gray-400">+{rest}</span>}
+    </>
+  );
+};
+
 const calculateMargin = (dp, rp) => {
   const d = parseFloat(String(dp || 0).replace(/,/g, '')) || 0;
   const r = parseFloat(String(rp || 0).replace(/,/g, '')) || 0;
@@ -73,7 +90,8 @@ const AccessoryInventorySummaryForm = () => {
     locationId: '',
     category: '',
     manufacturer: '',
-    model: ''
+    model: '',
+    searchTerm: ''
   });
   const [includeInactive, setIncludeInactive] = useState(false);
   const [inactiveListCollapsed, setInactiveListCollapsed] = useState(true);
@@ -201,6 +219,20 @@ const AccessoryInventorySummaryForm = () => {
       filteredProducts = filteredProducts.filter((p) => p.manufacturer === filters.manufacturer);
     if (filters.model)
       filteredProducts = filteredProducts.filter((p) => p.model === filters.model);
+    if (filters.searchTerm) {
+      const s = filters.searchTerm.toLowerCase();
+      filteredProducts = filteredProducts.filter((p) => {
+        const sku = p.internalSku || p.id;
+        const tags = Array.isArray(p.tags) ? p.tags.join(' ') : '';
+        return (
+          sku.toLowerCase().includes(s) ||
+          (p.model || '').toLowerCase().includes(s) ||
+          (p.shortDescription || '').toLowerCase().includes(s) ||
+          (p.barcode || '').toLowerCase().includes(s) ||
+          tags.toLowerCase().includes(s)
+        );
+      });
+    }
 
     const rowsArr = filteredProducts
       .map((p) => {
@@ -259,8 +291,10 @@ const AccessoryInventorySummaryForm = () => {
           sku,
           product: p,
           manufacturer: p.manufacturer || '',
+          shortDescription: p.shortDescription || '',
           model: p.model || '',
           category: p.category || '',
+          tags: Array.isArray(p.tags) ? p.tags : [],
           active: p.active !== false,
           photoUrl: p.photoUrl || '',
           dealersPrice: pricing.dealersPrice,
@@ -319,7 +353,7 @@ const AccessoryInventorySummaryForm = () => {
   };
 
   const clearFilters = () =>
-    setFilters({ locationId: '', category: '', manufacturer: '', model: '' });
+    setFilters({ locationId: '', category: '', manufacturer: '', model: '', searchTerm: '' });
   const hasActiveFilters = Object.values(filters).some((v) => v);
 
   const toggleRow = (sku) => {
@@ -367,7 +401,7 @@ const AccessoryInventorySummaryForm = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-white p-4">
-        <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+        <Card className="w-full mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
           <CardHeader className="bg-red-600 py-3">
             <CardTitle className="text-2xl text-white">Error</CardTitle>
           </CardHeader>
@@ -386,15 +420,15 @@ const AccessoryInventorySummaryForm = () => {
   }
 
   /* ========== COLUMN COUNT (for expanded row colSpan) ========== */
-  // Columns: Manufacturer, SKU, Model, Category, [DP], SRP, [Margin],
-  // Sold, Display, Stock, Available, Pending, Actions
-  const columnCount = isAdmin ? 13 : 11;
+  // Columns: Manufacturer, SKU, Short Description, Model, Category, Tags,
+  // [DP], SRP, [Margin], Sold, Display, Stock, Available, Pending, Actions
+  const columnCount = isAdmin ? 15 : 13;
 
   /* ========== MAIN RENDER ========== */
 
   return (
     <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-[1400px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+      <Card className="w-full mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
         <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <LayoutDashboard className="h-6 w-6 text-white" />
@@ -434,7 +468,7 @@ const AccessoryInventorySummaryForm = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Store className="h-4 w-4 inline mr-1" />
@@ -506,6 +540,20 @@ const AccessoryInventorySummaryForm = () => {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="searchTerm"
+                    value={filters.searchTerm}
+                    onChange={handleFilterChange}
+                    placeholder="SKU, model, description, barcode, tags…"
+                    className="w-full p-2 pl-9 border rounded"
+                  />
+                  <Search className="h-4 w-4 text-gray-400 absolute left-3 top-3" />
+                </div>
+              </div>
             </div>
 
             {/* Active filter chips */}
@@ -523,7 +571,7 @@ const AccessoryInventorySummaryForm = () => {
                       className="bg-gray-200 rounded-full px-3 py-1 text-sm flex items-center"
                     >
                       <span className="font-medium capitalize">
-                        {key === 'locationId' ? 'store' : key}:
+                        {key === 'locationId' ? 'store' : key === 'searchTerm' ? 'search' : key}:
                       </span>
                       <span className="ml-1">{label}</span>
                       <button
@@ -652,8 +700,10 @@ const AccessoryInventorySummaryForm = () => {
                     <tr className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       <th className="px-3 py-3 text-left">Manufacturer</th>
                       <th className="px-3 py-3 text-left">SKU</th>
+                      <th className="px-3 py-3 text-left">Short Description</th>
                       <th className="px-3 py-3 text-left">Model</th>
-                      <th className="px-3 py-3 text-left">Category</th>
+                      <th className="px-3 py-3 text-left min-w-36">Category</th>
+                      <th className="px-3 py-3 text-left">Tags</th>
                       {isAdmin && <th className="px-2 py-3 text-right">DP</th>}
                       <th className="px-2 py-3 text-right">SRP</th>
                       {isAdmin && <th className="px-2 py-3 text-right">Margin</th>}
@@ -686,7 +736,15 @@ const AccessoryInventorySummaryForm = () => {
                                 <span>{row.manufacturer || '-'}</span>
                               </div>
                             </td>
-                            <td className="px-3 py-3 text-sm">{row.sku}</td>
+                            <td className="px-3 py-3 text-sm whitespace-nowrap">{row.sku}</td>
+                            <td
+                              className="px-3 py-3 text-sm text-gray-600"
+                              title={row.shortDescription || ''}
+                            >
+                              <div className="max-w-40 truncate">
+                                {row.shortDescription || '-'}
+                              </div>
+                            </td>
                             <td className="px-3 py-3 text-sm font-medium">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{row.model || '-'}</span>
@@ -698,6 +756,12 @@ const AccessoryInventorySummaryForm = () => {
                               </div>
                             </td>
                             <td className="px-3 py-3 text-sm">{row.category || '-'}</td>
+                            <td
+                              className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap"
+                              title={row.tags.join(', ')}
+                            >
+                              {renderTagsCell(row.tags, filters.searchTerm)}
+                            </td>
                             {isAdmin && (
                               <td className="px-2 py-3 text-sm text-right">
                                 {renderPriceCell(row.dealersPrice)}
@@ -758,10 +822,10 @@ const AccessoryInventorySummaryForm = () => {
                                   className="bg-gray-50 border-l-4 border-l-[rgb(52,69,157)]/20"
                                 >
                                   {/* Left columns collapsed into one; holds the store name.
-                                      Admin columns: Manufacturer+SKU+Model+Category+DP+SRP+Margin = 7
-                                      Non-admin:     Manufacturer+SKU+Model+Category+SRP         = 5 */}
+                                      Admin columns: Manufacturer+SKU+ShortDesc+Model+Category+Tags+DP+SRP+Margin = 9
+                                      Non-admin:     Manufacturer+SKU+ShortDesc+Model+Category+Tags+SRP          = 7 */}
                                   <td
-                                    colSpan={isAdmin ? 7 : 5}
+                                    colSpan={isAdmin ? 9 : 7}
                                     className="px-3 py-2 text-sm"
                                   >
                                     <div className="flex items-center gap-2 pl-6">

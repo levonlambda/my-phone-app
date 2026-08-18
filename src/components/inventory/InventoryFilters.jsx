@@ -271,66 +271,90 @@ const InventoryFilters = ({
         )}
       </div>
       
-      {/* RAM filter */}
+      {/* Location filter */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          RAM
+          Location
         </label>
         <select
-          name="ram"
-          value={filters.ram}
+          name="location"
+          value={filters.location}
           onChange={handleFilterChange}
           className="w-full p-2 border rounded"
-          disabled={!filters.manufacturer || !filters.model || isLoadingRams}
         >
-          <option value="">All RAM</option>
-          {isLoadingRams ? (
-            <option value="" disabled>Loading RAM options...</option>
-          ) : (
-            filteredRams.map(ram => (
-              <option key={ram} value={ram}>
-                {ram}
-              </option>
-            ))
-          )}
+          <option value="">
+            {filterOptions.locations.length === 0
+              ? 'All Locations (no stores configured)'
+              : 'All Locations'}
+          </option>
+          {filterOptions.locations.map(location => (
+            <option key={location.id} value={location.name}>
+              {location.name}
+            </option>
+          ))}
         </select>
-        {isLoadingRams && (
-          <p className="text-xs text-gray-500 mt-1">Loading RAM options...</p>
-        )}
-        {(!filters.manufacturer || !filters.model) && (
-          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
-        )}
       </div>
-      
-      {/* Storage filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Storage
-        </label>
-        <select
-          name="storage"
-          value={filters.storage}
-          onChange={handleFilterChange}
-          className="w-full p-2 border rounded"
-          disabled={!filters.manufacturer || !filters.model || isLoadingStorages}
-        >
-          <option value="">All Storage</option>
-          {isLoadingStorages ? (
-            <option value="" disabled>Loading storage options...</option>
-          ) : (
-            filteredStorages.map(storage => (
-              <option key={storage} value={storage}>
-                {storage}
-              </option>
-            ))
+
+      {/* RAM and Storage filters - side by side */}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            RAM
+          </label>
+          <select
+            name="ram"
+            value={filters.ram}
+            onChange={handleFilterChange}
+            className="w-full p-2 border rounded"
+            disabled={!filters.manufacturer || !filters.model || isLoadingRams}
+          >
+            <option value="">All RAM</option>
+            {isLoadingRams ? (
+              <option value="" disabled>Loading RAM options...</option>
+            ) : (
+              filteredRams.map(ram => (
+                <option key={ram} value={ram}>
+                  {ram}
+                </option>
+              ))
+            )}
+          </select>
+          {isLoadingRams && (
+            <p className="text-xs text-gray-500 mt-1">Loading RAM options...</p>
           )}
-        </select>
-        {isLoadingStorages && (
-          <p className="text-xs text-gray-500 mt-1">Loading storage options...</p>
-        )}
-        {(!filters.manufacturer || !filters.model) && (
-          <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
-        )}
+          {(!filters.manufacturer || !filters.model) && (
+            <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
+          )}
+        </div>
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Storage
+          </label>
+          <select
+            name="storage"
+            value={filters.storage}
+            onChange={handleFilterChange}
+            className="w-full p-2 border rounded"
+            disabled={!filters.manufacturer || !filters.model || isLoadingStorages}
+          >
+            <option value="">All Storage</option>
+            {isLoadingStorages ? (
+              <option value="" disabled>Loading storage options...</option>
+            ) : (
+              filteredStorages.map(storage => (
+                <option key={storage} value={storage}>
+                  {storage}
+                </option>
+              ))
+            )}
+          </select>
+          {isLoadingStorages && (
+            <p className="text-xs text-gray-500 mt-1">Loading storage options...</p>
+          )}
+          {(!filters.manufacturer || !filters.model) && (
+            <p className="text-xs text-gray-500 mt-1">Select manufacturer and model first</p>
+          )}
+        </div>
       </div>
       
       {/* Status filter - COLLAPSIBLE CHECKBOXES */}

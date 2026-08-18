@@ -16,6 +16,8 @@ import supplierService from '../services/supplierService';
 import { useGlobalState } from '../context/GlobalStateContext';
 // Import usePhoneCache hook to update price configurations
 import { usePhoneCache } from './phone-selection/hooks/usePhoneCache';
+// Import price sync service to re-price existing sellable inventory on price changes
+import priceSyncService from '../services/priceSyncService';
 
 const PhoneProcurementForm = () => {
   // ====== GLOBAL STATE FOR EDITING ======
@@ -23,6 +25,67 @@ const PhoneProcurementForm = () => {
   
   // ====== PRICE CACHE HOOK ======
   const { updatePriceConfiguration } = usePhoneCache();
+
+  // Sync procurement item prices to price_configurations (base + all colors) and
+  // to existing sellable inventory. Dedupes by model/spec — last line wins.
+  const syncPricesForItems = async (items) => {
+    const uniqueSpecs = new Map();
+    items.forEach(item => {
+      const key = `${item.manufacturer}|${item.model}|${item.ram}|${item.storage}`;
+      uniqueSpecs.set(key, item);
+    });
+
+    let totalUpdated = 0;
+    const failures = [];
+
+    for (const item of uniqueSpecs.values()) {
+      // Parse prices to remove commas and ensure numeric values
+      const dealersPriceNumeric = typeof item.dealersPrice === 'string'
+        ? item.dealersPrice.replace(/,/g, '')
+        : item.dealersPrice.toString();
+      const retailPriceNumeric = typeof item.retailPrice === 'string'
+        ? item.retailPrice.replace(/,/g, '')
+        : item.retailPrice.toString();
+
+      try {
+        // Ensure the procured color's config exists even when it's brand new —
+        // the sync service only updates color configs that already exist
+        if (item.color) {
+          await updatePriceConfiguration(
+            item.manufacturer,
+            item.model,
+            item.ram,
+            item.storage,
+            dealersPriceNumeric,
+            retailPriceNumeric,
+            item.color
+          );
+        }
+
+        const result = await priceSyncService.syncModelPricing(
+          item.manufacturer,
+          item.model,
+          item.ram,
+          item.storage,
+          dealersPriceNumeric,
+          retailPriceNumeric
+        );
+
+        if (result.success) {
+          totalUpdated += result.updatedInventoryCount;
+          console.log(`Price sync for ${item.manufacturer} ${item.model} ${item.ram}GB ${item.storage}GB: ${result.skipped ? 'unchanged, skipped' : `${result.updatedInventoryCount} inventory item(s) re-priced`}`);
+        } else {
+          failures.push(`${item.manufacturer} ${item.model} ${item.ram}GB/${item.storage}GB`);
+          console.error(`Price sync failed for ${item.manufacturer} ${item.model}:`, result.error);
+        }
+      } catch (error) {
+        failures.push(`${item.manufacturer} ${item.model} ${item.ram}GB/${item.storage}GB`);
+        console.error(`Error syncing prices for item:`, item, error);
+      }
+    }
+
+    return { totalUpdated, failures };
+  };
   
   // ====== EDITING STATE ======
   const [isEditing, setIsEditing] = useState(false);
@@ -865,47 +928,10 @@ const PhoneProcurementForm = () => {
         
         if (result.success) {
           console.log("Procurement updated successfully:", result);
-          
-          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS - FIXED
-          for (const item of procurementItems) {
-            try {
-              // Parse prices to remove commas and ensure numeric values
-              const dealersPriceNumeric = typeof item.dealersPrice === 'string' 
-                ? item.dealersPrice.replace(/,/g, '') 
-                : item.dealersPrice.toString();
-              const retailPriceNumeric = typeof item.retailPrice === 'string' 
-                ? item.retailPrice.replace(/,/g, '') 
-                : item.retailPrice.toString();
-              
-              // Update base price (without color)
-              await updatePriceConfiguration(
-                item.manufacturer,
-                item.model,
-                item.ram,
-                item.storage,
-                dealersPriceNumeric,  // Pass numeric value without commas
-                retailPriceNumeric    // Pass numeric value without commas
-              );
-              
-              // Update color-specific price
-              if (item.color) {
-                await updatePriceConfiguration(
-                  item.manufacturer,
-                  item.model,
-                  item.ram,
-                  item.storage,
-                  dealersPriceNumeric,  // Pass numeric value without commas
-                  retailPriceNumeric,   // Pass numeric value without commas
-                  item.color
-                );
-              }
-              
-              console.log(`Updated price configuration for ${item.manufacturer} ${item.model} ${item.ram}GB ${item.storage}GB ${item.color}`);
-            } catch (error) {
-              console.error(`Error updating price configuration for item:`, item, error);
-            }
-          }
-          
+
+          // Sync prices to configurations (base + all colors) and existing sellable inventory
+          const priceSync = await syncPricesForItems(procurementItems);
+
           // Clear editing state
           clearProcurementToEdit();
           
@@ -916,7 +942,12 @@ const PhoneProcurementForm = () => {
           message += `Total Items: ${procurementData.items.length}\n`;
           message += `Total Quantity: ${procurementData.totalQuantity}\n`;
           message += `Grand Total: ₱${formatPrice(grandTotal.toString())}\n`;
-          
+          message += `Existing inventory re-priced: ${priceSync.totalUpdated} item(s)\n`;
+
+          if (priceSync.failures.length > 0) {
+            message += `\n⚠️ Procurement was saved, but inventory prices could not be synced for: ${priceSync.failures.join(', ')}`;
+          }
+
           if (result.supplierChanged) {
             message += `\n🔄 Supplier was changed - balances updated accordingly`;
           }
@@ -946,49 +977,19 @@ const PhoneProcurementForm = () => {
         
         if (result.success) {
           console.log("Procurement created successfully:", result);
-          
-          // UPDATE PRICE CONFIGURATIONS FOR ALL ITEMS - FIXED
-          for (const item of procurementItems) {
-            try {
-              // Parse prices to remove commas and ensure numeric values
-              const dealersPriceNumeric = typeof item.dealersPrice === 'string' 
-                ? item.dealersPrice.replace(/,/g, '') 
-                : item.dealersPrice.toString();
-              const retailPriceNumeric = typeof item.retailPrice === 'string' 
-                ? item.retailPrice.replace(/,/g, '') 
-                : item.retailPrice.toString();
-              
-              // Update base price (without color)
-              await updatePriceConfiguration(
-                item.manufacturer,
-                item.model,
-                item.ram,
-                item.storage,
-                dealersPriceNumeric,  // Pass numeric value without commas
-                retailPriceNumeric    // Pass numeric value without commas
-              );
-              
-              // Update color-specific price
-              if (item.color) {
-                await updatePriceConfiguration(
-                  item.manufacturer,
-                  item.model,
-                  item.ram,
-                  item.storage,
-                  dealersPriceNumeric,  // Pass numeric value without commas
-                  retailPriceNumeric,   // Pass numeric value without commas
-                  item.color
-                );
-              }
-              
-              console.log(`Updated price configuration for ${item.manufacturer} ${item.model} ${item.ram}GB ${item.storage}GB ${item.color}`);
-            } catch (error) {
-              console.error(`Error updating price configuration for item:`, item, error);
-            }
-          }
-          
+
+          // Sync prices to configurations (base + all colors) and existing sellable inventory
+          const priceSync = await syncPricesForItems(procurementItems);
+
           // Success message
-          alert(`Procurement record saved successfully!\n\nProcurement ID: ${result.procurementId}\nReference: ${result.reference}\nSupplier: ${selectedSupplierData?.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatPrice(grandTotal.toString())}`);
+          let message = `Procurement record saved successfully!\n\nProcurement ID: ${result.procurementId}\nReference: ${result.reference}\nSupplier: ${selectedSupplierData?.supplierName}\nTotal Items: ${procurementData.items.length}\nTotal Quantity: ${procurementData.totalQuantity}\nGrand Total: ₱${formatPrice(grandTotal.toString())}`;
+          message += `\nExisting inventory re-priced: ${priceSync.totalUpdated} item(s)`;
+
+          if (priceSync.failures.length > 0) {
+            message += `\n\n⚠️ Procurement was saved, but inventory prices could not be synced for: ${priceSync.failures.join(', ')}`;
+          }
+
+          alert(message);
           
           // Reset form
           resetForm();

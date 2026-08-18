@@ -26,6 +26,9 @@ const AccessoryProductDetailModal = ({ isOpen, product, onClose, onEdit }) => {
             <h2 className="text-xl font-bold text-white leading-tight">
               {product.manufacturer} {product.model}
             </h2>
+            {product.shortDescription && (
+              <p className="text-sm text-white/80 mt-0.5">{product.shortDescription}</p>
+            )}
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {product.category && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-white/15 text-white/95 text-xs font-medium">

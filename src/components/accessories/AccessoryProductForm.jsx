@@ -42,6 +42,7 @@ const EMPTY_FORM = {
   barcode: '',
   category: '',
   manufacturer: '',
+  shortDescription: '',
   model: '',
   tagsInput: '',
   description: '',
@@ -162,6 +163,7 @@ const AccessoryProductForm = () => {
         barcode: accessoryProductToEdit.barcode || '',
         category: accessoryProductToEdit.category || '',
         manufacturer: accessoryProductToEdit.manufacturer || '',
+        shortDescription: accessoryProductToEdit.shortDescription || '',
         model: accessoryProductToEdit.model || '',
         tagsInput: Array.isArray(accessoryProductToEdit.tags)
           ? accessoryProductToEdit.tags.join(', ')
@@ -297,6 +299,7 @@ const AccessoryProductForm = () => {
       barcode: barcode || '',
       category,
       manufacturer: capitalizeWords(manufacturer),
+      shortDescription: formData.shortDescription.trim(),
       model: capitalizeWords(model),
       tags: cleanTags,
       description: formData.description.trim(),
@@ -477,6 +480,17 @@ const AccessoryProductForm = () => {
                       <option key={m} value={m} />
                     ))}
                   </datalist>
+                </div>
+
+                <div className="flex items-center py-0.5">
+                  <p className="text-[rgb(52,69,157)] w-40 text-base">Short Description:</p>
+                  <input
+                    type="text"
+                    value={formData.shortDescription}
+                    onChange={(e) => handleFieldChange('shortDescription', e.target.value)}
+                    placeholder="e.g., Wireless earbuds with charging case"
+                    className="text-base flex-1 border rounded px-2 py-1"
+                  />
                 </div>
 
                 <div className="flex items-center py-0.5">

@@ -320,9 +320,12 @@ const AccessoryInventoryListForm = () => {
       result = result.filter(
         (r) =>
           r.sku.toLowerCase().includes(s) ||
+          (r.barcode || '').toLowerCase().includes(s) ||
           r.manufacturer.toLowerCase().includes(s) ||
+          (r.shortDescription || '').toLowerCase().includes(s) ||
           r.model.toLowerCase().includes(s) ||
           r.category.toLowerCase().includes(s) ||
+          r.tags.join(' ').toLowerCase().includes(s) ||
           (r.locationName || '').toLowerCase().includes(s)
       );
     }
@@ -332,8 +335,9 @@ const AccessoryInventoryListForm = () => {
       let cmp = 0;
       const aVal = a[sortField];
       const bVal = b[sortField];
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        cmp = aVal - bVal;
+      if (typeof aVal === 'number' || typeof bVal === 'number') {
+        // Numeric column — rows missing the value (e.g. no pricing set) sort as 0
+        cmp = (Number(aVal) || 0) - (Number(bVal) || 0);
       } else {
         cmp = String(aVal || '').localeCompare(String(bVal || ''));
       }
@@ -494,7 +498,7 @@ const AccessoryInventoryListForm = () => {
 
   return (
     <div className="min-h-screen bg-white p-4">
-      <Card className="w-full max-w-[1600px] mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
+      <Card className="w-full mx-auto rounded-lg overflow-hidden shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
         <CardHeader className="bg-[rgb(52,69,157)] py-3 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-6 w-6 text-white" />
@@ -661,7 +665,7 @@ const AccessoryInventoryListForm = () => {
                       name="searchTerm"
                       value={filters.searchTerm}
                       onChange={handleFilterChange}
-                      placeholder="SKU, model, store…"
+                      placeholder="SKU, barcode, model, description, tags, store…"
                       className="w-full p-2 pl-9 border rounded"
                     />
                     <Search className="h-4 w-4 text-gray-400 absolute left-3 top-3" />
@@ -716,9 +720,21 @@ const AccessoryInventoryListForm = () => {
                     </th>
                     <th
                       className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('barcode')}
+                    >
+                      Barcode {sortCaret('barcode')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('manufacturer')}
                     >
                       Manufacturer {sortCaret('manufacturer')}
+                    </th>
+                    <th
+                      className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('shortDescription')}
+                    >
+                      Short Description {sortCaret('shortDescription')}
                     </th>
                     <th
                       className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
@@ -732,6 +748,7 @@ const AccessoryInventoryListForm = () => {
                     >
                       Category {sortCaret('category')}
                     </th>
+                    <th className="border px-3 py-2 text-left">Tags</th>
                     <th
                       className="border px-3 py-2 text-left cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('locationName')}
@@ -774,8 +791,20 @@ const AccessoryInventoryListForm = () => {
                     >
                       Pending {sortCaret('pending')}
                     </th>
-                    <th className="border px-3 py-2 text-right">Retail Price</th>
-                    {isAdmin && <th className="border px-3 py-2 text-right">Dealer Price</th>}
+                    {isAdmin && (
+                      <th
+                        className="border px-3 py-2 text-right cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('dealersPrice')}
+                      >
+                        Dealer Price {sortCaret('dealersPrice')}
+                      </th>
+                    )}
+                    <th
+                      className="border px-3 py-2 text-right cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('retailPrice')}
+                    >
+                      Retail Price {sortCaret('retailPrice')}
+                    </th>
                     <th className="border px-3 py-2 text-center w-28">Actions</th>
                   </tr>
                 </thead>
@@ -789,8 +818,17 @@ const AccessoryInventoryListForm = () => {
                         key={row.rowKey}
                         className={isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}
                       >
-                        <td className="border px-3 py-2">{row.sku}</td>
+                        <td className="border px-3 py-2 whitespace-nowrap">{row.sku}</td>
+                        <td className="border px-3 py-2" title={row.barcode || ''}>
+                          <div className="max-w-28 truncate">{row.barcode || '-'}</div>
+                        </td>
                         <td className="border px-3 py-2">{row.manufacturer || '-'}</td>
+                        <td
+                          className="border px-3 py-2 text-gray-600"
+                          title={row.shortDescription || ''}
+                        >
+                          <div className="max-w-40 truncate">{row.shortDescription || '-'}</div>
+                        </td>
                         <td className="border px-3 py-2 font-medium">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span>{row.model || '-'}</span>
@@ -802,7 +840,14 @@ const AccessoryInventoryListForm = () => {
                           </div>
                         </td>
                         <td className="border px-3 py-2">{row.category || '-'}</td>
-                        <td className="border px-3 py-2">{row.locationName || '-'}</td>
+                        <td className="border px-3 py-2 text-gray-600" title={row.tags.join(', ')}>
+                          <div className="max-w-28 truncate">
+                            {renderTagsCell(row.tags, filters.searchTerm)}
+                          </div>
+                        </td>
+                        <td className="border px-3 py-2 whitespace-nowrap">
+                          {row.locationName || '-'}
+                        </td>
 
                         <td className="border px-3 py-2 text-center">
                           <span className={`${PILL_BASE} ${PILL_CLASS.sold}`}>{row.sold}</span>
@@ -850,12 +895,12 @@ const AccessoryInventoryListForm = () => {
                         <td className="border px-3 py-2 text-center">
                           <span className={`${PILL_BASE} ${PILL_CLASS.pending}`}>{row.pending}</span>
                         </td>
-                        <td className="border px-3 py-2 text-right">{renderPrice(row.retailPrice)}</td>
                         {isAdmin && (
                           <td className="border px-3 py-2 text-right">
                             {renderPrice(row.dealersPrice)}
                           </td>
                         )}
+                        <td className="border px-3 py-2 text-right">{renderPrice(row.retailPrice)}</td>
                         <td className="border px-3 py-2 text-center">
                           {isEditing ? (
                             <div className="flex justify-center gap-1">
@@ -954,6 +999,22 @@ const AccessoryInventoryListForm = () => {
 /**
  * Build a single table row from a product + (optional) inventory doc.
  */
+// Single-line tag display: show the tag matching the search term (or the first
+// tag), plus a "+N" count for the rest. Full list lives in the cell's tooltip.
+function renderTagsCell(tags, searchTerm) {
+  if (!tags.length) return '-';
+  const s = (searchTerm || '').trim().toLowerCase();
+  const matched = s ? tags.find((t) => t.toLowerCase().includes(s)) : null;
+  const shown = matched || tags[0];
+  const rest = tags.length - 1;
+  return (
+    <>
+      {shown}
+      {rest > 0 && <span className="ml-1 text-xs text-gray-400">+{rest}</span>}
+    </>
+  );
+}
+
 function buildRow(sku, product, locationId, locationName, inv, price, pending = 0) {
   const onHand = inv.onHand || 0;
   const onDisplay = inv.onDisplay || 0;
@@ -964,11 +1025,14 @@ function buildRow(sku, product, locationId, locationName, inv, price, pending = 
   return {
     rowKey: `${sku}__${locationId}`,
     sku,
+    barcode: product.barcode || '',
     locationId,
     locationName: inv.locationName || locationName || '',
     manufacturer: product.manufacturer || '',
+    shortDescription: product.shortDescription || '',
     model: product.model || '',
     category: product.category || '',
+    tags: Array.isArray(product.tags) ? product.tags : [],
     active: product.active !== false,
     onHand,
     onDisplay,

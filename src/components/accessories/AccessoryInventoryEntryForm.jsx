@@ -88,6 +88,8 @@ const AccessoryInventoryEntryForm = () => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [barcodeLookingUp, setBarcodeLookingUp] = useState(false);
   const [barcodeError, setBarcodeError] = useState(null);
+  // Multiple products matched a keyword search — user picks one from a list
+  const [barcodeMatches, setBarcodeMatches] = useState([]);
 
   /* ========== PRODUCT FILTERS (cascading) ========== */
 
@@ -275,6 +277,7 @@ const AccessoryInventoryEntryForm = () => {
     const code = barcodeInput.trim();
     if (!code) return;
     setBarcodeError(null);
+    setBarcodeMatches([]);
     setBarcodeLookingUp(true);
     try {
       const res = await getProductByBarcode(code);
@@ -282,17 +285,44 @@ const AccessoryInventoryEntryForm = () => {
         setBarcodeError(res.error || 'Lookup failed');
         return;
       }
-      if (!res.product) {
-        setBarcodeError(`No product found with barcode "${code}"`);
-        return;
+      let product = res.product;
+      if (!product) {
+        // No barcode match — fall back to matching the code against product SKUs
+        const codeUpper = code.toUpperCase();
+        product =
+          products.find((p) => (p.internalSku || p.id).toUpperCase() === codeUpper) || null;
       }
-      if (res.product.active === false) {
+      if (!product) {
+        // Still nothing exact — keyword search across model, short description,
+        // and tags (active products only). One hit selects it; several show a
+        // pick-list.
+        const s = code.toLowerCase();
+        const matches = activeProducts.filter((p) => {
+          const model = (p.model || '').toLowerCase();
+          const shortDesc = (p.shortDescription || '').toLowerCase();
+          const tags = Array.isArray(p.tags) ? p.tags.join(' ').toLowerCase() : '';
+          return model.includes(s) || shortDesc.includes(s) || tags.includes(s);
+        });
+        if (matches.length === 1) {
+          product = matches[0];
+        } else if (matches.length > 1) {
+          setBarcodeMatches(matches);
+          return;
+        }
+      }
+      if (!product) {
         setBarcodeError(
-          `Product "${res.product.model}" is INACTIVE and cannot have inventory adjusted. Reactivate it first.`
+          `No product found matching "${code}" (searched barcode, SKU, model, short description, tags)`
         );
         return;
       }
-      const sku = res.product.internalSku || res.product.id;
+      if (product.active === false) {
+        setBarcodeError(
+          `Product "${product.model}" is INACTIVE and cannot have inventory adjusted. Reactivate it first.`
+        );
+        return;
+      }
+      const sku = product.internalSku || product.id;
       setSelectedSku(sku);
       setBarcodeInput('');
     } catch (err) {
@@ -300,6 +330,14 @@ const AccessoryInventoryEntryForm = () => {
     } finally {
       setBarcodeLookingUp(false);
     }
+  };
+
+  const handleSelectMatch = (product) => {
+    const sku = product.internalSku || product.id;
+    setSelectedSku(sku);
+    setBarcodeInput('');
+    setBarcodeMatches([]);
+    setBarcodeError(null);
   };
 
   const handleProductFilterChange = (name, value) => {
@@ -428,6 +466,9 @@ const AccessoryInventoryEntryForm = () => {
     setCurrentInventory(null);
     setSaveError(null);
     setSuccessMessage('');
+    setBarcodeInput('');
+    setBarcodeMatches([]);
+    setBarcodeError(null);
     clearProductFilters();
     clearAccessoryInventoryItemToEdit();
   };
@@ -458,18 +499,37 @@ const AccessoryInventoryEntryForm = () => {
     );
   };
 
+  const keywordFilter = barcodeInput.trim().toLowerCase();
+
   const sortedProductOptions = useMemo(() => {
     let list = activeProducts;
     if (productFilters.category) list = list.filter((p) => p.category === productFilters.category);
     if (productFilters.manufacturer)
       list = list.filter((p) => p.manufacturer === productFilters.manufacturer);
     if (productFilters.model) list = list.filter((p) => p.model === productFilters.model);
+    // The barcode/SKU/keyword input also live-filters the dropdown
+    if (keywordFilter) {
+      list = list.filter((p) => {
+        const sku = (p.internalSku || p.id || '').toLowerCase();
+        const barcode = (p.barcode || '').toLowerCase();
+        const model = (p.model || '').toLowerCase();
+        const shortDesc = (p.shortDescription || '').toLowerCase();
+        const tags = Array.isArray(p.tags) ? p.tags.join(' ').toLowerCase() : '';
+        return (
+          sku.includes(keywordFilter) ||
+          barcode.includes(keywordFilter) ||
+          model.includes(keywordFilter) ||
+          shortDesc.includes(keywordFilter) ||
+          tags.includes(keywordFilter)
+        );
+      });
+    }
     return list.slice().sort((a, b) => {
       const m = (a.manufacturer || '').localeCompare(b.manufacturer || '');
       if (m !== 0) return m;
       return (a.model || '').localeCompare(b.model || '');
     });
-  }, [activeProducts, productFilters]);
+  }, [activeProducts, productFilters, keywordFilter]);
 
   return (
     <div className="min-h-screen bg-white p-4">
@@ -637,7 +697,7 @@ const AccessoryInventoryEntryForm = () => {
                             ? 'No active products'
                             : sortedProductOptions.length === 0
                             ? 'No products match the current filters'
-                            : anyProductFilterActive
+                            : anyProductFilterActive || keywordFilter
                             ? `Select a product (${sortedProductOptions.length} of ${activeProducts.length} matching)`
                             : `Select a product (${activeProducts.length} active)`}
                         </option>
@@ -645,7 +705,9 @@ const AccessoryInventoryEntryForm = () => {
                           const sku = p.internalSku || p.id;
                           return (
                             <option key={sku} value={sku}>
-                              {p.manufacturer} — {p.model} [{sku}]
+                              {p.manufacturer} —{' '}
+                              {p.shortDescription ? `${p.shortDescription} — ` : ''}
+                              {p.model} [{sku}]
                             </option>
                           );
                         })}
@@ -658,14 +720,17 @@ const AccessoryInventoryEntryForm = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         <Barcode className="h-4 w-4 inline mr-1" />
-                        Or enter barcode
+                        Or find by barcode / SKU / keyword
                       </label>
                       <form onSubmit={handleBarcodeLookup} className="flex gap-2">
                         <input
                           type="text"
                           value={barcodeInput}
-                          onChange={(e) => setBarcodeInput(e.target.value)}
-                          placeholder="Type or paste barcode"
+                          onChange={(e) => {
+                            setBarcodeInput(e.target.value);
+                            setBarcodeMatches([]);
+                          }}
+                          placeholder="Barcode, SKU, model, description, or tag"
                           className="flex-1 px-3 py-2 border rounded text-sm bg-white"
                         />
                         <button
@@ -685,10 +750,42 @@ const AccessoryInventoryEntryForm = () => {
                           <span>Find</span>
                         </button>
                       </form>
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        Typing here also filters the product dropdown. Press Find to select
+                        directly.
+                      </p>
                       {barcodeError && (
                         <div className="mt-1 flex items-start gap-1 text-xs text-red-700">
                           <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
                           <span>{barcodeError}</span>
+                        </div>
+                      )}
+                      {barcodeMatches.length > 0 && (
+                        <div className="mt-2 border rounded bg-white overflow-hidden">
+                          <p className="px-3 py-1.5 text-xs text-gray-600 bg-gray-100 border-b">
+                            {barcodeMatches.length} products match — pick one:
+                          </p>
+                          <div className="max-h-52 overflow-y-auto divide-y">
+                            {barcodeMatches.map((p) => {
+                              const sku = p.internalSku || p.id;
+                              return (
+                                <button
+                                  key={sku}
+                                  type="button"
+                                  onClick={() => handleSelectMatch(p)}
+                                  className="w-full text-left px-3 py-2 hover:bg-[rgb(52,69,157)]/5"
+                                >
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {p.manufacturer} — {p.model}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {p.shortDescription ? `${p.shortDescription} · ` : ''}
+                                    <span className="font-mono">{sku}</span>
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>

@@ -339,7 +339,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('manufacturer')}
-              style={{ width: '12%' }}
+              style={{ width: '10%' }}
             >
               Manufacturer
               {sortField === 'manufacturer' && (
@@ -349,7 +349,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('model')}
-              style={{ width: '12%' }}
+              style={{ width: '11%' }}
             >
               Model
               {sortField === 'model' && (
@@ -359,7 +359,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
               onClick={() => handleSort('ram')}
-              style={{ width: '7%' }}
+              style={{ width: '5%' }}
             >
               RAM
               {sortField === 'ram' && (
@@ -369,7 +369,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
               onClick={() => handleSort('storage')}
-              style={{ width: '7%' }}
+              style={{ width: '5%' }}
             >
               Storage
               {sortField === 'storage' && (
@@ -379,7 +379,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
               onClick={() => handleSort('color')}
-              style={{ width: '12%' }}
+              style={{ width: '9%' }}
             >
               Color
               {sortField === 'color' && (
@@ -389,7 +389,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
               onClick={() => handleSort('imei1')}
-              style={{ width: '15%' }}
+              style={{ width: '13%' }}
             >
               IMEI1
               {sortField === 'imei1' && (
@@ -400,7 +400,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
               onClick={() => handleSort('serialNumber')}
-              style={{ width: '12%' }}
+              style={{ width: '10%' }}
             >
               Serial Number
               {sortField === 'serialNumber' && (
@@ -408,21 +408,32 @@ const InventoryTable = ({
               )}
             </th>
             {/* NEW: Added Supplier column */}
-            <th 
-              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
+            <th
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('supplier')}
-              style={{ width: '12%' }}
+              style={{ width: '9%' }}
             >
               Supplier
               {sortField === 'supplier' && (
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </th>
+            {/* NEW: Added Location column */}
+            <th
+              className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold"
+              onClick={() => handleSort('location')}
+              style={{ width: '9%' }}
+            >
+              Location
+              {sortField === 'location' && (
+                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              )}
+            </th>
             {/* NEW: Added Retail Price column */}
-            <th 
-              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold" 
+            <th
+              className="border px-2 py-3 text-right cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('retailPrice')}
-              style={{ width: '10%' }}
+              style={{ width: '8%' }}
             >
               Price
               {sortField === 'retailPrice' && (
@@ -432,7 +443,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-left cursor-pointer hover:bg-gray-200 font-semibold" 
               onClick={() => handleSort('lastUpdated')}
-              style={{ width: '8%' }}
+              style={{ width: '7%' }}
             >
               Date
               {sortField === 'lastUpdated' && (
@@ -442,7 +453,7 @@ const InventoryTable = ({
             <th 
               className="border px-2 py-3 text-center cursor-pointer hover:bg-gray-200 font-semibold"
               onClick={() => handleSort('status')}
-              style={{ width: '8%' }}
+              style={{ width: '7%' }}
             >
               Status
               {sortField === 'status' && (

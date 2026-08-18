@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { getActiveLocations } from '../services/accessoryLocationService';
 import { useAuth } from '../context/AuthContext'; // NEW: Added useAuth import
 import {
   Smartphone,
@@ -43,16 +44,18 @@ const InventorySummaryForm = () => {
     model: '',
     ram: '',
     storage: '',
-    color: ''
+    color: '',
+    location: ''
   });
-  
+
   // Filter options
   const [filterOptions, setFilterOptions] = useState({
     manufacturers: [],
     models: [],
     rams: [],
     storages: [],
-    colors: []
+    colors: [],
+    locations: []
   });
   
   // Filtered options based on selections
@@ -108,6 +111,7 @@ const InventorySummaryForm = () => {
       filterSummary.push(`RAM: ${filters.ram || 'All'}`);
       filterSummary.push(`Storage: ${filters.storage || 'All'}`);
       filterSummary.push(`Color: ${filters.color || 'All'}`);
+      filterSummary.push(`Location: ${filters.location || 'All'}`);
 
       // Build column headers and colgroup based on admin status
       const colGroupHtml = isAdmin
@@ -473,7 +477,8 @@ const InventorySummaryForm = () => {
       model: '',
       ram: '',
       storage: '',
-      color: ''
+      color: '',
+      location: ''
     });
     setFilteredOptions({
       models: filterOptions.models,
@@ -527,14 +532,51 @@ const InventorySummaryForm = () => {
   // Apply filters to data
   const applyFilters = () => {
     if (!inventoryData.length) return;
-    const filtered = inventoryData.filter(item => {
-      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) return false;
-      if (filters.model && item.model !== filters.model) return false;
-      if (filters.ram && item.ram !== filters.ram) return false;
-      if (filters.storage && item.storage !== filters.storage) return false;
-      if (filters.color && !item.colors.some(colorData => colorData.color === filters.color)) return false;
-      return true;
-    });
+    const filtered = inventoryData.reduce((acc, item) => {
+      if (filters.manufacturer && item.manufacturer !== filters.manufacturer) return acc;
+      if (filters.model && item.model !== filters.model) return acc;
+      if (filters.ram && item.ram !== filters.ram) return acc;
+      if (filters.storage && item.storage !== filters.storage) return acc;
+      if (filters.color && !item.colors.some(colorData => colorData.color === filters.color)) return acc;
+
+      // Location filter: counts are aggregated across all stores at fetch time,
+      // so recompute them from the per-item arrays for the selected location.
+      // Pending counts come from procurements (no location yet) and are kept as-is.
+      if (filters.location) {
+        const colors = item.colors
+          .map(colorData => {
+            const soldItems = colorData.soldItems.filter(i => i.location === filters.location);
+            const onDisplayItems = colorData.onDisplayItems.filter(i => i.location === filters.location);
+            const onHandItems = colorData.onHandItems.filter(i => i.location === filters.location);
+            return {
+              ...colorData,
+              sold: soldItems.length,
+              onDisplay: onDisplayItems.length,
+              onHand: onHandItems.length,
+              available: onDisplayItems.length + onHandItems.length,
+              soldItems,
+              onDisplayItems,
+              onHandItems
+            };
+          })
+          .filter(colorData => colorData.sold > 0 || colorData.available > 0);
+
+        if (colors.length === 0) return acc;
+
+        acc.push({
+          ...item,
+          colors,
+          totalSold: colors.reduce((t, c) => t + c.sold, 0),
+          totalOnDisplay: colors.reduce((t, c) => t + c.onDisplay, 0),
+          totalOnHand: colors.reduce((t, c) => t + c.onHand, 0),
+          totalAvailable: colors.reduce((t, c) => t + c.available, 0)
+        });
+        return acc;
+      }
+
+      acc.push(item);
+      return acc;
+    }, []);
     setFilteredData(filtered);
   };
   
@@ -935,7 +977,8 @@ const InventorySummaryForm = () => {
         storages: [...storages].sort(),
         colors: [...colors].sort()
       };
-      setFilterOptions(filterOpts);
+      // Merge to preserve locations, which are loaded separately from Manage Stores
+      setFilterOptions(prev => ({ ...prev, ...filterOpts }));
       setFilteredOptions({
         models: filterOpts.models,
         rams: filterOpts.rams,
@@ -963,6 +1006,27 @@ const InventorySummaryForm = () => {
     fetchInventoryData();
     fetchExcludedModelsInfo();
   }, [fetchInventoryData, fetchExcludedModelsInfo]); // Both functions are now memoized with useCallback
+
+  // Load active store locations from Manage Stores (accessory_locations)
+  useEffect(() => {
+    async function loadLocations() {
+      try {
+        const result = await getActiveLocations();
+        if (result.success) {
+          setFilterOptions(prev => ({
+            ...prev,
+            locations: result.locations
+          }));
+        } else {
+          console.error("Error loading locations:", result.error);
+        }
+      } catch (error) {
+        console.error("Error loading locations:", error);
+      }
+    }
+
+    loadLocations();
+  }, []);
   
   useEffect(() => {
     updateFilteredOptions();
@@ -1071,7 +1135,7 @@ const InventorySummaryForm = () => {
               </button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
                 <select name="manufacturer" value={filters.manufacturer} onChange={handleFilterChange} className="w-full p-2 border rounded">
@@ -1118,6 +1182,16 @@ const InventorySummaryForm = () => {
                   <option value="">All Colors</option>
                   {filteredOptions.colors.map(color => (
                     <option key={color} value={color}>{color}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <select name="location" value={filters.location} onChange={handleFilterChange} className="w-full p-2 border rounded">
+                  <option value="">All Locations</option>
+                  {filterOptions.locations.map(location => (
+                    <option key={location.id} value={location.name}>{location.name}</option>
                   ))}
                 </select>
               </div>
