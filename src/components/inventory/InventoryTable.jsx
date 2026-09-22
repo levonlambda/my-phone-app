@@ -20,7 +20,9 @@ const InventoryTable = ({
   allItems,
   setAllItems,
   setInventoryItems,
-  applyFilters
+  applyFilters,
+  locations = [], // Active store locations (from accessory_locations) for the quick-edit dropdown
+  canEditLocation = false // Admin only: allow changing location in quick edit
 }) => {
 {/* Part 2 End - Component Definition */}
 
@@ -205,7 +207,11 @@ const InventoryTable = ({
         serialNumber: editFormData.serialNumber || '', // UPDATED: Save serialNumber
         barcode: originalItem.barcode || '', // Preserve barcode from original
         status: editFormData.status,
-        location: originalItem.location || '', // NEW: Preserve location
+        // Admins may change location via the quick-edit dropdown; never blank it on save.
+        // Non-admins keep the original location (read-only in quick edit).
+        location: canEditLocation
+          ? (editFormData.location || originalItem.location || '')
+          : (originalItem.location || ''),
         supplier: editFormData.supplier || '', // UPDATED: Save supplier
         lastUpdated: getCurrentDate() // Update lastUpdated when item is edited
       };
@@ -474,6 +480,8 @@ const InventoryTable = ({
                 handleSaveEdit={handleSaveEdit}
                 handleCancelEdit={handleCancelEdit}
                 savingItemId={savingItemId}
+                locations={locations}
+                canEditLocation={canEditLocation}
               />
             ) : (
              <InventoryRow 
@@ -510,7 +518,9 @@ InventoryTable.propTypes = {
   allItems: PropTypes.array.isRequired,
   setAllItems: PropTypes.func.isRequired,
   setInventoryItems: PropTypes.func.isRequired,
-  applyFilters: PropTypes.func.isRequired
+  applyFilters: PropTypes.func.isRequired,
+  locations: PropTypes.array,
+  canEditLocation: PropTypes.bool
 };
 {/* Part 7 End - PropTypes Definition */}
 

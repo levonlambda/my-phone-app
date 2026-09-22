@@ -11,8 +11,10 @@ const InventoryEditForm = ({
   handleEditInputChange, 
   handleSaveEdit, 
   handleCancelEdit, 
-  itemId, 
-  savingItemId 
+  itemId,
+  savingItemId,
+  locations = [], // Active store locations (from accessory_locations)
+  canEditLocation = false // Admin only: show the location dropdown
 }) => {
 {/* Part 2 End - Component Definition */}
 
@@ -35,6 +37,17 @@ const InventoryEditForm = ({
     
     fetchSuppliers();
   }, []);
+
+  // Build the store-name options for the location dropdown.
+  // Active stores come first (already sorted by sortOrder). If the item's current
+  // location is not among them (renamed/deactivated/deleted/legacy value), append it
+  // so the true saved value is still displayed and selectable.
+  const activeLocationNames = locations.map(loc => loc.name);
+  const currentLocation = editFormData.location || '';
+  const locationOptions =
+    currentLocation && !activeLocationNames.includes(currentLocation)
+      ? [...activeLocationNames, currentLocation]
+      : activeLocationNames;
 
   // NEW: Function to format price with currency - read-only display
   const formatPrice = (price) => {
@@ -128,10 +141,31 @@ const InventoryEditForm = ({
         </select>
       </td>
 
-      {/* NEW: Added location column - read-only display (preserved on save) */}
-      <td className="border px-2 py-3 text-sm text-gray-600">
-        {editFormData.location || 'N/A'}
-      </td>
+      {/* Location column - admins get a store dropdown (from Manage Stores), others read-only */}
+      {canEditLocation ? (
+        <td className="border px-2 py-3 whitespace-nowrap">
+          <select
+            name="location"
+            value={currentLocation}
+            onChange={handleEditInputChange}
+            className="w-full p-1 border rounded"
+          >
+            {/* Placeholder only when the item has no location; not re-selectable once a store is chosen */}
+            {!currentLocation && (
+              <option value="" disabled>Select a store...</option>
+            )}
+            {locationOptions.map(name => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </td>
+      ) : (
+        <td className="border px-2 py-3 text-sm text-gray-600">
+          {currentLocation || 'N/A'}
+        </td>
+      )}
 
       {/* NEW: Added retail price column - read-only display */}
       <td className="border px-2 py-3 whitespace-nowrap text-right">
@@ -191,7 +225,9 @@ InventoryEditForm.propTypes = {
   handleSaveEdit: PropTypes.func.isRequired,
   handleCancelEdit: PropTypes.func.isRequired,
   itemId: PropTypes.string.isRequired,
-  savingItemId: PropTypes.string
+  savingItemId: PropTypes.string,
+  locations: PropTypes.array,
+  canEditLocation: PropTypes.bool
 };
 {/* Part 5 End - PropTypes Definition */}
 
