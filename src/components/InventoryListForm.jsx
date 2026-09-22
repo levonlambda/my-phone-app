@@ -1341,6 +1341,8 @@ const InventoryListForm = () => {
                 sortDirection={sortDirection}
                 handleSort={handleSort}
                 applyFilters={applyFilters}
+                locations={filterOptions.locations}
+                canEditLocation={isAdmin}
               />
             )}
           </div>
