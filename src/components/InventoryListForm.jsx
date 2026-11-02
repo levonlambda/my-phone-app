@@ -3,8 +3,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Smartphone, RefreshCw, Filter, X, Search, FileText, FlaskConical } from 'lucide-react';
+import { Smartphone, RefreshCw, Filter, X, Search, FileText, FlaskConical, Clipboard, Check } from 'lucide-react';
 import InventoryTable from './inventory/InventoryTable';
+import { sortInventoryItems } from './inventory/inventorySort';
 import InventoryFilters from './inventory/InventoryFilters';
 import { getActiveLocations } from '../services/accessoryLocationService';
 import { useAuth } from '../context/AuthContext'; // Added for admin check
@@ -78,6 +79,16 @@ const InventoryListForm = () => {
   
   // State for Word export
   const [isExporting, setIsExporting] = useState(false);
+
+  // State for clipboard copy: identifier-priority dialog and transient button feedback
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
+  const [copyStatus, setCopyStatus] = useState('idle'); // 'idle' | 'copied' | 'error'
+
+  useEffect(() => {
+    if (copyStatus === 'idle') return undefined;
+    const timer = setTimeout(() => setCopyStatus('idle'), 2000);
+    return () => clearTimeout(timer);
+  }, [copyStatus]);
 {/* Part 1 End - Imports and Initial State */}
 
 {/* Part 2 Start - Helper Functions and Effects */}
@@ -653,6 +664,53 @@ const InventoryListForm = () => {
     }
   };
 
+  // Build the clipboard text for the currently displayed rows, in on-screen order.
+  // One line per row: Manufacturer Model RAM / Storage - Identifier.
+  // `priority` is 'imei1' or 'serialNumber'; the other identifier is used when the preferred one is empty.
+  const buildInventoryCopyText = (priority) => {
+    const primary = priority === 'serialNumber' ? 'serialNumber' : 'imei1';
+    const fallback = primary === 'imei1' ? 'serialNumber' : 'imei1';
+
+    return sortInventoryItems(inventoryItems, sortField, sortDirection)
+      .map((item) => {
+        const identifier = (item[primary] || '').trim() || (item[fallback] || '').trim();
+        if (!identifier) return null; // skip rows with neither IMEI1 nor Serial Number
+
+        const description = `${item.manufacturer || ''} ${item.model || ''} ${item.ram || ''} / ${item.storage || ''}`
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        return `${description} - ${identifier}`;
+      })
+      .filter(Boolean)
+      .join('\n');
+  };
+
+  // Copy the displayed inventory rows to the clipboard using the chosen identifier priority
+  const handleCopyInventory = async (priority) => {
+    setShowCopyDialog(false);
+
+    const text = buildInventoryCopyText(priority);
+    if (!text) {
+      setCopyStatus('error');
+      return;
+    }
+
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+      console.warn('Clipboard API is not available in this context');
+      setCopyStatus('error');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus('copied');
+    } catch (err) {
+      console.error('Failed to copy inventory list:', err);
+      setCopyStatus('error');
+    }
+  };
+
   // Handle Word export
   const handleWordExport = async () => {
     if (inventoryItems.length === 0) {
@@ -1107,6 +1165,33 @@ const InventoryListForm = () => {
               <span>Refresh</span>
             </button>
             <button
+              onClick={() => setShowCopyDialog(true)}
+              disabled={inventoryItems.length === 0}
+              title="Copy the listed rows (manufacturer, model, RAM, storage, IMEI1 or serial) to clipboard"
+              className={`flex items-center gap-1 justify-center min-w-[120px] ${
+                inventoryItems.length === 0
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-white text-[rgb(52,69,157)]'
+              } px-4 py-2 rounded text-base font-medium`}
+            >
+              {copyStatus === 'copied' ? (
+                <>
+                  <Check className="h-5 w-5 mr-1" />
+                  <span>Copied</span>
+                </>
+              ) : copyStatus === 'error' ? (
+                <>
+                  <X className="h-5 w-5 mr-1" />
+                  <span>Copy failed</span>
+                </>
+              ) : (
+                <>
+                  <Clipboard className="h-5 w-5 mr-1" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+            <button
               onClick={handleWordExport}
               disabled={isExporting || inventoryItems.length === 0}
               className={`flex items-center gap-1 ${
@@ -1374,6 +1459,44 @@ const InventoryListForm = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Copy identifier-priority dialog */}
+      {showCopyDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Copy Inventory List
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Which identifier should be copied for each row? If a row does not have the one you pick,
+              the other identifier is used for that row automatically.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCopyDialog(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopyInventory('serialNumber')}
+                className="px-4 py-2 border border-[rgb(52,69,157)] text-[rgb(52,69,157)] rounded hover:bg-gray-50"
+              >
+                Serial Number
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopyInventory('imei1')}
+                className="px-4 py-2 bg-[rgb(52,69,157)] text-white rounded hover:bg-[rgb(52,69,157)]/90"
+              >
+                IMEI1
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

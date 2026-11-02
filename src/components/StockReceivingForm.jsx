@@ -8,7 +8,9 @@ import {
   MapPin,
   X,
   CheckCircle,
-  Loader
+  Loader,
+  Clipboard,
+  Check
 } from 'lucide-react';
 import { useGlobalState } from '../context/GlobalStateContext';
 import { 
@@ -428,6 +430,40 @@ const StockReceivingForm = () => {
     console.log('📦 Final groupedItems:', groups);
     return groups;
   }, [receivingItems, groupBarcodes]); // Added groupBarcodes as dependency
+
+  // Clipboard export (view-only mode): group by manufacturer + model + RAM + storage (color ignored),
+  // one bare IMEI1 (or Serial Number fallback) per line, blank line between groups.
+  const exportText = useMemo(() => {
+    const groups = new Map();
+
+    receivingItems.forEach((item) => {
+      const identifier = (item.imei1 || '').trim() || (item.serialNumber || '').trim();
+      if (!identifier) return; // skip units with neither IMEI1 nor Serial Number
+
+      const key = [item.manufacturer, item.model, item.ram, item.storage].join('|');
+      if (!groups.has(key)) {
+        const heading = `${item.manufacturer || ''} ${item.model || ''} ${item.ram || ''} / ${item.storage || ''}`
+          .replace(/\s+/g, ' ')
+          .trim();
+        groups.set(key, { heading, lines: [] });
+      }
+      groups.get(key).lines.push(identifier);
+    });
+
+    return Array.from(groups.values())
+      .filter((group) => group.lines.length > 0)
+      .map((group) => [group.heading, ...group.lines].join('\n'))
+      .join('\n\n');
+  }, [receivingItems]);
+
+  // Transient feedback for the Copy button: 'idle' | 'copied' | 'error'
+  const [copyStatus, setCopyStatus] = useState('idle');
+
+  useEffect(() => {
+    if (copyStatus === 'idle') return undefined;
+    const timer = setTimeout(() => setCopyStatus('idle'), 2000);
+    return () => clearTimeout(timer);
+  }, [copyStatus]);
 {/* Part 2 End - State and Data Setup */}
 
 {/* Part 3 Start - Handler Functions */}
@@ -852,6 +888,28 @@ const StockReceivingForm = () => {
     setActiveComponent('procurementmgmt');
   };
 
+  // Copy the grouped IMEI / serial list to the clipboard (view-only mode)
+  const handleCopyExport = async () => {
+    if (!exportText) {
+      setCopyStatus('error');
+      return;
+    }
+
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+      console.warn('Clipboard API is not available in this context');
+      setCopyStatus('error');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setCopyStatus('copied');
+    } catch (error) {
+      console.error('Failed to copy stock receiving export:', error);
+      setCopyStatus('error');
+    }
+  };
+
   // Format price with commas
   const formatPrice = (value) => {
     if (!value) return '0.00';
@@ -872,16 +930,44 @@ const StockReceivingForm = () => {
               <Package className="h-6 w-6 mr-2" />
               Stock Receiving {isViewOnly && '(View Only)'}
             </CardTitle>
-            
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center text-sm"
-              title="Cancel and return to procurement management"
-            >
-              <X className="h-4 w-4 mr-1" />
-              {isViewOnly ? 'Close' : 'Cancel'}
-            </button>
+
+            <div className="flex items-center gap-2">
+              {isViewOnly && (
+                <button
+                  type="button"
+                  onClick={handleCopyExport}
+                  className="px-4 py-2 min-w-[120px] justify-center bg-white text-[rgb(52,69,157)] rounded hover:bg-gray-100 flex items-center text-sm"
+                  title="Copy grouped IMEI / serial list to clipboard"
+                >
+                  {copyStatus === 'copied' ? (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Copied
+                    </>
+                  ) : copyStatus === 'error' ? (
+                    <>
+                      <X className="h-4 w-4 mr-1" />
+                      Copy failed
+                    </>
+                  ) : (
+                    <>
+                      <Clipboard className="h-4 w-4 mr-1" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center text-sm"
+                title="Cancel and return to procurement management"
+              >
+                <X className="h-4 w-4 mr-1" />
+                {isViewOnly ? 'Close' : 'Cancel'}
+              </button>
+            </div>
           </div>
         </CardHeader>
 
